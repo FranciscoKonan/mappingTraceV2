@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login | MappingTrace V2</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .auth-container {
+            max-width: 450px;
+            width: 100%;
+            background: white;
+            border-radius: 24px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+            overflow: hidden;
+            animation: slideUp 0.5s ease;
+        }
+        
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .auth-header {
+            background: linear-gradient(135deg, #2c6e49 0%, #4CAF50 100%);
+            color: white;
+            padding: 40px 30px;
+            text-align: center;
+        }
+        
+        .auth-header i { font-size: 56px; margin-bottom: 15px; }
+        .auth-header h1 { font-size: 28px; margin-bottom: 8px; }
+        .auth-header p { opacity: 0.9; font-size: 14px; }
+        
+        .auth-body { padding: 40px 30px; }
+        
+        .form-group { margin-bottom: 20px; }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #2d3748;
+            font-size: 14px;
+        }
+        
+        .form-group label i { margin-right: 8px; color: #2c6e49; }
+        
+        .form-group input {
+            width: 100%;
+            padding: 14px 16px;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            font-size: 15px;
+            transition: all 0.3s;
+        }
+        
+        .form-group input:focus {
+            border-color: #2c6e49;
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(44, 110, 73, 0.1);
+        }
+        
+        .password-field { position: relative; }
+        .password-field input { padding-right: 45px; }
+        
+        .password-toggle {
+            position: absolute;
+            right: 16px;
+            top: 50%;
+            transform: translateY(-50%);
+            cursor: pointer;
+            color: #718096;
+            transition: color 0.2s;
+        }
+        
+        .password-toggle:hover { color: #2c6e49; }
+        
+        .auth-btn {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #2c6e49 0%, #4CAF50 100%);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .auth-btn:hover { 
+            transform: translateY(-2px); 
+            box-shadow: 0 10px 20px rgba(44, 110, 73, 0.3);
+        }
+        
+        .auth-btn:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .auth-footer {
+            text-align: center;
+            margin-top: 24px;
+            padding-top: 20px;
+            border-top: 1px solid #edf2f7;
+        }
+        
+        .auth-footer a { color: #2c6e49; text-decoration: none; font-weight: 600; }
+        .auth-footer a:hover { text-decoration: underline; }
+        
+        .forgot-link { text-align: right; margin-top: -10px; margin-bottom: 20px; }
+        .forgot-link a { font-size: 13px; color: #718096; text-decoration: none; }
+        .forgot-link a:hover { color: #2c6e49; }
+        
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 20px;
+            border-radius: 8px;
+            color: white;
+            z-index: 9999;
+            animation: slideIn 0.3s ease;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        
+        .notification-success { background: #4CAF50; }
+        .notification-error { background: #F44336; }
+        .notification-warning { background: #FFC107; color: #333; }
+        .notification-info { background: #2196F3; }
+        
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        
+        @keyframes slideOut {
+            from { transform: translateX(0); opacity: 1; }
+            to { transform: translateX(100%); opacity: 0; }
+        }
+    </style>
+</head>
+<body>
+    <div class="auth-container">
+        <div class="auth-header">
+            <i class="fas fa-map-marked-alt"></i>
+            <h1>Welcome Back</h1>
+            <p>Sign in to your account</p>
+        </div>
+        
+        <div class="auth-body">
+            <form id="loginForm">
+                <div class="form-group">
+                    <label><i class="fas fa-envelope"></i> Email Address</label>
+                    <input type="email" id="email" placeholder="john@example.com" autocomplete="email" required>
+                </div>
+                
+                <div class="form-group">
+                    <label><i class="fas fa-lock"></i> Password</label>
+                    <div class="password-field">
+                        <input type="password" id="password" placeholder="Enter your password" autocomplete="current-password" required>
+                        <i class="fas fa-eye password-toggle" onclick="togglePassword()"></i>
+                    </div>
+                </div>
+                
+                <div class="forgot-link">
+                    <a href="forgot-password.html">Forgot password?</a>
+                </div>
+                
+                <button type="submit" class="auth-btn" id="loginBtn">
+                    <i class="fas fa-sign-in-alt"></i> Sign In
+                </button>
+            </form>
+            
+            <div class="auth-footer">
+                <p>Don't have an account? <a href="register.html">Create account</a></p>
+            </div>
+            <div class="auth-footer" style="margin-top: 12px; padding-top: 0; border-top: none;">
+                <p style="font-size: 12px; color: #94a3b8;">
+                    <i class="fas fa-shield-alt"></i> Secure login powered by Supabase
+                </p>
+            </div>
+        </div>
+    </div>
+    
+    <div id="notificationContainer"></div>
+    
+    <script>
+        const SUPABASE_URL = 'https://crvnohvudurqfukjpisv.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNydm5vaHZ1ZHVycWZ1a2pwaXN2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg0NTUxNzMsImV4cCI6MjA5NDAzMTE3M30.Qp8E57yAN4LnO4A-yirf-Z3QufGZw9OKjBfcQxG7fo8';
+        
+        let supabaseClient = null;
+        
+        function showNotification(message, type = 'info') {
+            const container = document.getElementById('notificationContainer');
+            const notification = document.createElement('div');
+            notification.className = `notification notification-${type}`;
+            const icon = type === 'success' ? 'fa-check-circle' : 
+                        type === 'error' ? 'fa-exclamation-circle' : 
+                        type === 'warning' ? 'fa-exclamation-triangle' : 'fa-info-circle';
+            notification.innerHTML = `<i class="fas ${icon}"></i> ${message}`;
+            container.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.style.animation = 'slideOut 0.3s ease';
+                setTimeout(() => notification.remove(), 300);
+            }, 4000);
+        }
+        
+        function togglePassword() {
+            const passwordInput = document.getElementById('password');
+            const icon = document.querySelector('.password-toggle');
+            if (passwordInput.type === 'password') {
+                passwordInput.type = 'text';
+                icon.classList.remove('fa-eye');
+                icon.classList.add('fa-eye-slash');
+            } else {
+                passwordInput.type = 'password';
+                icon.classList.remove('fa-eye-slash');
+                icon.classList.add('fa-eye');
+            }
+        }
+        
+        // Check if already logged in
+        async function checkExistingSession() {
+            try {
+                if (!supabaseClient) {
+                    supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+                }
+                const { data: { session } } = await supabaseClient.auth.getSession();
+                if (session) {
+                    // User is already logged in, redirect to index
+                    window.location.href = 'index.html';
+                }
+            } catch (error) {
+                console.error('Session check error:', error);
+            }
+        }
+        
+        // Handle login
+        async function handleLogin(event) {
+            event.preventDefault();
+            
+            const email = document.getElementById('email').value.trim();
+            const password = document.getElementById('password').value;
+            const loginBtn = document.getElementById('loginBtn');
+            
+            if (!email || !password) {
+                showNotification('Please enter both email and password', 'warning');
+                return;
+            }
+            
+            loginBtn.disabled = true;
+            loginBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Signing in...';
+            
+            try {
+                if (!supabaseClient) {
+                    supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+                }
+                
+                const { data, error } = await supabaseClient.auth.signInWithPassword({ 
+                    email: email, 
+                    password: password 
+                });
+                
+                if (error) throw error;
+                
+                if (data.session) {
+                    // Store user info in localStorage
+                    const user = data.user;
+                    const metadata = user.user_metadata || {};
+                    const fullName = metadata.full_name || metadata.first_name || user.email.split('@')[0];
+                    const role = metadata.role || 'field_officer';
+                    
+                    localStorage.setItem('mappingtrace_user', JSON.stringify({ 
+                        id: user.id, 
+                        email: user.email,
+                        fullName: fullName,
+                        role: role
+                    }));
+                    
+                    showNotification('Login successful! Redirecting...', 'success');
+                    
+                    setTimeout(() => { 
+                        window.location.href = 'index.html'; 
+                    }, 1500);
+                }
+            } catch (error) {
+                console.error('Login error:', error);
+                
+                let errorMessage = error.message;
+                if (errorMessage === 'Invalid login credentials') {
+                    errorMessage = 'Invalid email or password. Please try again.';
+                } else if (errorMessage.includes('Email not confirmed')) {
+                    errorMessage = 'Please verify your email address before logging in. Check your inbox.';
+                }
+                
+                showNotification(errorMessage, 'error');
+                loginBtn.disabled = false;
+                loginBtn.innerHTML = '<i class="fas fa-sign-in-alt"></i> Sign In';
+            }
+        }
+        
+        // Initialize Supabase and set up event listeners
+        function init() {
+            supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+            
+            // Check for email confirmation redirect
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.get('confirmed') === 'true') {
+                showNotification('Email confirmed! You can now log in.', 'success');
+            } else if (urlParams.get('registered') === 'true') {
+                const email = urlParams.get('email');
+                if (email) {
+                    document.getElementById('email').value = email;
+                }
+                showNotification('Account created! Please check your email to confirm your account.', 'info');
+            }
+            
+            // Set up form submit handler
+            const loginForm = document.getElementById('loginForm');
+            if (loginForm) {
+                loginForm.addEventListener('submit', handleLogin);
+            }
+            
+            // Check if already logged in
+            setTimeout(checkExistingSession, 500);
+        }
+        
+        // Make functions global for onclick handlers
+        window.togglePassword = togglePassword;
+        
+        // Start the app
+        init();
+    </script>
+</body>
+</html>

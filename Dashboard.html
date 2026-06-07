@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard | MappingTrace</title>
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css" />
+    
+    <link rel="stylesheet" href="globalCSS.css">
+    <link rel="stylesheet" href="layoutCSS.css">
+    <link rel="stylesheet" href="mapCSS.css">
+    <link rel="stylesheet" href="tableCSS.css">
+    <link rel="stylesheet" href="alertCSS.css">
+    
+    <link rel="icon" type="image/x-icon" href="assets/favicon.ico">
+    
+    <style>
+        .loading-spinner {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 20px 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+            z-index: 10000;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .data-mgmt-link {
+            margin-top: 16px;
+            border-top: 1px solid rgba(255,255,255,0.1);
+            padding-top: 16px;
+        }
+        .data-mgmt-link a {
+            background: rgba(44,110,73,0.3);
+        }
+        .project-selector-container {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-right: 20px;
+            position: relative;
+        }
+        .custom-dropdown {
+            position: relative;
+            min-width: 280px;
+        }
+        .dropdown-selected {
+            padding: 6px 12px;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            background: white;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .dropdown-menu {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            max-height: 300px;
+            overflow-y: auto;
+            display: none;
+            z-index: 1000;
+        }
+        .dropdown-menu.show {
+            display: block;
+        }
+        .dropdown-search {
+            padding: 8px;
+            border-bottom: 1px solid #e2e8f0;
+            position: sticky;
+            top: 0;
+            background: white;
+        }
+        .dropdown-search input {
+            width: 100%;
+            padding: 6px 10px;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            font-size: 12px;
+            outline: none;
+        }
+        .dropdown-item {
+            padding: 8px 12px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: background 0.2s;
+        }
+        .dropdown-item:hover {
+            background: #f1f5f9;
+        }
+        .dropdown-item.selected {
+            background: #dcfce7;
+            color: #166534;
+        }
+        .project-selector-container.hidden {
+            display: none;
+        }
+        .role-badge {
+            background: #e2e8f0;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 500;
+            margin-left: 10px;
+        }
+        .role-badge.owner { background: #dcfce7; color: #166534; }
+        .alert-item {
+            padding: 12px;
+            border-bottom: 1px solid #e2e8f0;
+            cursor: pointer;
+            border-left: 3px solid transparent;
+        }
+        .alert-item.critical { border-left-color: #dc2626; background: #fef2f2; }
+        .alert-item.high { border-left-color: #f97316; background: #fff7ed; }
+        .alert-item.medium { border-left-color: #eab308; background: #fefce8; }
+        .alert-item.low { border-left-color: #22c55e; background: #f0fdf4; }
+        .alert-title { font-weight: 600; font-size: 13px; margin-bottom: 4px; }
+        .alert-description { font-size: 11px; color: #64748b; }
+        .alerts-empty-state { text-align: center; padding: 40px 20px; color: #94a3b8; }
+        .alerts-empty-state i { font-size: 48px; margin-bottom: 16px; }
+        .alerts-count { background: #2c6e49; color: white; padding: 2px 8px; border-radius: 20px; font-size: 12px; }
+        .alerts-list { flex: 1; overflow-y: auto; padding: 10px; max-height: 350px; }
+    </style>
+</head>
+<body>
+    <div class="layout">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h2><i class="fas fa-map-marked-alt"></i><span>MappingTrace</span></h2>
+                <button class="sidebar-toggle" id="sidebarToggle"><i class="fas fa-bars"></i></button>
+            </div>
+            <nav class="menu">
+                <a href="#" class="active" data-page="dashboard"><i class="fas fa-tachometer-alt"></i><span>Dashboard</span></a>
+                <a href="#" data-page="live-mapping"><i class="fas fa-map"></i><span>Live Mapping</span></a>
+                <a href="#" data-page="submissions"><i class="fas fa-clipboard-list"></i><span>Submissions</span></a>
+                <a href="#" data-page="quality-alerts"><i class="fas fa-exclamation-triangle"></i><span>Quality Alerts</span></a>
+                <a href="#" data-page="exports"><i class="fas fa-file-export"></i><span>Exports</span></a>
+                <!-- Data Management Link - CORRECTED: same folder, no ../ -->
+                <div class="data-mgmt-link">
+                    <a href="DataManagement.html" id="dataMgmtLink"><i class="fas fa-database"></i><span>Data Management</span></a>
+                </div>
+                <div class="menu-bottom">
+                    <a href="#" id="logoutBtn"><i class="fas fa-sign-out-alt"></i><span>Logout</span></a>
+                </div>
+            </nav>
+        </aside>
+
+        <main class="main">
+            <header class="main-header">
+                <div class="header-title">
+                    <h1>Dashboard</h1>
+                    <div class="breadcrumb">Home / Dashboard</div>
+                </div>
+                <div class="user-info">
+                    <div class="project-selector-container hidden" id="projectSelectorContainer">
+                        <label><i class="fas fa-folder-open"></i> Project:</label>
+                        <div class="custom-dropdown" id="customDropdown">
+                            <div class="dropdown-selected" id="dropdownSelected">
+                                <span id="selectedProjectName">Loading...</span>
+                                <i class="fas fa-chevron-down"></i>
+                            </div>
+                            <div class="dropdown-menu" id="dropdownMenu">
+                                <div class="dropdown-search">
+                                    <input type="text" id="projectSearch" placeholder="Search projects...">
+                                </div>
+                                <div id="dropdownItems"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="user-avatar" id="userAvatar">JD</div>
+                    <div class="user-details">
+                        <div class="user-name" id="userName">User</div>
+                        <div class="user-role" id="userRole">Role</div>
+                    </div>
+                    <button class="sync-btn" id="syncKoboBtn"><i class="fas fa-sync-alt"></i> Sync</button>
+                </div>
+            </header>
+
+            <section class="kpis">
+                <div class="kpi"><div class="kpi-icon"><i class="fas fa-tractor"></i></div><div class="kpi-content"><h4>Farms Mapped</h4><p class="kpi-value" id="farmsCount">0</p></div></div>
+                <div class="kpi"><div class="kpi-icon"><i class="fas fa-vector-square"></i></div><div class="kpi-content"><h4>Total Area (ha)</h4><p class="kpi-value" id="totalArea">0</p></div></div>
+                <div class="kpi"><div class="kpi-icon"><i class="fas fa-th-large"></i></div><div class="kpi-content"><h4>Active Plots</h4><p class="kpi-value" id="activePlots">0</p></div></div>
+                <div class="kpi"><div class="kpi-icon"><i class="fas fa-exclamation-triangle"></i></div><div class="kpi-content"><h4>Quality Alerts</h4><p class="kpi-value" id="alertsCount">0</p></div></div>
+            </section>
+
+            <section class="map-alerts-grid">
+                <div class="map-container">
+                    <div class="map-header">
+                        <h3>LIVE MAP</h3>
+                        <div class="map-actions">
+                            <div class="base-layer-selector">
+                                <button class="map-action-btn active" onclick="setBaseLayer('satellite')"><i class="fas fa-satellite"></i> Satellite</button>
+                                <button class="map-action-btn" onclick="setBaseLayer('streets')"><i class="fas fa-road"></i> Streets</button>
+                                <button class="map-action-btn" onclick="setBaseLayer('terrain')"><i class="fas fa-mountain"></i> Terrain</button>
+                            </div>
+                            <button class="map-action-btn" onclick="refreshMapData()"><i class="fas fa-sync-alt"></i> Refresh</button>
+                        </div>
+                    </div>
+                    <div class="map-toolbar">
+                        <button class="map-btn" onclick="zoomIn()"><i class="fas fa-plus"></i></button>
+                        <button class="map-btn" onclick="zoomOut()"><i class="fas fa-minus"></i></button>
+                        <button class="map-btn" onclick="resetView()"><i class="fas fa-home"></i></button>
+                        <button class="map-btn" onclick="locateMe()"><i class="fas fa-location-crosshairs"></i></button>
+                        <button class="map-btn" onclick="toggleLegend()"><i class="fas fa-layer-group"></i></button>
+                        <button class="map-btn" onclick="zoomToAllFarms()"><i class="fas fa-globe"></i></button>
+                    </div>
+                    <div id="map"></div>
+                    <div class="map-overlay">
+                        <div class="map-search-box">
+                            <input type="text" id="mapSearch" placeholder="Search farm...">
+                            <button onclick="performSearch()"><i class="fas fa-search"></i></button>
+                        </div>
+                        <div class="map-stats">
+                            <span>Farms: <span id="mapFarmsCount">0</span></span>
+                            <span>Area: <span id="mapTotalArea">0 ha</span></span>
+                        </div>
+                    </div>
+                    <div class="map-legend" id="mapLegend" style="display: none;">
+                        <div class="legend-header"><h4>Legend</h4><button onclick="toggleLegend()">✕</button></div>
+                        <div class="legend-content">
+                            <div class="legend-item"><div class="legend-color" style="background:#4CAF50;"></div><span>Validated</span></div>
+                            <div class="legend-item"><div class="legend-color" style="background:#FFC107;"></div><span>Pending</span></div>
+                            <div class="legend-item"><div class="legend-color" style="background:#F44336;"></div><span>Rejected</span></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="alerts-container">
+                    <div class="alerts-header"><h3>Quality Alerts</h3><span class="alerts-count" id="alertsBadge">0</span></div>
+                    <div class="alerts-list" id="alertsList"><div class="alerts-empty-state"><i class="fas fa-check-circle"></i><h4>No Alerts</h4></div></div>
+                    <div class="alerts-footer"><button onclick="viewAllAlerts()" class="btn-secondary">View All</button><button onclick="refreshAlerts()" class="btn-primary">Refresh</button></div>
+                </div>
+            </section>
+
+            <section class="table-section">
+                <div class="table-header">
+                    <h3>Recent Submissions</h3>
+                    <div class="table-actions">
+                        <div class="search-box"><input type="text" id="tableSearch" placeholder="Search..."><button onclick="filterTable()"><i class="fas fa-search"></i></button></div>
+                        <select id="supplierFilter" class="filter-select"><option value="all">All Suppliers</option></select>
+                        <select id="statusFilter" class="filter-select"><option value="all">All Status</option></select>
+                        <button onclick="refreshTable()" class="btn-icon"><i class="fas fa-redo-alt"></i></button>
+                        <button onclick="exportTableData()" class="btn-icon"><i class="fas fa-download"></i></button>
+                    </div>
+                </div>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Farmer ID</th>
+                                <th>Farmer Name</th>
+                                <th>Cooperative</th>
+                                <th>Area (ha)</th>
+                                <th>Date</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tableBody">
+                            <tr><td colspan="7" style="text-align:center;padding:40px;">Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="table-footer">
+                    <div class="table-stats">Showing <span id="showingCount">0-0</span> of <span id="totalCount">0</span></div>
+                    <div class="pagination">
+                        <button onclick="prevPage()" class="pagination-btn" id="prevBtn" disabled><i class="fas fa-chevron-left"></i></button>
+                        <div class="page-numbers" id="pageNumbers"></div>
+                        <button onclick="nextPage()" class="pagination-btn" id="nextBtn"><i class="fas fa-chevron-right"></i></button>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <div id="loadingOverlay" class="loading-spinner" style="display: none;">
+        <i class="fas fa-spinner fa-spin"></i><span>Loading...</span>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
+
+    <script>
+        const SUPABASE_URL = 'https://crvnohvudurqfukjpisv.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNydm5vaHZ1ZHVycWZ1a2pwaXN2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg0NTUxNzMsImV4cCI6MjA5NDAzMTE3M30.Qp8E57yAN4LnO4A-yirf-Z3QufGZw9OKjBfcQxG7fo8';
+        
+        let supabaseClient, currentUser, currentProject, allUserProjects = [], farmsData = [], currentAlerts = [];
+        let currentMap = null, farmLayers = [];
+        
+        function updateNavigationLinks() {
+            const queryString = currentProject ? `?project=${currentProject.id}` : '';
+            document.querySelector('a[data-page="live-mapping"]').href = `LiveMapping/live-mapping.html${queryString}`;
+            document.querySelector('a[data-page="submissions"]').href = `Submissions/submissions.html${queryString}`;
+            document.querySelector('a[data-page="quality-alerts"]').href = `QualityAlerts/quality-alerts.html${queryString}`;
+            document.querySelector('a[data-page="exports"]').href = `Exports/exports.html${queryString}`;
+            
+            // CORRECTED: DataManagement.html is in the same folder (MapProject/)
+            const dataMgmtLink = document.getElementById('dataMgmtLink');
+            if (dataMgmtLink) {
+                dataMgmtLink.href = `DataManagement.html${queryString}`;
+            }
+        }
+        
+        async function init() {
+            supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+            await loadUserAndProjects();
+            setupDropdown();
+        }
+        
+        async function loadUserAndProjects() {
+            showLoading(true);
+            const { data: { session } } = await supabaseClient.auth.getSession();
+            if (!session) { window.location.href = '../login.html'; return; }
+            currentUser = session.user;
+            
+            const metadata = currentUser.user_metadata || {};
+            const firstName = metadata.first_name || '';
+            const fullName = metadata.full_name || firstName || currentUser.email.split('@')[0];
+            document.getElementById('userName').textContent = fullName;
+            document.getElementById('userAvatar').textContent = (firstName.charAt(0) || currentUser.email.charAt(0)).toUpperCase();
+            
+            const { data: memberships } = await supabaseClient
+                .from('project_members')
+                .select('project_id, role, projects(*)')
+                .eq('user_id', currentUser.id)
+                .eq('status', 'active');
+            
+            if (memberships && memberships.length > 0) {
+                allUserProjects = memberships;
+                const isOwner = memberships.some(m => m.role === 'owner');
+                document.getElementById('userRole').textContent = memberships[0].role.replace('_', ' ').toUpperCase();
+                
+                // Add role badge
+                const roleBadge = document.createElement('span');
+                roleBadge.className = `role-badge ${memberships[0].role}`;
+                roleBadge.textContent = memberships[0].role.toUpperCase();
+                document.querySelector('.user-info').insertBefore(roleBadge, document.querySelector('.sync-btn'));
+                
+                // Get project from URL
+                const urlParams = new URLSearchParams(window.location.search);
+                let projectIdFromUrl = urlParams.get('project');
+                
+                let targetProject = null;
+                
+                if (projectIdFromUrl && projectIdFromUrl !== 'all') {
+                    targetProject = memberships.find(m => m.projects.id === projectIdFromUrl);
+                    if (targetProject) {
+                        console.log('Found project:', targetProject.projects.name);
+                    } else {
+                        console.log('Project not found in user memberships');
+                        document.getElementById('pageContent').innerHTML = `
+                            <div style="text-align:center;padding:60px;background:white;border-radius:12px;">
+                                <i class="fas fa-lock" style="font-size:48px;color:#dc2626;"></i>
+                                <h3>Access Denied</h3>
+                                <p>You don't have permission to view this project.</p>
+                                <button onclick="window.location.href='Dashboard.html'" class="btn-primary" style="margin-top:16px;">Go to My Projects</button>
+                            </div>
+                        `;
+                        showLoading(false);
+                        return;
+                    }
+                }
+                
+                if (!targetProject) {
+                    const lastViewed = localStorage.getItem(`lastProject_${currentUser.id}`);
+                    if (lastViewed) targetProject = memberships.find(m => m.projects.id === lastViewed);
+                    if (!targetProject) targetProject = memberships[0];
+                }
+                
+                if (isOwner && memberships.length > 1) {
+                    document.getElementById('projectSelectorContainer').classList.remove('hidden');
+                    await populateDropdown(memberships);
+                }
+                
+                currentProject = targetProject.projects;
+                document.getElementById('selectedProjectName').innerHTML = `📁 ${currentProject.name}`;
+                await loadProjectData(currentProject.id);
+                localStorage.setItem(`lastProject_${currentUser.id}`, currentProject.id);
+                
+                const url = new URL(window.location);
+                url.searchParams.set('project', currentProject.id);
+                window.history.replaceState({}, '', url);
+                
+                updateNavigationLinks();
+            }
+            showLoading(false);
+        }
+        
+        async function populateDropdown(memberships) {
+            const container = document.getElementById('dropdownItems');
+            let html = `<div class="dropdown-item" data-value="all">📊 ALL PROJECTS</div>`;
+            for (const m of memberships) {
+                html += `<div class="dropdown-item" data-value="${m.projects.id}">📁 ${m.projects.name}</div>`;
+            }
+            container.innerHTML = html;
+            
+            document.querySelectorAll('.dropdown-item').forEach(item => {
+                item.addEventListener('click', () => {
+                    const value = item.dataset.value;
+                    document.getElementById('selectedProjectName').innerHTML = value === 'all' ? '📊 ALL PROJECTS' : `📁 ${item.textContent.slice(2)}`;
+                    document.getElementById('dropdownMenu').classList.remove('show');
+                    
+                    if (value === 'all') {
+                        loadAllProjectsData();
+                    } else {
+                        const selected = allUserProjects.find(p => p.projects.id === value);
+                        if (selected) {
+                            currentProject = selected.projects;
+                            loadProjectData(value);
+                            localStorage.setItem(`lastProject_${currentUser.id}`, value);
+                            updateNavigationLinks();
+                        }
+                    }
+                    
+                    const url = new URL(window.location);
+                    url.searchParams.set('project', value);
+                    window.history.pushState({}, '', url);
+                    
+                    document.querySelectorAll('.dropdown-item').forEach(i => i.classList.remove('selected'));
+                    item.classList.add('selected');
+                });
+            });
+        }
+        
+        function setupDropdown() {
+            const selected = document.getElementById('dropdownSelected');
+            const menu = document.getElementById('dropdownMenu');
+            const search = document.getElementById('projectSearch');
+            selected.addEventListener('click', (e) => { e.stopPropagation(); menu.classList.toggle('show'); if (menu.classList.contains('show')) { search.value = ''; filterDropdown(''); search.focus(); } });
+            search.addEventListener('input', (e) => filterDropdown(e.target.value.toLowerCase()));
+            document.addEventListener('click', () => menu.classList.remove('show'));
+        }
+        
+        function filterDropdown(term) {
+            document.querySelectorAll('.dropdown-item').forEach(item => {
+                item.style.display = item.textContent.toLowerCase().includes(term) ? 'block' : 'none';
+            });
+        }
+        
+        async function loadProjectData(projectId) {
+            showLoading(true);
+            const { data: farms } = await supabaseClient.from('farms').select('*').eq('project_id', projectId);
+            farmsData = farms || [];
+            updateKPIs(farmsData);
+            updateTable(farmsData);
+            updateMap(farmsData);
+            generateAlerts(farmsData);
+            updateAlerts(currentAlerts);
+            showLoading(false);
+            document.querySelector('.header-title h1').innerHTML = `Dashboard <span style="font-size:14px; background:#e2e8f0; padding:2px 10px; border-radius:20px;">${currentProject.name}</span>`;
+        }
+        
+        async function loadAllProjectsData() {
+            showLoading(true);
+            let allFarms = [];
+            for (const m of allUserProjects) {
+                const { data: farms } = await supabaseClient.from('farms').select('*').eq('project_id', m.projects.id);
+                if (farms) allFarms = [...allFarms, ...farms];
+            }
+            farmsData = allFarms;
+            updateKPIs(allFarms);
+            updateTable(allFarms);
+            updateMap(allFarms);
+            generateAlerts(allFarms);
+            updateAlerts(currentAlerts);
+            showLoading(false);
+            document.querySelector('.header-title h1').innerHTML = 'Dashboard <span style="font-size:14px; background:#e2e8f0; padding:2px 10px; border-radius:20px;">ALL PROJECTS</span>';
+        }
+        
+        function generateAlerts(farms) {
+            const alerts = [];
+            const geoFarms = farms.filter(f => f.geometry?.coordinates);
+            for (let i = 0; i < geoFarms.length; i++) {
+                for (let j = i+1; j < geoFarms.length; j++) {
+                    try {
+                        const poly1 = turf.polygon(geoFarms[i].geometry.coordinates);
+                        const poly2 = turf.polygon(geoFarms[j].geometry.coordinates);
+                        if (turf.booleanIntersects(poly1, poly2)) {
+                            const intersection = turf.intersect(poly1, poly2);
+                            if (intersection) {
+                                const area = turf.area(intersection) / 10000;
+                                if (area > 0.01) {
+                                    let severity = area > 5 ? 'critical' : area > 3 ? 'high' : area > 1 ? 'medium' : 'low';
+                                    alerts.push({ title: `${severity.toUpperCase()} Overlap: ${area.toFixed(1)}ha`, description: `Farm "${geoFarms[i].farmer_name}" overlaps with "${geoFarms[j].farmer_name}"`, severity });
+                                }
+                            }
+                        }
+                    } catch(e) {}
+                }
+            }
+            farms.forEach(f => { if (f.area === 0 && f.geometry) alerts.push({ title: 'Zero Area Detected', description: `Farm "${f.farmer_name}" has zero area`, severity: 'medium' }); });
+            currentAlerts = alerts;
+        }
+        
+        function updateAlerts(alerts) {
+            const list = document.getElementById('alertsList');
+            const badge = document.getElementById('alertsBadge');
+            const kpi = document.getElementById('alertsCount');
+            badge.textContent = alerts.length;
+            kpi.textContent = alerts.length;
+            if (alerts.length === 0) { list.innerHTML = '<div class="alerts-empty-state"><i class="fas fa-check-circle"></i><h4>No Alerts</h4></div>'; return; }
+            list.innerHTML = alerts.map(a => `<div class="alert-item ${a.severity}"><div class="alert-title">${a.title}</div><div class="alert-description">${a.description}</div></div>`).join('');
+        }
+        
+        function updateKPIs(farms) {
+            document.getElementById('farmsCount').textContent = farms.length;
+            document.getElementById('totalArea').textContent = farms.reduce((s,f) => s + (f.area || 0), 0).toFixed(1);
+            document.getElementById('activePlots').textContent = farms.filter(f => f.status === 'validated').length;
+            document.getElementById('mapFarmsCount').textContent = farms.length;
+            document.getElementById('mapTotalArea').textContent = farms.reduce((s,f) => s + (f.area || 0), 0).toFixed(1) + ' ha';
+        }
+        
+        function updateTable(farms) {
+            const tbody = document.getElementById('tableBody');
+            const recent = [...farms].sort((a,b) => new Date(b.created_at) - new Date(a.created_at)).slice(0,10);
+            if (recent.length === 0) { tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:40px;">No farms found</td></tr>'; return; }
+            tbody.innerHTML = recent.map(f => `<tr><td>${f.farmer_id || f.id.slice(0,8)}</td><td>${f.farmer_name || 'Unknown'}</td><td>${f.cooperative || '-'}</td><td>${f.area || 0}</td><td>${new Date(f.created_at).toLocaleDateString()}</td><td><span class="status-badge ${f.status || 'pending'}">${f.status || 'pending'}</span></td><td><button class="action-btn view" onclick="viewFarm('${f.id}')"><i class="fas fa-eye"></i></button></td></tr>`).join('');
+            document.getElementById('showingCount').textContent = `1-${Math.min(10, recent.length)}`;
+            document.getElementById('totalCount').textContent = farms.length;
+        }
+        
+        function convertCoords(c) {
+            if (!c || !Array.isArray(c)) return c;
+            if (c.length === 2 && typeof c[0] === 'number') return [c[1], c[0]];
+            return c.map(convertCoords);
+        }
+        
+        function updateMap(farms) {
+            if (currentMap) currentMap.remove();
+            currentMap = L.map('map').setView([7.539989, -5.547080], 7);
+            L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', { maxZoom: 20, subdomains: ['mt0','mt1','mt2','mt3'] }).addTo(currentMap);
+            farmLayers = [];
+            let bounds = L.latLngBounds();
+            farms.forEach(farm => {
+                if (farm.geometry?.coordinates) {
+                    try {
+                        const coords = convertCoords(farm.geometry.coordinates);
+                        const color = farm.status === 'validated' ? '#4CAF50' : farm.status === 'pending' ? '#FFC107' : '#F44336';
+                        const poly = L.polygon(coords, { color, weight: 2, fillColor: color, fillOpacity: 0.3 }).addTo(currentMap);
+                        poly.bindPopup(`<b>${farm.farmer_name}</b><br>Area: ${farm.area} ha`);
+                        farmLayers.push(poly);
+                        bounds.extend(poly.getBounds());
+                    } catch(e) {}
+                }
+            });
+            if (bounds.isValid()) currentMap.fitBounds(bounds, { padding: [50,50] });
+        }
+        
+        function showLoading(show) {
+            document.getElementById('loadingOverlay').style.display = show ? 'flex' : 'none';
+        }
+        
+        window.viewFarm = (id) => { const f = farmsData.find(f => f.id === id); alert(`Farm: ${f?.farmer_name}\nArea: ${f?.area} ha\nStatus: ${f?.status}`); };
+        window.viewAllAlerts = () => alert('Alerts: ' + currentAlerts.length);
+        window.refreshAlerts = () => { if (currentProject) loadProjectData(currentProject.id); };
+        window.setBaseLayer = (type) => {
+            if (!currentMap) return;
+            currentMap.eachLayer(l => { if (l instanceof L.TileLayer) currentMap.removeLayer(l); });
+            if (type === 'satellite') L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', { maxZoom: 20, subdomains: ['mt0','mt1','mt2','mt3'] }).addTo(currentMap);
+            else if (type === 'streets') L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(currentMap);
+            else L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', { maxZoom: 17 }).addTo(currentMap);
+        };
+        window.zoomIn = () => currentMap?.zoomIn();
+        window.zoomOut = () => currentMap?.zoomOut();
+        window.resetView = () => currentMap?.setView([7.539989, -5.547080], 7);
+        window.locateMe = () => currentMap?.locate({setView: true});
+        window.zoomToAllFarms = () => { if (farmLayers.length) { let b = L.latLngBounds(); farmLayers.forEach(l => b.extend(l.getBounds())); currentMap?.fitBounds(b); } };
+        window.toggleLegend = () => { const l = document.getElementById('mapLegend'); l.style.display = l.style.display === 'none' ? 'block' : 'none'; };
+        window.performSearch = () => {
+            const term = document.getElementById('mapSearch').value.toLowerCase();
+            for (let layer of farmLayers) {
+                if (layer.farmData?.farmer_name?.toLowerCase().includes(term)) {
+                    currentMap?.fitBounds(layer.getBounds());
+                    layer.setStyle({ weight: 4, color: '#FF5722' });
+                    setTimeout(() => layer.setStyle({ weight: 2 }), 2000);
+                    break;
+                }
+            }
+        };
+        window.refreshMapData = () => { if (currentProject) loadProjectData(currentProject.id); };
+        window.refreshTable = () => { if (currentProject) loadProjectData(currentProject.id); };
+        window.exportTableData = () => alert('Export feature available');
+        window.filterTable = () => {};
+        
+        document.getElementById('logoutBtn')?.addEventListener('click', async () => {
+            await supabaseClient.auth.signOut();
+            localStorage.clear();
+            window.location.href = '../login.html';
+        });
+        
+        init();
+    </script>
+</body>
+</html>

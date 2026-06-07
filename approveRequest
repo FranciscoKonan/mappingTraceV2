@@ -1,0 +1,75 @@
+window.approveRequest = async function(requestId, userId, role) {
+    if (!confirm(`Approve this user's request for ${role} role?`)) return;
+    
+    const approveBtn = event?.target;
+    if (approveBtn) {
+        approveBtn.disabled = true;
+        approveBtn.textContent = 'Approving...';
+    }
+    
+    try {
+        // First, check if user is already a member
+        const { data: existingMember } = await supabaseClient
+            .from('project_members')
+            .select('id')
+            .eq('project_id', currentProject.id)
+            .eq('user_id', userId)
+            .maybeSingle();
+        
+        if (existingMember) {
+            alert('User is already a member of this project!');
+            // Update request status anyway
+            await supabaseClient
+                .from('access_requests')
+                .update({ 
+                    status: 'approved', 
+                    reviewed_by: currentUser.id, 
+                    reviewed_at: new Date().toISOString() 
+                })
+                .eq('id', requestId);
+            
+            // Refresh the requests page
+            await loadRequestsPage();
+            return;
+        }
+        
+        // Add user to project members
+        const { error: insertError } = await supabaseClient
+            .from('project_members')
+            .insert({
+                project_id: currentProject.id,
+                user_id: userId,
+                role: role,
+                granted_by: currentUser.id,
+                status: 'active'
+            });
+        
+        if (insertError) throw insertError;
+        
+        // Update request status
+        const { error: updateError } = await supabaseClient
+            .from('access_requests')
+            .update({ 
+                status: 'approved', 
+                reviewed_by: currentUser.id, 
+                reviewed_at: new Date().toISOString() 
+            })
+            .eq('id', requestId);
+        
+        if (updateError) throw updateError;
+        
+        alert('Request approved! User has been added to the project.');
+        
+        // Refresh the current page (Access Requests) to remove the approved request
+        await loadRequestsPage();
+        
+    } catch (error) {
+        console.error('Error approving request:', error);
+        alert('Error: ' + error.message);
+    } finally {
+        if (approveBtn) {
+            approveBtn.disabled = false;
+            approveBtn.textContent = 'Approve';
+        }
+    }
+};

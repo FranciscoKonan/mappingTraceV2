@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Project Analytics | MappingTrace</title>
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Inter', sans-serif; background: #f0f2f5; color: #1a1a2e; }
+        
+        /* Modern Header */
+        .top-bar { background: white; box-shadow: 0 2px 10px rgba(0,0,0,0.05); padding: 16px 32px; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 100; }
+        .back-btn { background: #f0f2f5; border: none; padding: 10px 20px; border-radius: 10px; cursor: pointer; display: flex; align-items: center; gap: 8px; font-weight: 500; transition: all 0.2s; }
+        .back-btn:hover { background: #e4e6e9; transform: translateX(-2px); }
+        .project-name { font-size: 22px; font-weight: 700; background: linear-gradient(135deg, #2c6e49, #4CAF50); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        
+        .main-content { padding: 32px; max-width: 1600px; margin: 0 auto; }
+        
+        /* Period Banner */
+        .period-banner { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); border-radius: 20px; padding: 24px 32px; margin-bottom: 32px; color: white; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 20px; }
+        .period-info h3 { font-size: 14px; font-weight: 500; opacity: 0.8; margin-bottom: 8px; }
+        .period-info h2 { font-size: 28px; font-weight: 700; margin-bottom: 4px; }
+        .period-info p { opacity: 0.7; font-size: 14px; }
+        .period-stats { display: flex; gap: 40px; }
+        .period-stat { text-align: center; }
+        .period-stat .value { font-size: 32px; font-weight: 800; }
+        .period-stat .label { font-size: 12px; opacity: 0.7; margin-top: 4px; }
+        .progress-circle { width: 80px; height: 80px; }
+        
+        /* Stats Grid */
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 24px; margin-bottom: 32px; }
+        .stat-card { background: white; border-radius: 20px; padding: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); transition: transform 0.2s, box-shadow 0.2s; }
+        .stat-card:hover { transform: translateY(-4px); box-shadow: 0 12px 24px rgba(0,0,0,0.1); }
+        .stat-card h3 { font-size: 16px; font-weight: 600; color: #64748b; margin-bottom: 20px; display: flex; align-items: center; gap: 8px; }
+        .stat-card h3 i { color: #2c6e49; }
+        
+        /* KPI Cards */
+        .kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 32px; }
+        .kpi-card { background: white; border-radius: 20px; padding: 20px; display: flex; align-items: center; gap: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+        .kpi-icon { width: 56px; height: 56px; background: linear-gradient(135deg, #2c6e49, #4CAF50); border-radius: 16px; display: flex; align-items: center; justify-content: center; color: white; font-size: 24px; }
+        .kpi-content h4 { font-size: 13px; color: #64748b; margin-bottom: 4px; }
+        .kpi-content .value { font-size: 28px; font-weight: 800; color: #1a1a2e; }
+        .kpi-content .trend { font-size: 12px; margin-top: 4px; }
+        .trend.up { color: #22c55e; }
+        .trend.down { color: #ef4444; }
+        
+        .chart-container { height: 280px; position: relative; margin-top: 16px; }
+        
+        /* Gantt Chart */
+        .gantt-container { overflow-x: auto; margin-top: 20px; }
+        .gantt-chart { min-width: 800px; }
+        .gantt-header { display: flex; background: #f8fafc; border-radius: 12px 12px 0 0; font-weight: 600; }
+        .gantt-label-header { width: 220px; padding: 14px 16px; }
+        .gantt-timeline-header { flex: 1; padding: 14px 0; position: relative; }
+        .gantt-row { display: flex; border-bottom: 1px solid #e2e8f0; transition: background 0.2s; }
+        .gantt-row:hover { background: #f8fafc; }
+        .gantt-label { width: 220px; padding: 12px 16px; font-weight: 500; }
+        .gantt-label small { font-size: 11px; color: #64748b; font-weight: normal; }
+        .gantt-bars { flex: 1; position: relative; padding: 8px 0; min-height: 48px; }
+        .gantt-bar { position: absolute; height: 32px; background: linear-gradient(90deg, #2c6e49, #4CAF50); border-radius: 8px; display: flex; align-items: center; padding: 0 10px; color: white; font-size: 11px; font-weight: 500; cursor: pointer; transition: all 0.2s; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
+        .gantt-bar:hover { transform: scaleY(1.05); filter: brightness(1.05); }
+        .gantt-bar.completed { background: linear-gradient(90deg, #22c55e, #4ade80); }
+        .gantt-bar.active { background: linear-gradient(90deg, #eab308, #fbbf24); }
+        
+        .filter-bar { background: white; border-radius: 16px; padding: 20px 24px; margin-bottom: 24px; display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-end; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+        .filter-group { display: flex; flex-direction: column; gap: 6px; }
+        .filter-group label { font-size: 12px; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; }
+        .filter-select, .filter-input { padding: 10px 14px; border: 1px solid #e2e8f0; border-radius: 10px; font-family: inherit; font-size: 14px; min-width: 180px; transition: all 0.2s; }
+        .filter-select:focus, .filter-input:focus { outline: none; border-color: #2c6e49; box-shadow: 0 0 0 3px rgba(44,110,73,0.1); }
+        
+        .btn-primary { background: linear-gradient(135deg, #2c6e49, #4CAF50); color: white; border: none; padding: 10px 24px; border-radius: 10px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 6px 14px rgba(44,110,73,0.3); }
+        .btn-secondary { background: #f1f5f9; color: #475569; border: none; padding: 10px 24px; border-radius: 10px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+        .btn-secondary:hover { background: #e2e8f0; }
+        
+        .export-btn { background: white; border: 1px solid #e2e8f0; padding: 10px 20px; border-radius: 10px; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: all 0.2s; }
+        .export-btn:hover { background: #f8fafc; border-color: #2c6e49; }
+        
+        .loading-spinner { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 24px 32px; border-radius: 20px; box-shadow: 0 20px 40px rgba(0,0,0,0.2); z-index: 10000; display: flex; align-items: center; gap: 16px; }
+        .user-avatar { width: 40px; height: 40px; background: linear-gradient(135deg, #2c6e49, #4CAF50); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; }
+        .role-badge { background: #e2e8f0; padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 600; margin-left: 10px; }
+        
+        @media (max-width: 768px) {
+            .main-content { padding: 16px; }
+            .kpi-row { grid-template-columns: repeat(2, 1fr); }
+            .period-banner { flex-direction: column; text-align: center; }
+            .period-stats { justify-content: center; }
+            .filter-group { width: 100%; }
+            .filter-select, .filter-input { width: 100%; }
+        }
+    </style>
+</head>
+<body>
+<div class="top-bar">
+    <div style="display: flex; align-items: center; gap: 20px;">
+        <button class="back-btn" onclick="goBack()"><i class="fas fa-arrow-left"></i> Back</button>
+        <span class="project-name" id="projectName">Loading...</span>
+        <span class="role-badge" id="roleBadge"></span>
+    </div>
+    <div style="display: flex; align-items: center; gap: 20px;">
+        <button class="export-btn" onclick="exportStatistics()"><i class="fas fa-download"></i> Export Report</button>
+        <div class="user-avatar" id="userAvatar">JD</div>
+        <span id="userName">User</span>
+        <button id="logoutBtn" style="background:none;border:none;cursor:pointer;font-size:18px;"><i class="fas fa-sign-out-alt"></i></button>
+    </div>
+</div>
+
+<div class="main-content">
+    <!-- Period Banner -->
+    <div class="period-banner" id="periodBanner">
+        <div class="period-info">
+            <h3><i class="fas fa-calendar-alt"></i> PROJECT PERIOD</h3>
+            <h2 id="periodRange">Loading...</h2>
+            <p id="periodDuration">Loading...</p>
+        </div>
+        <div class="period-stats">
+            <div class="period-stat">
+                <div class="value" id="elapsedDays">0</div>
+                <div class="label">Days Elapsed</div>
+            </div>
+            <div class="period-stat">
+                <div class="value" id="remainingDays">0</div>
+                <div class="label">Days Remaining</div>
+            </div>
+            <div class="period-stat">
+                <div class="value" id="completionPercent">0%</div>
+                <div class="label">Completion</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filter Bar -->
+    <div class="filter-bar">
+        <div class="filter-group">
+            <label><i class="fas fa-user-check"></i> ENUMERATOR</label>
+            <select id="enumeratorFilter" class="filter-select"><option value="all">All Enumerators</option></select>
+        </div>
+        <div class="filter-group">
+            <label><i class="fas fa-building"></i> COOPERATIVE</label>
+            <select id="cooperativeFilter" class="filter-select"><option value="all">All Cooperatives</option></select>
+        </div>
+        <div class="filter-group">
+            <label><i class="fas fa-calendar-week"></i> DATE RANGE</label>
+            <input type="date" id="startDate" class="filter-input" placeholder="Start Date">
+        </div>
+        <div class="filter-group">
+            <label><i class="fas fa-calendar-week"></i> TO</label>
+            <input type="date" id="endDate" class="filter-input" placeholder="End Date">
+        </div>
+        <div class="filter-group">
+            <button class="btn-primary" onclick="applyFilters()"><i class="fas fa-chart-line"></i> Apply</button>
+        </div>
+        <div class="filter-group">
+            <button class="btn-secondary" onclick="resetFilters()"><i class="fas fa-undo"></i> Reset</button>
+        </div>
+    </div>
+
+    <!-- KPI Cards -->
+    <div class="kpi-row">
+        <div class="kpi-card">
+            <div class="kpi-icon"><i class="fas fa-tractor"></i></div>
+            <div class="kpi-content">
+                <h4>Total Farms</h4>
+                <div class="value" id="totalFarms">0</div>
+                <div class="trend up" id="farmsTrend">+0 this period</div>
+            </div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-icon"><i class="fas fa-vector-square"></i></div>
+            <div class="kpi-content">
+                <h4>Total Area (ha)</h4>
+                <div class="value" id="totalArea">0</div>
+                <div class="trend" id="areaTrend">0 ha this period</div>
+            </div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-icon"><i class="fas fa-users"></i></div>
+            <div class="kpi-content">
+                <h4>Active Enumerators</h4>
+                <div class="value" id="activeEnumerators">0</div>
+                <div class="trend" id="enumeratorTrend">out of <span id="totalEnumerators">0</span></div>
+            </div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-icon"><i class="fas fa-chart-line"></i></div>
+            <div class="kpi-content">
+                <h4>Avg Daily Submissions</h4>
+                <div class="value" id="avgDaily">0</div>
+                <div class="trend" id="dailyTrend">farms/day</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts Grid -->
+    <div class="stats-grid">
+        <div class="stat-card">
+            <h3><i class="fas fa-chart-bar"></i> Submissions by Enumerator</h3>
+            <div class="chart-container"><canvas id="enumeratorChart"></canvas></div>
+        </div>
+        <div class="stat-card">
+            <h3><i class="fas fa-chart-pie"></i> Area by Cooperative</h3>
+            <div class="chart-container"><canvas id="cooperativePieChart"></canvas></div>
+        </div>
+        <div class="stat-card">
+            <h3><i class="fas fa-chart-line"></i> Submission Trend</h3>
+            <div class="chart-container"><canvas id="timelineChart"></canvas></div>
+        </div>
+    </div>
+
+    <div class="stats-grid">
+        <div class="stat-card">
+            <h3><i class="fas fa-chart-bar"></i> Enumerator Performance by Cooperative</h3>
+            <div class="chart-container" style="height: 350px;"><canvas id="enumeratorCooperativeCanvas"></canvas></div>
+        </div>
+        <div class="stat-card">
+            <h3><i class="fas fa-gantt"></i> Enumerator Timeline (Gantt Chart)</h3>
+            <div class="gantt-container" id="ganttContainer"><div style="text-align:center;padding:40px;">Loading...</div></div>
+        </div>
+    </div>
+</div>
+
+<div id="loadingOverlay" class="loading-spinner" style="display: none;">
+    <i class="fas fa-spinner fa-spin"></i><span>Loading analytics...</span>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://crvnohvudurqfukjpisv.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNydm5vaHZ1ZHVycWZ1a2pwaXN2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg0NTUxNzMsImV4cCI6MjA5NDAzMTE3M30.Qp8E57yAN4LnO4A-yirf-Z3QufGZw9OKjBfcQxG7fo8';
+
+let supabaseClient, currentUser, currentProject, allFarms = [];
+let enumeratorChart, cooperativePieChart, timelineChart, enumeratorCooperativeChart = null;
+
+function getProjectIdFromUrl() {
+    const urlParams = new URLSearchParams(window.location.search);
+    return urlParams.get('project');
+}
+
+async function init() {
+    supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    await loadUser();
+    await loadProject();
+    await loadStatistics();
+}
+
+async function loadUser() {
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (!session) { window.location.href = 'login.html'; return; }
+    currentUser = session.user;
+    const { data: profile } = await supabaseClient.from('user_profiles').select('first_name, email').eq('id', currentUser.id).maybeSingle();
+    const firstName = profile?.first_name || '';
+    document.getElementById('userName').textContent = firstName || currentUser.email.split('@')[0];
+    document.getElementById('userAvatar').textContent = (firstName.charAt(0) || currentUser.email.charAt(0)).toUpperCase();
+}
+
+async function loadProject() {
+    const projectId = getProjectIdFromUrl();
+    if (!projectId) { window.location.href = 'Dashboard.html'; return; }
+    const { data: project } = await supabaseClient.from('projects').select('*').eq('id', projectId).single();
+    if (project) {
+        currentProject = project;
+        document.getElementById('projectName').textContent = project.name;
+        updatePeriodBanner(project);
+    }
+}
+
+function updatePeriodBanner(project) {
+    const startDate = new Date(project.created_at);
+    const today = new Date();
+    const endDate = project.end_date ? new Date(project.end_date) : new Date(startDate.getTime() + 90 * 24 * 60 * 60 * 1000);
+    
+    const elapsed = Math.max(0, Math.floor((today - startDate) / (1000 * 60 * 60 * 24)));
+    const total = Math.max(1, Math.floor((endDate - startDate) / (1000 * 60 * 60 * 24)));
+    const remaining = Math.max(0, total - elapsed);
+    const percent = Math.min(100, Math.floor((elapsed / total) * 100));
+    
+    document.getElementById('periodRange').innerHTML = `${startDate.toLocaleDateString()} - ${endDate.toLocaleDateString()}`;
+    document.getElementById('periodDuration').innerHTML = `${total} days total project duration`;
+    document.getElementById('elapsedDays').innerHTML = elapsed;
+    document.getElementById('remainingDays').innerHTML = remaining;
+    document.getElementById('completionPercent').innerHTML = `${percent}%`;
+}
+
+async function loadStatistics() {
+    showLoading(true);
+    const projectId = getProjectIdFromUrl();
+    if (!projectId) return;
+    const { data: farms } = await supabaseClient.from('farms').select('*').eq('project_id', projectId);
+    allFarms = farms || [];
+    populateFilters();
+    updateAllCharts();
+    showLoading(false);
+}
+
+function populateFilters() {
+    const enumerators = [...new Set(allFarms.map(f => f.enumerator).filter(e => e && e !== 'null'))];
+    const cooperatives = [...new Set(allFarms.map(f => f.cooperative).filter(c => c && c !== 'null'))];
+    document.getElementById('enumeratorFilter').innerHTML = '<option value="all">All Enumerators</option>' + enumerators.map(e => `<option value="${e}">${e}</option>`).join('');
+    document.getElementById('cooperativeFilter').innerHTML = '<option value="all">All Cooperatives</option>' + cooperatives.map(c => `<option value="${c}">${c}</option>`).join('');
+}
+
+function getFilteredFarms() {
+    let filtered = [...allFarms];
+    const enumerator = document.getElementById('enumeratorFilter').value;
+    const cooperative = document.getElementById('cooperativeFilter').value;
+    const startDate = document.getElementById('startDate').value;
+    const endDate = document.getElementById('endDate').value;
+    if (enumerator !== 'all') filtered = filtered.filter(f => f.enumerator === enumerator);
+    if (cooperative !== 'all') filtered = filtered.filter(f => f.cooperative === cooperative);
+    if (startDate) filtered = filtered.filter(f => new Date(f.created_at) >= new Date(startDate));
+    if (endDate) filtered = filtered.filter(f => new Date(f.created_at) <= new Date(endDate));
+    return filtered;
+}
+
+function updateAllCharts() {
+    const filtered = getFilteredFarms();
+    updateKPIs(filtered);
+    updateEnumeratorChart(filtered);
+    updateCooperativePieChart(filtered);
+    updateTimelineChart(filtered);
+    updateEnumeratorCooperativeChart(filtered);
+    updateGanttChart(filtered);
+}
+
+function updateKPIs(filtered) {
+    const total = filtered.length;
+    const totalArea = filtered.reduce((s, f) => s + (f.area || 0), 0);
+    const uniqueEnumerators = [...new Set(filtered.map(f => f.enumerator).filter(e => e && e !== 'null'))];
+    const allEnumerators = [...new Set(allFarms.map(f => f.enumerator).filter(e => e && e !== 'null'))];
+    const activeCount = uniqueEnumerators.length;
+    const avgDaily = filtered.length > 0 ? (filtered.length / 30).toFixed(1) : 0;
+    document.getElementById('totalFarms').innerHTML = total;
+    document.getElementById('totalArea').innerHTML = totalArea.toFixed(1);
+    document.getElementById('activeEnumerators').innerHTML = activeCount;
+    document.getElementById('totalEnumerators').innerHTML = allEnumerators.length;
+    document.getElementById('avgDaily').innerHTML = avgDaily;
+}
+
+function updateEnumeratorChart(filtered) {
+    const counts = {};
+    filtered.forEach(f => { const name = f.enumerator || 'Unknown'; counts[name] = (counts[name] || 0) + 1; });
+    const ctx = document.getElementById('enumeratorChart').getContext('2d');
+    if (enumeratorChart) enumeratorChart.destroy();
+    enumeratorChart = new Chart(ctx, { type: 'bar', data: { labels: Object.keys(counts), datasets: [{ label: 'Submissions', data: Object.values(counts), backgroundColor: '#2c6e49', borderRadius: 8 }] }, options: { responsive: true, maintainAspectRatio: false } });
+}
+
+function updateCooperativePieChart(filtered) {
+    const areas = {};
+    filtered.forEach(f => { const name = f.cooperative || 'Unknown'; areas[name] = (areas[name] || 0) + (f.area || 0); });
+    const ctx = document.getElementById('cooperativePieChart').getContext('2d');
+    if (cooperativePieChart) cooperativePieChart.destroy();
+    cooperativePieChart = new Chart(ctx, { type: 'pie', data: { labels: Object.keys(areas), datasets: [{ data: Object.values(areas), backgroundColor: ['#2c6e49', '#4CAF50', '#8BC34A', '#CDDC39', '#FFC107', '#FF9800'] }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { tooltip: { callbacks: { label: (ctx) => `${ctx.label}: ${ctx.raw.toFixed(1)} ha` } } } } });
+}
+
+function updateTimelineChart(filtered) {
+    const daily = {};
+    filtered.forEach(f => { const date = new Date(f.created_at).toLocaleDateString(); daily[date] = (daily[date] || 0) + 1; });
+    const sorted = Object.keys(daily).sort((a, b) => new Date(a) - new Date(b));
+    const ctx = document.getElementById('timelineChart').getContext('2d');
+    if (timelineChart) timelineChart.destroy();
+    timelineChart = new Chart(ctx, { type: 'line', data: { labels: sorted, datasets: [{ label: 'Daily Submissions', data: sorted.map(d => daily[d]), borderColor: '#2c6e49', backgroundColor: 'rgba(44,110,73,0.1)', fill: true, tension: 0.3 }] }, options: { responsive: true, maintainAspectRatio: false } });
+}
+
+function updateEnumeratorCooperativeChart(filtered) {
+    const matrix = {};
+    filtered.forEach(f => {
+        const enumName = f.enumerator || 'Unknown';
+        const coopName = f.cooperative || 'Unknown';
+        if (!matrix[enumName]) matrix[enumName] = {};
+        matrix[enumName][coopName] = (matrix[enumName][coopName] || 0) + 1;
+    });
+    const enumerators = Object.keys(matrix);
+    const cooperatives = [...new Set(filtered.map(f => f.cooperative || 'Unknown'))];
+    const datasets = cooperatives.map((coop, i) => ({ label: coop, data: enumerators.map(e => matrix[e][coop] || 0), backgroundColor: `hsl(${i * 360 / cooperatives.length}, 70%, 55%)` }));
+    const ctx = document.getElementById('enumeratorCooperativeCanvas').getContext('2d');
+    if (enumeratorCooperativeChart) enumeratorCooperativeChart.destroy();
+    enumeratorCooperativeChart = new Chart(ctx, { type: 'bar', data: { labels: enumerators, datasets }, options: { responsive: true, maintainAspectRatio: true, scales: { x: { stacked: true }, y: { stacked: true, title: { display: true, text: 'Number of Farms' } } } } });
+}
+
+function updateGanttChart(filtered) {
+    const work = {};
+    filtered.forEach(f => {
+        const name = f.enumerator || 'Unknown';
+        const date = new Date(f.created_at);
+        if (!work[name]) work[name] = { first: date, last: date, count: 0 };
+        work[name].first = new Date(Math.min(work[name].first, date));
+        work[name].last = new Date(Math.max(work[name].last, date));
+        work[name].count++;
+    });
+    const allDates = Object.values(work).flatMap(w => [w.first, w.last]);
+    const minDate = new Date(Math.min(...allDates));
+    const maxDate = new Date(Math.max(...allDates));
+    const totalDays = Math.max(1, Math.ceil((maxDate - minDate) / (1000 * 60 * 60 * 24)));
+    
+    let html = '<div class="gantt-chart"><div class="gantt-header"><div class="gantt-label-header">Enumerator</div><div class="gantt-timeline-header"><span style="position:absolute;left:0;">' + minDate.toLocaleDateString() + '</span><span style="position:absolute;right:0;">' + maxDate.toLocaleDateString() + '</span></div></div>';
+    for (const [name, data] of Object.entries(work)) {
+        const startOffset = Math.max(0, Math.floor((data.first - minDate) / (1000 * 60 * 60 * 24)));
+        const duration = Math.max(1, Math.ceil((data.last - data.first) / (1000 * 60 * 60 * 24)) + 1);
+        const leftPercent = (startOffset / totalDays) * 100;
+        const widthPercent = (duration / totalDays) * 100;
+        html += `<div class="gantt-row"><div class="gantt-label">${name}<br><small>${data.count} farms</small></div><div class="gantt-bars"><div class="gantt-bar" style="left:${leftPercent}%;width:${widthPercent}%;" title="${name}: ${data.count} farms (${data.first.toLocaleDateString()} - ${data.last.toLocaleDateString()})">${duration > 5 ? name : ''}</div></div></div>`;
+    }
+    html += '</div>';
+    document.getElementById('ganttContainer').innerHTML = html;
+}
+
+function applyFilters() { updateAllCharts(); }
+function resetFilters() {
+    document.getElementById('enumeratorFilter').value = 'all';
+    document.getElementById('cooperativeFilter').value = 'all';
+    document.getElementById('startDate').value = '';
+    document.getElementById('endDate').value = '';
+    updateAllCharts();
+}
+
+function exportStatistics() {
+    const filtered = getFilteredFarms();
+    let csv = 'Farmer Name,Enumerator,Cooperative,Area (ha),Status,Date\n';
+    filtered.forEach(f => csv += `"${f.farmer_name || ''}","${f.enumerator || ''}","${f.cooperative || ''}",${f.area || 0},${f.status || ''},${new Date(f.created_at).toLocaleDateString()}\n`);
+    const blob = new Blob([csv], { type: 'text/csv' }), url = URL.createObjectURL(blob), a = document.createElement('a');
+    a.href = url; a.download = `statistics_${currentProject?.name || 'project'}.csv`; a.click(); URL.revokeObjectURL(url);
+}
+
+function goBack() { const pid = getProjectIdFromUrl(); window.location.href = `DataManagement.html${pid ? `?project=${pid}` : ''}`; }
+function showLoading(show) { document.getElementById('loadingOverlay').style.display = show ? 'flex' : 'none'; }
+
+document.getElementById('logoutBtn')?.addEventListener('click', async () => { await supabaseClient.auth.signOut(); localStorage.clear(); window.location.href = 'login.html'; });
+init();
+</script>
+</body>
+</html>

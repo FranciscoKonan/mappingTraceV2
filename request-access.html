@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Request Access | MappingTrace</title>
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 40px 20px;
+        }
+        
+        .container {
+            max-width: 650px;
+            margin: 0 auto;
+        }
+        
+        .card {
+            background: white;
+            border-radius: 24px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #2c6e49 0%, #4CAF50 100%);
+            color: white;
+            padding: 35px 30px;
+            text-align: center;
+        }
+        
+        .header i {
+            font-size: 56px;
+            margin-bottom: 15px;
+        }
+        
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 8px;
+        }
+        
+        .header p {
+            opacity: 0.9;
+            font-size: 14px;
+        }
+        
+        .body {
+            padding: 35px 30px;
+        }
+        
+        .user-info {
+            background: #f8fafc;
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 25px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .user-avatar {
+            width: 50px;
+            height: 50px;
+            background: #2c6e49;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 18px;
+        }
+        
+        .user-details {
+            flex: 1;
+        }
+        
+        .user-email {
+            font-weight: 600;
+            color: #1e293b;
+            font-size: 14px;
+        }
+        
+        .user-name {
+            font-size: 13px;
+            color: #64748b;
+            margin-top: 4px;
+        }
+        
+        .info-box {
+            background: #dbeafe;
+            border-left: 4px solid #3b82f6;
+            padding: 14px 16px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 13px;
+        }
+        
+        .warning-box {
+            background: #fef3c7;
+            border-left: 4px solid #f59e0b;
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 12px;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #1e293b;
+        }
+        
+        .token-input {
+            width: 100%;
+            padding: 14px 16px;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            font-size: 16px;
+            font-family: monospace;
+            text-align: center;
+            transition: all 0.3s;
+        }
+        
+        .token-input:focus {
+            border-color: #2c6e49;
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(44, 110, 73, 0.1);
+        }
+        
+        .btn-primary {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #2c6e49 0%, #4CAF50 100%);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(44, 110, 73, 0.3);
+        }
+        
+        .btn-primary:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+        }
+        
+        .btn-secondary {
+            width: 100%;
+            padding: 12px;
+            background: white;
+            color: #2c6e49;
+            border: 2px solid #2c6e49;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 12px;
+        }
+        
+        .success-box {
+            background: #dcfce7;
+            padding: 30px;
+            border-radius: 16px;
+            text-align: center;
+        }
+        
+        .success-box i {
+            font-size: 64px;
+            color: #22c55e;
+            margin-bottom: 20px;
+        }
+        
+        .error-box {
+            background: #fee2e2;
+            padding: 20px;
+            border-radius: 12px;
+            color: #991b1b;
+            text-align: center;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+        }
+        
+        .spinner {
+            display: inline-block;
+            width: 40px;
+            height: 40px;
+            border: 3px solid #e2e8f0;
+            border-top-color: #2c6e49;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .toast {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 12px 18px;
+            border-radius: 10px;
+            color: white;
+            z-index: 9999;
+            animation: slideIn 0.3s ease;
+        }
+        
+        .toast-success { background: #22c55e; }
+        .toast-error { background: #ef4444; }
+        .toast-info { background: #3b82f6; }
+        
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        
+        .back-link {
+            text-align: center;
+            margin-top: 20px;
+        }
+        
+        .back-link a {
+            color: white;
+            text-decoration: none;
+        }
+        
+        .demo-token-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 20px;
+            padding: 10px;
+            background: #f8fafc;
+            border-radius: 12px;
+        }
+        
+        .demo-token {
+            background: white;
+            border: 1px solid #2c6e49;
+            border-radius: 20px;
+            padding: 6px 12px;
+            font-family: monospace;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .demo-token:hover {
+            background: #2c6e49;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="card">
+            <div class="header">
+                <i class="fas fa-ticket-alt"></i>
+                <h1>Request Project Access</h1>
+                <p>Enter your invitation token to request access</p>
+            </div>
+            <div class="body">
+                <div id="userInfo" class="user-info">
+                    <div class="user-avatar" id="userAvatar">?</div>
+                    <div class="user-details">
+                        <div class="user-email" id="userEmail">Loading...</div>
+                        <div class="user-name" id="userName">Loading...</div>
+                    </div>
+                </div>
+                
+                <div id="loadingDiv" class="loading">
+                    <div class="spinner"></div>
+                    <p style="margin-top: 16px;">Loading...</p>
+                </div>
+                
+                <div id="mainContent" style="display: none;">
+                    <div class="info-box">
+                        <i class="fas fa-info-circle"></i> 
+                        Enter the token provided by the project owner. Your request will be sent for approval.
+                    </div>
+                    
+                    <div id="knownTokens" class="demo-token-list">
+                        <strong style="width:100%; margin-bottom:5px;">Known tokens (click to use):</strong>
+                        <span class="demo-token" onclick="setToken('MANAG64b1')">MANAG64b1</span>
+                        <span class="demo-token" onclick="setToken('COFFEE1')">COFFEE1</span>
+                        <span class="demo-token" onclick="setToken('TRACE1')">TRACE1</span>
+                        <span class="demo-token" onclick="setToken('RUBBER1')">RUBBER1</span>
+                        <span class="demo-token" onclick="setToken('TEST1234')">TEST1234</span>
+                        <span class="demo-token" onclick="setToken('COCOA123')">COCOA123</span>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label><i class="fas fa-qrcode"></i> Invitation Token</label>
+                        <input type="text" id="tokenInput" class="token-input" placeholder="e.g., MANAG64b1" autocomplete="off">
+                    </div>
+                    
+                    <button id="requestBtn" class="btn-primary">
+                        <i class="fas fa-paper-plane"></i> Submit Access Request
+                    </button>
+                    
+                    <button onclick="window.location.href='index.html'" class="btn-secondary">
+                        <i class="fas fa-home"></i> Go to Dashboard
+                    </button>
+                </div>
+                
+                <div id="resultDiv" style="display: none;"></div>
+            </div>
+        </div>
+        <div class="back-link">
+            <a href="login.html">← Back to Login</a>
+        </div>
+    </div>
+    
+    <div id="toastContainer"></div>
+    
+    <script>
+        (function() {
+            const SUPABASE_URL = 'https://crvnohvudurqfukjpisv.supabase.co';
+            const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNydm5vaHZ1ZHVycWZ1a2pwaXN2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg0NTUxNzMsImV4cCI6MjA5NDAzMTE3M30.Qp8E57yAN4LnO4A-yirf-Z3QufGZw9OKjBfcQxG7fo8';
+            
+            let supabase = null;
+            let currentUser = null;
+            
+            function showToast(message, type) {
+                const container = document.getElementById('toastContainer');
+                const toast = document.createElement('div');
+                toast.className = `toast toast-${type}`;
+                toast.innerHTML = `<i class="fas ${type === 'success' ? 'fa-check-circle' : type === 'error' ? 'fa-exclamation-circle' : 'fa-info-circle'}"></i> ${message}`;
+                container.appendChild(toast);
+                setTimeout(() => toast.remove(), 4000);
+            }
+            
+            async function init() {
+                supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+                
+                try {
+                    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+                    if (sessionError) throw sessionError;
+                    if (!session) {
+                        window.location.href = 'login.html';
+                        return;
+                    }
+                    currentUser = session.user;
+                    
+                    await loadUser();
+                    
+                    document.getElementById('loadingDiv').style.display = 'none';
+                    document.getElementById('mainContent').style.display = 'block';
+                } catch (error) {
+                    console.error('Init error:', error);
+                    showToast('Error loading page. Please refresh.', 'error');
+                }
+            }
+            
+            async function loadUser() {
+                const { data: profile, error } = await supabase
+                    .from('user_profiles')
+                    .select('email, first_name')
+                    .eq('id', currentUser.id)
+                    .maybeSingle();
+                
+                if (error) console.error('Profile error:', error);
+                
+                const email = profile?.email || currentUser.email;
+                const firstName = profile?.first_name || '';
+                document.getElementById('userEmail').textContent = email;
+                document.getElementById('userName').textContent = firstName || email.split('@')[0];
+                document.getElementById('userAvatar').textContent = (firstName.charAt(0) || email.charAt(0)).toUpperCase();
+            }
+            
+            window.setToken = function(token) {
+                document.getElementById('tokenInput').value = token;
+                showToast(`Selected: ${token}`, 'success');
+            };
+            
+            async function submitRequest() {
+                const tokenInput = document.getElementById('tokenInput').value.trim();
+                
+                if (!tokenInput) {
+                    showToast('Please enter an invitation token', 'error');
+                    return;
+                }
+                
+                const requestBtn = document.getElementById('requestBtn');
+                requestBtn.disabled = true;
+                requestBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Submitting...';
+                document.getElementById('resultDiv').style.display = 'none';
+                
+                try {
+                    console.log('Looking for token:', tokenInput);
+                    
+                    // Try multiple approaches to find the token
+                    let tokenData = null;
+                    
+                    // Approach 1: Direct query by token (case sensitive)
+                    let { data: directMatch, error: directError } = await supabase
+                        .from('invitation_tokens')
+                        .select('*')
+                        .eq('token', tokenInput)
+                        .eq('status', 'active')
+                        .maybeSingle();
+                    
+                    if (directMatch) {
+                        tokenData = directMatch;
+                        console.log('Found via direct match');
+                    }
+                    
+                    // Approach 2: If not found, get all tokens and search manually
+                    if (!tokenData) {
+                        console.log('Direct match failed, fetching all tokens...');
+                        const { data: allTokens, error: allError } = await supabase
+                            .from('invitation_tokens')
+                            .select('*')
+                            .eq('status', 'active');
+                        
+                        if (allError) {
+                            console.error('Error fetching all tokens:', allError);
+                            throw new Error(`Database error: ${allError.message}`);
+                        }
+                        
+                        console.log('All active tokens:', allTokens);
+                        
+                        if (allTokens && allTokens.length > 0) {
+                            tokenData = allTokens.find(t => 
+                                t.token.toLowerCase() === tokenInput.toLowerCase()
+                            );
+                            if (tokenData) {
+                                console.log('Found via case-insensitive search:', tokenData);
+                            }
+                        }
+                    }
+                    
+                    if (!tokenData) {
+                        throw new Error(`Token "${tokenInput}" not found. Please check the token and try again.`);
+                    }
+                    
+                    console.log('Token validated:', tokenData);
+                    
+                    // Get project details
+                    const { data: project, error: projectError } = await supabase
+                        .from('projects')
+                        .select('name')
+                        .eq('id', tokenData.project_id)
+                        .single();
+                    
+                    if (projectError) {
+                        console.error('Project error:', projectError);
+                        throw new Error('Project not found');
+                    }
+                    
+                    // Check if already a member
+                    const { data: existingMember } = await supabase
+                        .from('project_members')
+                        .select('status')
+                        .eq('project_id', tokenData.project_id)
+                        .eq('user_id', currentUser.id)
+                        .maybeSingle();
+                    
+                    if (existingMember && existingMember.status === 'active') {
+                        throw new Error(`You already have access to "${project.name}"`);
+                    }
+                    
+                    // Check for existing pending request
+                    const { data: pendingRequest } = await supabase
+                        .from('access_requests')
+                        .select('id')
+                        .eq('project_id', tokenData.project_id)
+                        .eq('requester_id', currentUser.id)
+                        .eq('status', 'pending')
+                        .maybeSingle();
+                    
+                    if (pendingRequest) {
+                        throw new Error(`You already have a pending request for "${project.name}"`);
+                    }
+                    
+                    // Create access request
+                    const { error: insertError } = await supabase
+                        .from('access_requests')
+                        .insert({
+                            project_id: tokenData.project_id,
+                            requester_id: currentUser.id,
+                            requested_role: tokenData.role,
+                            reason: `Requesting access via token: ${tokenInput}`,
+                            status: 'pending',
+                            created_at: new Date().toISOString()
+                        });
+                    
+                    if (insertError) {
+                        console.error('Insert error:', insertError);
+                        throw new Error(`Failed to create request: ${insertError.message}`);
+                    }
+                    
+                    // Update token usage count
+                    await supabase
+                        .from('invitation_tokens')
+                        .update({ used_count: (tokenData.used_count || 0) + 1 })
+                        .eq('id', tokenData.id);
+                    
+                    // Show success
+                    document.getElementById('mainContent').style.display = 'none';
+                    document.getElementById('resultDiv').innerHTML = `
+                        <div class="success-box">
+                            <i class="fas fa-paper-plane"></i>
+                            <h3>Request Submitted!</h3>
+                            <p style="margin: 15px 0;">Your request to join <strong>${escapeHtml(project.name)}</strong> as <strong>${tokenData.role.replace('_', ' ').toUpperCase()}</strong> has been sent.</p>
+                            <div style="background: #f0fdf4; padding: 15px; border-radius: 8px; margin-top: 15px;">
+                                <i class="fas fa-clock"></i> 
+                                The project manager will review your request. You will be notified once approved.
+                            </div>
+                            <button onclick="window.location.href='index.html'" class="btn-primary" style="margin-top: 20px;">
+                                <i class="fas fa-home"></i> Go to Dashboard
+                            </button>
+                        </div>
+                    `;
+                    document.getElementById('resultDiv').style.display = 'block';
+                    showToast(`Request submitted for ${project.name}!`, 'success');
+                    
+                } catch (error) {
+                    console.error('Request error:', error);
+                    showToast(error.message, 'error');
+                    
+                    document.getElementById('resultDiv').innerHTML = `
+                        <div class="error-box">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            <h3 style="margin-bottom: 10px;">Request Failed</h3>
+                            <p>${escapeHtml(error.message)}</p>
+                            <button onclick="location.reload()" class="btn-secondary" style="margin-top: 15px;">
+                                <i class="fas fa-redo"></i> Try Again
+                            </button>
+                        </div>
+                    `;
+                    document.getElementById('resultDiv').style.display = 'block';
+                } finally {
+                    requestBtn.disabled = false;
+                    requestBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Submit Access Request';
+                }
+            }
+            
+            function escapeHtml(str) {
+                if (!str) return '';
+                return str.replace(/[&<>]/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[m] || m));
+            }
+            
+            // Event listeners
+            document.getElementById('requestBtn').addEventListener('click', submitRequest);
+            document.getElementById('tokenInput').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') submitRequest();
+            });
+            
+            init();
+        })();
+    </script>
+</body>
+</html>

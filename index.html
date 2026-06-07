@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MappingTrace V2 - Projects</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+        
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 40px;
+            color: white;
+        }
+        
+        .logo h1 {
+            font-size: 28px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .user-menu {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            background: rgba(255,255,255,0.2);
+            padding: 10px 20px;
+            border-radius: 50px;
+        }
+        
+        .user-avatar {
+            width: 40px;
+            height: 40px;
+            background: #2c6e49;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+        }
+        
+        .logout-btn {
+            background: rgba(255,255,255,0.2);
+            border: none;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+        
+        .logout-btn:hover {
+            background: rgba(255,255,255,0.3);
+        }
+        
+        .projects-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 24px;
+        }
+        
+        .project-card {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            transition: transform 0.2s;
+            cursor: pointer;
+        }
+        
+        .project-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 30px rgba(0,0,0,0.15);
+        }
+        
+        .project-icon {
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, #2c6e49, #4CAF50);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            margin-bottom: 16px;
+            color: white;
+        }
+        
+        .project-name {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #1e293b;
+        }
+        
+        .project-description {
+            color: #64748b;
+            font-size: 14px;
+            margin-bottom: 16px;
+        }
+        
+        .project-stats {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 16px;
+            font-size: 13px;
+            color: #475569;
+        }
+        
+        .project-role {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        
+        .project-role.owner { background: #dcfce7; color: #166534; }
+        .project-role.manager { background: #dbeafe; color: #1e40af; }
+        .project-role.validator { background: #fef3c7; color: #92400e; }
+        .project-role.field_officer { background: #e0e7ff; color: #3730a3; }
+        .project-role.viewer { background: #f1f5f9; color: #475569; }
+        
+        .create-card, .request-card {
+            background: rgba(255,255,255,0.95);
+            border: 2px dashed #cbd5e1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            min-height: 280px;
+            cursor: pointer;
+        }
+        
+        .create-card i, .request-card i {
+            font-size: 48px;
+            color: #2c6e49;
+            margin-bottom: 16px;
+        }
+        
+        .create-card h3, .request-card h3 {
+            margin-bottom: 8px;
+        }
+        
+        .create-card p, .request-card p {
+            color: #64748b;
+            font-size: 14px;
+        }
+        
+        .create-btn, .request-btn {
+            background: #2c6e49;
+            color: white;
+            border: none;
+            padding: 10px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            margin-top: 16px;
+        }
+        
+        .request-card {
+            border-color: #3b82f6;
+        }
+        
+        .request-card i {
+            color: #3b82f6;
+        }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .modal.active { display: flex; }
+        
+        .modal-content {
+            background: white;
+            border-radius: 16px;
+            max-width: 500px;
+            width: 90%;
+            padding: 24px;
+        }
+        
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .close-modal {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+        }
+        
+        .form-group {
+            margin-bottom: 16px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+        
+        .form-group input, .form-group textarea {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+        }
+        
+        .btn-primary {
+            background: #2c6e49;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            width: 100%;
+        }
+        
+        .btn-secondary {
+            background: #e2e8f0;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+        
+        .modal-buttons {
+            display: flex;
+            gap: 12px;
+            margin-top: 24px;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: white;
+        }
+        
+        .info-message {
+            background: #dbeafe;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 30px;
+            color: #1e40af;
+            text-align: center;
+        }
+        
+        @media (max-width: 768px) {
+            .projects-grid { grid-template-columns: 1fr; }
+            .header { flex-direction: column; gap: 16px; text-align: center; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">
+                <h1><i class="fas fa-map-marked-alt"></i> MappingTrace V2</h1>
+                <p>Multi-tenant Project Platform</p>
+            </div>
+            <div class="user-menu" id="userMenu">
+                <div class="user-avatar" id="userAvatar">JD</div>
+                <span id="userName">Loading...</span>
+                <button class="logout-btn" id="logoutBtn"><i class="fas fa-sign-out-alt"></i> Logout</button>
+            </div>
+        </div>
+        
+        <div id="infoMessage" class="info-message" style="display: none;">
+            <i class="fas fa-info-circle"></i> 
+            <span id="infoText"></span>
+        </div>
+        
+        <div class="projects-grid" id="projectsGrid">
+            <div class="loading"><i class="fas fa-spinner fa-spin"></i> Loading your projects...</div>
+        </div>
+    </div>
+    
+    <!-- Create Project Modal -->
+    <div class="modal" id="createProjectModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-plus-circle"></i> Create New Project</h3>
+                <button class="close-modal" onclick="closeModal()">&times;</button>
+            </div>
+            <form id="createProjectForm">
+                <div class="form-group">
+                    <label>Project Name</label>
+                    <input type="text" id="projectName" placeholder="e.g., Coffee Farm Monitoring" required>
+                </div>
+                <div class="form-group">
+                    <label>Description</label>
+                    <textarea id="projectDescription" rows="3" placeholder="Describe your project..."></textarea>
+                </div>
+                <div class="modal-buttons">
+                    <button type="button" class="btn-secondary" onclick="closeModal()">Cancel</button>
+                    <button type="submit" class="btn-primary">Create Project</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <script>
+        const SUPABASE_URL = 'https://crvnohvudurqfukjpisv.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNydm5vaHZ1ZHVycWZ1a2pwaXN2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg0NTUxNzMsImV4cCI6MjA5NDAzMTE3M30.Qp8E57yAN4LnO4A-yirf-Z3QufGZw9OKjBfcQxG7fo8';
+        
+        let supabaseClient = null;
+        let currentUser = null;
+        
+        async function init() {
+            supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+            await loadUser();
+            await loadProjects();
+        }
+        
+        async function loadUser() {
+            const { data: { session } } = await supabaseClient.auth.getSession();
+            if (!session) {
+                window.location.href = 'login.html';
+                return;
+            }
+            currentUser = session.user;
+            const metadata = currentUser.user_metadata || {};
+            const fullName = metadata.full_name || metadata.first_name || currentUser.email;
+            document.getElementById('userName').textContent = fullName;
+            document.getElementById('userAvatar').textContent = (fullName.charAt(0) || 'U').toUpperCase();
+        }
+        
+        async function loadProjects() {
+            const { data: memberships, error } = await supabaseClient
+                .from('project_members')
+                .select('project_id, role, projects(*)')
+                .eq('user_id', currentUser.id)
+                .eq('status', 'active');
+            
+            if (error) {
+                console.error(error);
+                return;
+            }
+            
+            const projectsGrid = document.getElementById('projectsGrid');
+            const infoMessage = document.getElementById('infoMessage');
+            const infoText = document.getElementById('infoText');
+            
+            // Check if user has any projects
+            const hasProjects = memberships && memberships.length > 0;
+            
+            if (!hasProjects) {
+                // User has NO projects - show helpful message with options
+                infoMessage.style.display = 'block';
+                infoText.innerHTML = 'You don\'t have access to any projects yet. You can <strong>create a new project</strong> or <strong>request access</strong> to an existing project.';
+                
+                projectsGrid.innerHTML = `
+                    <div class="project-card create-card" onclick="openModal()">
+                        <i class="fas fa-plus-circle"></i>
+                        <h3>Create Your First Project</h3>
+                        <p>Start by creating a new project as an Owner</p>
+                        <button class="create-btn">Create Project</button>
+                    </div>
+                    <div class="project-card request-card" onclick="goToRequestAccess()">
+                        <i class="fas fa-key"></i>
+                        <h3>Request Access</h3>
+                        <p>Request access to an existing project</p>
+                        <button class="request-btn">Request Access</button>
+                    </div>
+                `;
+                return;
+            }
+            
+            // User has projects - show them
+            infoMessage.style.display = 'none';
+            
+            let html = '';
+            for (const membership of memberships) {
+                const project = membership.projects;
+                const role = membership.role;
+                const roleDisplay = role.replace('_', ' ').toUpperCase();
+                
+                const { count } = await supabaseClient
+                    .from('farms')
+                    .select('*', { count: 'exact', head: true })
+                    .eq('project_id', project.id);
+                
+                html += `
+                    <div class="project-card" onclick="openProject('${project.id}')">
+                        <div class="project-icon"><i class="fas fa-folder-open"></i></div>
+                        <div class="project-name">${escapeHtml(project.name)}</div>
+                        <div class="project-description">${escapeHtml(project.description || 'No description')}</div>
+                        <div class="project-stats">
+                            <span><i class="fas fa-tractor"></i> ${count || 0} farms</span>
+                        </div>
+                        <div class="project-role ${role}">${roleDisplay}</div>
+                    </div>
+                `;
+            }
+            
+            // Add Create Project card for owners
+            const isOwner = memberships.some(m => m.role === 'owner');
+            if (isOwner) {
+                html += `
+                    <div class="project-card create-card" onclick="openModal()">
+                        <i class="fas fa-plus-circle"></i>
+                        <h3>Create New Project</h3>
+                        <p>Start another project</p>
+                        <button class="create-btn">Create Project</button>
+                    </div>
+                `;
+            }
+            
+            // Add Request Access card for non-owners
+            if (!isOwner) {
+                html += `
+                    <div class="project-card request-card" onclick="goToRequestAccess()">
+                        <i class="fas fa-key"></i>
+                        <h3>Request More Access</h3>
+                        <p>Request access to additional projects</p>
+                        <button class="request-btn">Request Access</button>
+                    </div>
+                `;
+            }
+            
+            projectsGrid.innerHTML = html;
+        }
+        
+        function openProject(projectId) {
+            localStorage.setItem('currentProjectId', projectId);
+            window.location.href = `DataManagement.html?project=${projectId}`;
+        }
+        
+        function goToRequestAccess() {
+            window.location.href = 'request-access.html';
+        }
+        
+        function openModal() {
+            document.getElementById('createProjectModal').classList.add('active');
+        }
+        
+        function closeModal() {
+            document.getElementById('createProjectModal').classList.remove('active');
+            document.getElementById('createProjectForm').reset();
+        }
+        
+        document.getElementById('createProjectForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const name = document.getElementById('projectName').value;
+            const description = document.getElementById('projectDescription').value;
+            
+            const btn = e.target.querySelector('button[type="submit"]');
+            btn.disabled = true;
+            btn.textContent = 'Creating...';
+            
+            try {
+                const { data: project, error: projectError } = await supabaseClient
+                    .from('projects')
+                    .insert({ name, description, owner_id: currentUser.id })
+                    .select()
+                    .single();
+                
+                if (projectError) throw projectError;
+                
+                await supabaseClient.from('project_members').insert({
+                    project_id: project.id,
+                    user_id: currentUser.id,
+                    role: 'owner',
+                    granted_by: currentUser.id,
+                    status: 'active'
+                });
+                
+                await supabaseClient.from('delegation_log').insert({
+                    project_id: project.id,
+                    granter_id: currentUser.id,
+                    granted_user_id: currentUser.id,
+                    role_granted: 'owner',
+                    action: 'create'
+                });
+                
+                alert('Project created successfully!');
+                closeModal();
+                await loadProjects();
+                
+            } catch (error) {
+                alert('Error: ' + error.message);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Create Project';
+            }
+        });
+        
+        document.getElementById('logoutBtn').addEventListener('click', async () => {
+            await supabaseClient.auth.signOut();
+            localStorage.clear();
+            window.location.href = 'login.html';
+        });
+        
+        function escapeHtml(str) {
+            if (!str) return '';
+            return str.replace(/[&<>]/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[m] || m));
+        }
+        
+        window.openModal = openModal;
+        window.closeModal = closeModal;
+        window.openProject = openProject;
+        window.goToRequestAccess = goToRequestAccess;
+        
+        init();
+    </script>
+</body>
+</html>

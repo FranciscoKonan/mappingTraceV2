@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manage Invitation Codes | MappingTrace</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #f1f5f9;
+            padding: 20px;
+        }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .card {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        h2 { color: #1e293b; }
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-primary {
+            background: #2c6e49;
+            color: white;
+        }
+        .btn-primary:hover { background: #1e4f33; transform: translateY(-1px); }
+        .btn-secondary {
+            background: #e2e8f0;
+            color: #1e293b;
+        }
+        .btn-danger {
+            background: #dc2626;
+            color: white;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            font-size: 14px;
+        }
+        select, input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+        .token-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        .token-card {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 15px;
+        }
+        .token-code {
+            font-family: monospace;
+            font-size: 20px;
+            font-weight: bold;
+            color: #2c6e49;
+            background: white;
+            padding: 8px;
+            border-radius: 8px;
+            text-align: center;
+            letter-spacing: 2px;
+            margin-bottom: 10px;
+        }
+        .token-info {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            margin-bottom: 10px;
+        }
+        .copy-btn {
+            width: 100%;
+            padding: 8px;
+            background: #e2e8f0;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        .copy-btn:hover { background: #cbd5e1; }
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal.active { display: flex; }
+        .modal-content {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            max-width: 500px;
+            width: 90%;
+        }
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            padding: 12px 20px;
+            border-radius: 8px;
+            color: white;
+            z-index: 9999;
+        }
+        .toast-success { background: #22c55e; }
+        .toast-error { background: #ef4444; }
+        .role-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+        }
+        .role-viewer { background: #e2e8f0; }
+        .role-manager { background: #dbeafe; }
+        .role-field_officer { background: #e0e7ff; }
+        .role-validator { background: #fef3c7; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="card">
+            <div class="header">
+                <h2><i class="fas fa-ticket-alt"></i> Invitation Codes Manager</h2>
+                <button class="btn btn-primary" onclick="openCreateModal()">
+                    <i class="fas fa-plus"></i> Create New Code
+                </button>
+            </div>
+            
+            <div id="projectSelect" class="form-group">
+                <label>Select Project</label>
+                <select id="projectSelectInput" onchange="loadTokens()">
+                    <option value="">Loading projects...</option>
+                </select>
+            </div>
+            
+            <div id="tokensList" class="token-grid">
+                <p>Select a project to see invitation codes</p>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Create Token Modal -->
+    <div id="createModal" class="modal">
+        <div class="modal-content">
+            <h3 style="margin-bottom: 20px;">Create Invitation Code</h3>
+            <div class="form-group">
+                <label>Role</label>
+                <select id="newRole">
+                    <option value="viewer">Viewer (can only view)</option>
+                    <option value="field_officer">Field Officer (can add/edit)</option>
+                    <option value="validator">Validator (can approve)</option>
+                    <option value="manager">Manager (can manage team)</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Custom Code (optional, leave blank for auto)</label>
+                <input type="text" id="customCode" placeholder="e.g., TEAM2024" maxlength="20">
+            </div>
+            <div class="form-group">
+                <label>Max Uses</label>
+                <input type="number" id="maxUses" value="10" min="1">
+            </div>
+            <div style="display: flex; gap: 10px; margin-top: 20px;">
+                <button class="btn btn-secondary" onclick="closeCreateModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="createToken()">Create Code</button>
+            </div>
+        </div>
+    </div>
+    
+    <div id="toast"></div>
+    
+    <script>
+        (function() {
+            const SUPABASE_URL = 'https://crvnohvudurqfukjpisv.supabase.co';
+            const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNydm5vaHZ1ZHVycWZ1a2pwaXN2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg0NTUxNzMsImV4cCI6MjA5NDAzMTE3M30.Qp8E57yAN4LnO4A-yirf-Z3QufGZw9OKjBfcQxG7fo8';
+            
+            let supabase = null;
+            let currentUser = null;
+            let currentProjectId = null;
+            let projects = [];
+            
+            function showToast(msg, type) {
+                const toast = document.getElementById('toast');
+                toast.innerHTML = `<div class="toast toast-${type}"><i class="fas ${type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle'}"></i> ${msg}</div>`;
+                setTimeout(() => toast.innerHTML = '', 3000);
+            }
+            
+            async function init() {
+                supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+                
+                const { data: { session } } = await supabase.auth.getSession();
+                if (!session) {
+                    window.location.href = 'login.html';
+                    return;
+                }
+                currentUser = session.user;
+                
+                await loadProjects();
+            }
+            
+            async function loadProjects() {
+                const { data: memberProjects, error } = await supabase
+                    .from('project_members')
+                    .select('project_id, role, projects(name)')
+                    .eq('user_id', currentUser.id)
+                    .in('role', ['owner', 'manager'])
+                    .eq('status', 'active');
+                
+                if (error) {
+                    showToast('Error loading projects', 'error');
+                    return;
+                }
+                
+                projects = memberProjects || [];
+                const select = document.getElementById('projectSelectInput');
+                
+                if (projects.length === 0) {
+                    select.innerHTML = '<option value="">You don\'t manage any projects</option>';
+                    showToast('You need to be a project owner or manager to create invitation codes', 'error');
+                    return;
+                }
+                
+                select.innerHTML = '<option value="">Select a project...</option>' + 
+                    projects.map(p => `<option value="${p.project_id}">${p.projects.name} (${p.role})</option>`).join('');
+                
+                select.onchange = () => {
+                    currentProjectId = select.value;
+                    if (currentProjectId) loadTokens();
+                };
+            }
+            
+            async function loadTokens() {
+                if (!currentProjectId) return;
+                
+                const { data: tokens, error } = await supabase
+                    .from('invitation_tokens')
+                    .select('*')
+                    .eq('project_id', currentProjectId);
+                
+                if (error) {
+                    showToast('Error loading tokens', 'error');
+                    return;
+                }
+                
+                const container = document.getElementById('tokensList');
+                
+                if (!tokens || tokens.length === 0) {
+                    container.innerHTML = '<p style="color: #64748b;">No invitation codes yet. Click "Create New Code" to get started.</p>';
+                    return;
+                }
+                
+                container.innerHTML = tokens.map(token => `
+                    <div class="token-card">
+                        <div class="token-code">${token.token}</div>
+                        <div class="token-info">
+                            <span><span class="role-badge role-${token.role}">${token.role}</span></span>
+                            <span>Uses: ${token.used_count || 0}/${token.max_uses || '∞'}</span>
+                            <span>${token.status}</span>
+                        </div>
+                        <button class="copy-btn" onclick="copyToken('${token.token}')">
+                            <i class="fas fa-copy"></i> Copy Code
+                        </button>
+                        <button class="copy-btn" style="margin-top: 5px; background: #dcfce7;" onclick="shareToken('${token.token}')">
+                            <i class="fas fa-share-alt"></i> Share Link
+                        </button>
+                    </div>
+                `).join('');
+            }
+            
+            window.copyToken = function(token) {
+                navigator.clipboard.writeText(token);
+                showToast(`Code "${token}" copied! Share it with users.`, 'success');
+            };
+            
+            window.shareToken = function(token) {
+                const redeemUrl = `${window.location.origin}/redeem.html`;
+                const text = `Join my project on MappingTrace! Use this invitation code: ${token}\n\nGo to: ${redeemUrl}`;
+                navigator.clipboard.writeText(text);
+                showToast(`Invitation message copied! Share it with users.`, 'success');
+            };
+            
+            window.openCreateModal = function() {
+                if (!currentProjectId) {
+                    showToast('Please select a project first', 'error');
+                    return;
+                }
+                document.getElementById('createModal').classList.add('active');
+            };
+            
+            window.closeCreateModal = function() {
+                document.getElementById('createModal').classList.remove('active');
+                document.getElementById('customCode').value = '';
+                document.getElementById('newRole').value = 'viewer';
+                document.getElementById('maxUses').value = '10';
+            };
+            
+            window.createToken = async function() {
+                const role = document.getElementById('newRole').value;
+                const customCode = document.getElementById('customCode').value.trim().toUpperCase();
+                const maxUses = parseInt(document.getElementById('maxUses').value);
+                
+                let token = customCode;
+                if (!token) {
+                    // Generate random 8-character code
+                    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+                    token = Array(8).fill().map(() => chars[Math.floor(Math.random() * chars.length)]).join('');
+                }
+                
+                const { error } = await supabase
+                    .from('invitation_tokens')
+                    .insert({
+                        project_id: currentProjectId,
+                        token: token,
+                        role: role,
+                        granted_by: currentUser.id,
+                        max_uses: maxUses,
+                        used_count: 0,
+                        status: 'active',
+                        created_at: new Date().toISOString()
+                    });
+                
+                if (error) {
+                    showToast('Error creating code: ' + error.message, 'error');
+                    return;
+                }
+                
+                showToast(`Code "${token}" created successfully!`, 'success');
+                closeCreateModal();
+                loadTokens();
+            };
+            
+            init();
+        })();
+    </script>
+</body>
+</html>

@@ -1,0 +1,22 @@
+# Secrets and config
+config.js
+.env
+.env.*
+*.env
+
+# Test files
+*test*.html
+*test*.js
+test-*
+
+# Backend (if you have it)
+Backend/
+node_modules/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/}}

@@ -1,0 +1,124 @@
+// -------------------------------
+// Alerts Management System - MINIMAL WORKING VERSION
+// -------------------------------
+
+console.log('🚀 Initializing alerts system...');
+
+// Global variables
+let alertsData = [];
+
+// Check if farmLayers already exists globally
+if (typeof window.farmLarks !== 'undefined') {
+    console.log('✅ Using existing farmLayers');
+} else {
+    window.farmLarks = new Map();
+    console.log('✅ Created new farmLayers');
+}
+
+// Use the global reference
+const farmLayers = window.farmLarks;
+
+// -------------------------------
+// Load mock alerts for testing
+// -------------------------------
+function loadMockAlerts() {
+    console.log('📊 Loading mock alerts');
+    
+    alertsData = [
+        {
+            id: 'ALERT001',
+            type: 'overlap',
+            severity: 'high',
+            title: 'Farm Boundary Overlap Detected',
+            description: 'Farm FARM001 overlaps with FARM003',
+            farmId: 'FARM001',
+            affectedFarmId: 'FARM003',
+            area: 1.5,
+            date: new Date().toISOString(),
+            status: 'new'
+        }
+    ];
+    
+    renderAlerts();
+}
+
+// -------------------------------
+// Render alerts panel
+// -------------------------------
+function renderAlerts() {
+    const alertsList = document.getElementById('alertsList');
+    const alertsBadge = document.getElementById('alertsBadge');
+    const alertsCount = document.getElementById('alertsCount');
+    
+    if (!alertsList) {
+        console.warn('Alerts list element not found');
+        return;
+    }
+
+    // Update badges
+    if (alertsBadge) alertsBadge.textContent = alertsData.length;
+    if (alertsCount) alertsCount.textContent = alertsData.length;
+
+    // Clear list
+    alertsList.innerHTML = '';
+
+    if (alertsData.length === 0) {
+        alertsList.innerHTML = `
+            <div class="alerts-empty-state">
+                <i class="fas fa-check-circle"></i>
+                <h4>No Alerts</h4>
+                <p>All farms are within quality standards.</p>
+            </div>
+        `;
+        return;
+    }
+
+    // Display alerts
+    alertsData.forEach(alert => {
+        const alertItem = document.createElement('div');
+        alertItem.className = `alert-item ${alert.severity}`;
+        alertItem.innerHTML = `
+            <div class="alert-header">
+                <div class="alert-title">
+                    <i class="fas fa-exclamation-circle"></i> ${alert.title}
+                </div>
+                <div class="alert-time">${new Date(alert.date).toLocaleTimeString()}</div>
+            </div>
+            <div class="alert-description">${alert.description}</div>
+            <div class="alert-farm">
+                <i class="fas fa-tractor"></i> Farm: ${alert.farmId}
+            </div>
+        `;
+        alertsList.appendChild(alertItem);
+    });
+}
+
+// -------------------------------
+// Refresh alerts
+// -------------------------------
+function refreshAlerts() {
+    console.log('🔄 Refresh Alerts clicked');
+    loadMockAlerts();
+}
+
+// -------------------------------
+// View all alerts
+// -------------------------------
+function viewAllAlerts() {
+    console.log('👁️ View All Alerts clicked');
+    alert(`Total alerts: ${alertsData.length}`);
+}
+
+// -------------------------------
+// Initialize
+// -------------------------------
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('✅ Alerts system ready');
+    loadMockAlerts();
+});
+
+// Make functions globally available
+window.refreshAlerts = refreshAlerts;
+window.viewAllAlerts = viewAllAlerts;
+
+console.log('✅ Alerts module loaded');

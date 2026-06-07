@@ -1,0 +1,29 @@
+mapping-platform/
+│
+├── index.html                 # Main dashboard
+├── login.html                 # Login page
+├── register.html              # Registration page
+│
+├── css/
+│   ├── global.css            # Global styles (colors, variables, reset)
+│   ├── layout.css            # Main layout (sidebar, header)
+│   ├── map.css               # Map-specific styles
+│   ├── table.css             # Table-specific styles
+│   ├── alerts.css            # Alerts-specific styles
+│   └── auth.css              # Authentication pages styles
+│
+├── js/
+│   ├── global.js             # Global utilities, notifications
+│   ├── map/
+│   │   ├── map-init.js       # Map initialization
+│   │   ├── map-controls.js   # Map control functions
+│   │   └── farm-visual.js    # Farm visualization
+│   ├── table/
+│   │   ├── table-data.js     # Table data management
+│   │   └── table-controls.js # Table controls & functions
+│   ├── alerts/
+│   │   └── alerts-system.js  # Alerts management
+│   └── auth/
+│       └── auth-system.js    # Authentication logic
+│
+└── assets/                    # Images, icons, etc.

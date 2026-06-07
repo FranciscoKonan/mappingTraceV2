@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quality Alerts | MappingTrace</title>
+    
+    <!-- Fonts & Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <!-- CSS Files -->
+    <link rel="stylesheet" href="../globalCSS.css">
+    <link rel="stylesheet" href="../layoutCSS.css">
+    <link rel="stylesheet" href="quality-alerts.css">
+    
+    <link rel="icon" type="image/x-icon" href="../assets/favicon.ico">
+</head>
+<body>
+    <div class="layout">
+        <!-- SIDEBAR - Same as Live Mapping -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h2><i class="fas fa-map-marked-alt"></i><span>MappingTrace</span></h2>
+                <button class="sidebar-toggle" id="sidebarToggle"><i class="fas fa-bars"></i></button>
+            </div>
+            <nav class="menu">
+                <a href="../Dashboard.html"><i class="fas fa-tachometer-alt"></i><span>Dashboard</span></a>
+                <a href="../LiveMapping/live-mapping.html"><i class="fas fa-map"></i><span>Live Mapping</span></a>
+                <a href="../Submissions/submissions.html"><i class="fas fa-clipboard-list"></i><span>Submissions</span></a>
+                <a href="#" class="active"><i class="fas fa-exclamation-triangle"></i><span>Quality Alerts</span></a>
+                <a href="../Exports/exports.html"><i class="fas fa-file-export"></i><span>Exports</span></a>
+                <!-- Data Management Link -->
+                <div class="data-mgmt-link">
+                    <a href="../DataManagement.html"><i class="fas fa-database"></i><span>Data Management</span></a>
+                </div>
+                <div class="menu-bottom">
+                    <a href="#" id="logoutBtn"><i class="fas fa-sign-out-alt"></i><span>Logout</span></a>
+                </div>
+            </nav>
+        </aside>
+
+        <!-- MAIN CONTENT -->
+        <main class="main">
+            <!-- HEADER - Same as Live Mapping -->
+            <header class="main-header">
+                <div class="header-title">
+                    <h1>Quality Alerts</h1>
+                    <div class="breadcrumb">Home / Quality Alerts</div>
+                </div>
+                <div class="user-info">
+                    <div class="project-selector-container hidden" id="projectSelectorContainer">
+                        <label><i class="fas fa-folder-open"></i> Project:</label>
+                        <div class="custom-dropdown" id="customDropdown">
+                            <div class="dropdown-selected" id="dropdownSelected">
+                                <span id="selectedProjectName">Loading...</span>
+                                <i class="fas fa-chevron-down"></i>
+                            </div>
+                            <div class="dropdown-menu" id="dropdownMenu">
+                                <div class="dropdown-search">
+                                    <input type="text" id="projectSearch" placeholder="Search projects...">
+                                </div>
+                                <div id="dropdownItems"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="user-avatar" id="userAvatar">JD</div>
+                    <div class="user-details">
+                        <div class="user-name" id="userName">User</div>
+                        <div class="user-role" id="userRole">Role</div>
+                    </div>
+                    <button class="sync-btn" id="refreshBtn"><i class="fas fa-sync-alt"></i> Refresh</button>
+                </div>
+            </header>
+
+            <!-- ALERTS CONTENT -->
+            <div class="alerts-container">
+                <!-- Stats Cards -->
+                <div class="stats-grid">
+                    <div class="stat-card critical">
+                        <div class="stat-icon"><i class="fas fa-skull-crossbones"></i></div>
+                        <div class="stat-info">
+                            <h4>Critical</h4>
+                            <div class="stat-value" id="criticalCount">0</div>
+                        </div>
+                    </div>
+                    <div class="stat-card high">
+                        <div class="stat-icon"><i class="fas fa-exclamation-triangle"></i></div>
+                        <div class="stat-info">
+                            <h4>High</h4>
+                            <div class="stat-value" id="highCount">0</div>
+                        </div>
+                    </div>
+                    <div class="stat-card medium">
+                        <div class="stat-icon"><i class="fas fa-exclamation"></i></div>
+                        <div class="stat-info">
+                            <h4>Medium</h4>
+                            <div class="stat-value" id="mediumCount">0</div>
+                        </div>
+                    </div>
+                    <div class="stat-card low">
+                        <div class="stat-icon"><i class="fas fa-info-circle"></i></div>
+                        <div class="stat-info">
+                            <h4>Low</h4>
+                            <div class="stat-value" id="lowCount">0</div>
+                        </div>
+                    </div>
+                    <div class="stat-card total">
+                        <div class="stat-icon"><i class="fas fa-bell"></i></div>
+                        <div class="stat-info">
+                            <h4>Total Alerts</h4>
+                            <div class="stat-value" id="totalAlerts">0</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Filters Bar -->
+                <div class="filters-bar">
+                    <div class="filter-group">
+                        <label>Alert Type</label>
+                        <select id="alertTypeFilter" class="filter-select">
+                            <option value="all">All Types</option>
+                            <option value="overlap">Overlap</option>
+                            <option value="data">Missing Data</option>
+                            <option value="area">Area Issue</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>Severity</label>
+                        <select id="severityFilter" class="filter-select">
+                            <option value="all">All Severities</option>
+                            <option value="critical">Critical</option>
+                            <option value="high">High</option>
+                            <option value="medium">Medium</option>
+                            <option value="low">Low</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>Supplier</label>
+                        <select id="supplierFilter" class="filter-select">
+                            <option value="all">All Suppliers</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>Status</label>
+                        <select id="statusFilter" class="filter-select">
+                            <option value="all">All Status</option>
+                            <option value="new">New</option>
+                            <option value="acknowledged">Acknowledged</option>
+                            <option value="resolved">Resolved</option>
+                        </select>
+                    </div>
+                    <div class="filter-actions">
+                        <button class="btn-primary" id="applyFiltersBtn"><i class="fas fa-search"></i> Apply</button>
+                        <button class="btn-secondary" id="clearFiltersBtn"><i class="fas fa-times"></i> Clear</button>
+                        <button class="btn-secondary" id="markAllReadBtn"><i class="fas fa-check-double"></i> Mark All Read</button>
+                    </div>
+                </div>
+
+                <!-- Alerts List Container -->
+                <div class="alerts-list-container">
+                    <div class="list-header">
+                        <h3><i class="fas fa-list"></i> Quality Alerts</h3>
+                        <button class="btn-icon" id="refreshListBtn" title="Refresh"><i class="fas fa-redo-alt"></i></button>
+                    </div>
+                    <div id="alertsList" class="alerts-list">
+                        <div class="empty-state">
+                            <i class="fas fa-spinner fa-spin"></i>
+                            <p>Loading alerts...</p>
+                        </div>
+                    </div>
+                    <div class="list-footer">
+                        <div class="list-stats">Showing <span id="showingCount">0</span> alerts</div>
+                        <div class="pagination">
+                            <button class="pagination-btn" id="prevPageBtn" disabled><i class="fas fa-chevron-left"></i></button>
+                            <span id="pageInfo">Page 1 of 1</span>
+                            <button class="pagination-btn" id="nextPageBtn" disabled><i class="fas fa-chevron-right"></i></button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <div id="loadingOverlay" class="loading-spinner" style="display: none;">
+        <i class="fas fa-spinner fa-spin"></i><span>Loading...</span>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
+    <script src="quality-alerts.js"></script>
+</body>
+</html>

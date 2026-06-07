@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Redeem Invitation | MappingTrace</title>
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 40px 20px;
+        }
+        
+        .container {
+            max-width: 650px;
+            margin: 0 auto;
+        }
+        
+        .card {
+            background: white;
+            border-radius: 24px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+            overflow: hidden;
+            animation: slideUp 0.5s ease;
+        }
+        
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #2c6e49 0%, #4CAF50 100%);
+            color: white;
+            padding: 35px 30px;
+            text-align: center;
+        }
+        
+        .header i {
+            font-size: 56px;
+            margin-bottom: 15px;
+        }
+        
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 8px;
+        }
+        
+        .header p {
+            opacity: 0.9;
+            font-size: 14px;
+        }
+        
+        .body {
+            padding: 35px 30px;
+        }
+        
+        .user-info {
+            background: #f8fafc;
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 25px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .user-avatar {
+            width: 50px;
+            height: 50px;
+            background: #2c6e49;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 18px;
+        }
+        
+        .user-details {
+            flex: 1;
+        }
+        
+        .user-email {
+            font-weight: 600;
+            color: #1e293b;
+            word-break: break-all;
+            font-size: 14px;
+        }
+        
+        .user-name {
+            font-size: 13px;
+            color: #64748b;
+            margin-top: 4px;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #1e293b;
+        }
+        
+        .token-input-container {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 10px;
+        }
+        
+        .token-input {
+            flex: 1;
+            padding: 14px 16px;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            font-size: 18px;
+            font-family: monospace;
+            letter-spacing: 2px;
+            text-align: center;
+            text-transform: uppercase;
+            transition: all 0.3s;
+        }
+        
+        .token-input:focus {
+            border-color: #2c6e49;
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(44, 110, 73, 0.1);
+        }
+        
+        .info-box {
+            background: #dbeafe;
+            border-left: 4px solid #3b82f6;
+            padding: 14px 16px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 13px;
+        }
+        
+        .available-tokens {
+            background: #f0fdf4;
+            border: 1px solid #86efac;
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .available-tokens h4 {
+            color: #166534;
+            margin-bottom: 12px;
+            font-size: 14px;
+        }
+        
+        .token-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 10px;
+        }
+        
+        .token-item {
+            background: white;
+            border: 1px solid #dcfce7;
+            border-radius: 8px;
+            padding: 8px 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .token-item:hover {
+            background: #dcfce7;
+            transform: translateY(-2px);
+        }
+        
+        .token-code {
+            font-family: monospace;
+            font-weight: bold;
+            color: #2c6e49;
+            font-size: 14px;
+        }
+        
+        .token-role {
+            font-size: 10px;
+            padding: 2px 6px;
+            border-radius: 10px;
+            background: #e2e8f0;
+        }
+        
+        .btn-primary {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #2c6e49 0%, #4CAF50 100%);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(44, 110, 73, 0.3);
+        }
+        
+        .btn-primary:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+        }
+        
+        .btn-secondary {
+            width: 100%;
+            padding: 12px;
+            background: white;
+            color: #2c6e49;
+            border: 2px solid #2c6e49;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-top: 12px;
+        }
+        
+        .btn-secondary:hover {
+            background: #f0fdf4;
+        }
+        
+        .success-box {
+            background: #dcfce7;
+            border-left: 4px solid #22c55e;
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+        }
+        
+        .success-box i {
+            font-size: 48px;
+            color: #22c55e;
+            margin-bottom: 15px;
+        }
+        
+        .error-box {
+            background: #fee2e2;
+            border-left: 4px solid #dc2626;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            color: #991b1b;
+            font-size: 14px;
+        }
+        
+        .debug-box {
+            background: #1e1e1e;
+            color: #0f0;
+            font-family: monospace;
+            font-size: 11px;
+            padding: 12px;
+            border-radius: 8px;
+            margin-top: 15px;
+            overflow-x: auto;
+            display: none;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 30px;
+        }
+        
+        .spinner {
+            display: inline-block;
+            width: 40px;
+            height: 40px;
+            border: 3px solid #e2e8f0;
+            border-top-color: #2c6e49;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .role-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-top: 10px;
+        }
+        
+        .role-badge.viewer { background: #f1f5f9; color: #475569; }
+        .role-badge.field_officer { background: #e0e7ff; color: #3730a3; }
+        .role-badge.validator { background: #fef3c7; color: #92400e; }
+        .role-badge.manager { background: #dbeafe; color: #1e40af; }
+        
+        .back-link {
+            text-align: center;
+            margin-top: 20px;
+        }
+        
+        .back-link a {
+            color: white;
+            text-decoration: none;
+        }
+        
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 20px;
+            border-radius: 8px;
+            color: white;
+            z-index: 9999;
+            animation: slideIn 0.3s ease;
+        }
+        
+        .notification-success { background: #4CAF50; }
+        .notification-error { background: #F44336; }
+        
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="card">
+            <div class="header">
+                <i class="fas fa-ticket-alt"></i>
+                <h1>Redeem Invitation</h1>
+                <p>Enter your invitation token to join a project</p>
+            </div>
+            <div class="body">
+                <div id="userInfo" class="user-info">
+                    <div class="user-avatar" id="userAvatar">?</div>
+                    <div class="user-details">
+                        <div class="user-email" id="userEmail">Loading...</div>
+                        <div class="user-name" id="userName">Loading...</div>
+                    </div>
+                </div>
+                
+                <div id="loadingState" class="loading">
+                    <div class="spinner"></div>
+                    <p style="margin-top: 16px;">Loading available tokens...</p>
+                </div>
+                
+                <div id="redeemForm" style="display: none;">
+                    <div class="info-box">
+                        <i class="fas fa-info-circle"></i> 
+                        Click on any token below to auto-fill, or enter your invitation token manually.
+                    </div>
+                    
+                    <div id="availableTokensSection" class="available-tokens">
+                        <h4><i class="fas fa-list"></i> Available Tokens (Click to use)</h4>
+                        <div id="tokensList" class="token-grid"></div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label><i class="fas fa-qrcode"></i> Or Enter Token Manually</label>
+                        <div class="token-input-container">
+                            <input type="text" id="tokenInput" class="token-input" placeholder="e.g., MANAG64b1" autocomplete="off">
+                        </div>
+                    </div>
+                    
+                    <button id="redeemBtn" class="btn-primary">
+                        <i class="fas fa-check-circle"></i> Redeem Invitation
+                    </button>
+                    
+                    <button onclick="window.location.href='index.html'" class="btn-secondary">
+                        <i class="fas fa-home"></i> Go to Dashboard
+                    </button>
+                </div>
+                
+                <div id="resultMessage" style="display: none;"></div>
+                <div id="debugInfo" class="debug-box"></div>
+            </div>
+        </div>
+        <div class="back-link">
+            <a href="login.html">← Back to Login</a>
+        </div>
+    </div>
+    
+    <div id="notificationContainer"></div>
+    
+    <script>
+        const SUPABASE_URL = 'https://crvnohvudurqfukjpisv.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNydm5vaHZ1ZHVycWZ1a2pwaXN2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg0NTUxNzMsImV4cCI6MjA5NDAzMTE3M30.Qp8E57yAN4LnO4A-yirf-Z3QufGZw9OKjBfcQxG7fo8';
+        
+        let supabaseClient = null;
+        let currentUser = null;
+        let availableTokens = [];
+        
+        function showNotification(message, type) {
+            const container = document.getElementById('notificationContainer');
+            const notification = document.createElement('div');
+            notification.className = `notification notification-${type}`;
+            notification.innerHTML = `<i class="fas ${type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle'}"></i> ${message}`;
+            container.appendChild(notification);
+            setTimeout(() => notification.remove(), 5000);
+        }
+        
+        async function init() {
+            supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+            await loadUser();
+            await loadAvailableTokens();
+            setupEventListeners();
+            
+            document.getElementById('loadingState').style.display = 'none';
+            document.getElementById('redeemForm').style.display = 'block';
+        }
+        
+        async function loadUser() {
+            const { data: { session } } = await supabaseClient.auth.getSession();
+            if (!session) {
+                window.location.href = 'login.html';
+                return;
+            }
+            currentUser = session.user;
+            
+            const { data: profile } = await supabaseClient
+                .from('user_profiles')
+                .select('email, first_name')
+                .eq('id', currentUser.id)
+                .maybeSingle();
+            
+            const email = profile?.email || currentUser.email;
+            const firstName = profile?.first_name || '';
+            const avatarInitial = (firstName.charAt(0) || email.charAt(0)).toUpperCase();
+            
+            document.getElementById('userEmail').textContent = email;
+            document.getElementById('userName').textContent = firstName || email.split('@')[0];
+            document.getElementById('userAvatar').textContent = avatarInitial;
+        }
+        
+        async function loadAvailableTokens() {
+            try {
+                // Fetch ALL active tokens (case insensitive search will be done in memory)
+                const { data: tokens, error } = await supabaseClient
+                    .from('invitation_tokens')
+                    .select(`
+                        token,
+                        role,
+                        project_id,
+                        projects!inner (name)
+                    `)
+                    .eq('status', 'active')
+                    .limit(20);
+                
+                if (error) throw error;
+                
+                if (tokens && tokens.length > 0) {
+                    availableTokens = tokens;
+                    const tokensList = document.getElementById('tokensList');
+                    tokensList.innerHTML = tokens.map(token => `
+                        <div class="token-item" onclick="selectToken('${token.token}')">
+                            <span class="token-code">${token.token}</span>
+                            <span class="token-role">${token.role}</span>
+                        </div>
+                    `).join('');
+                } else {
+                    document.getElementById('availableTokensSection').style.display = 'none';
+                }
+            } catch (error) {
+                console.error('Error loading tokens:', error);
+                document.getElementById('availableTokensSection').style.display = 'none';
+            }
+        }
+        
+        window.selectToken = function(token) {
+            document.getElementById('tokenInput').value = token;
+            document.getElementById('tokenInput').style.borderColor = '#22c55e';
+            document.getElementById('tokenInput').style.backgroundColor = '#f0fdf4';
+            showNotification(`Selected token: ${token}`, 'success');
+        };
+        
+        async function redeemToken() {
+            let token = document.getElementById('tokenInput').value.trim().toUpperCase();
+            
+            if (!token) {
+                showNotification('Please enter or select an invitation token', 'error');
+                return;
+            }
+            
+            const redeemBtn = document.getElementById('redeemBtn');
+            const originalText = redeemBtn.innerHTML;
+            redeemBtn.disabled = true;
+            redeemBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Redeeming...';
+            
+            document.getElementById('resultMessage').style.display = 'none';
+            document.getElementById('debugInfo').style.display = 'none';
+            
+            try {
+                console.log('Attempting to redeem token:', token);
+                
+                // Case-insensitive search using ilike
+                const { data: tokenData, error: tokenError } = await supabaseClient
+                    .from('invitation_tokens')
+                    .select('*, projects(name)')
+                    .ilike('token', token)
+                    .eq('status', 'active')
+                    .maybeSingle();
+                
+                console.log('Token query result:', tokenData);
+                
+                if (tokenError) {
+                    throw new Error(`Database error: ${tokenError.message}`);
+                }
+                
+                if (!tokenData) {
+                    // Check if token exists but not active
+                    const { data: anyToken } = await supabaseClient
+                        .from('invitation_tokens')
+                        .select('status, role')
+                        .ilike('token', token)
+                        .maybeSingle();
+                    
+                    if (anyToken) {
+                        if (anyToken.status === 'revoked') {
+                            throw new Error(`Token "${token}" has been revoked`);
+                        } else if (anyToken.status === 'expired') {
+                            throw new Error(`Token "${token}" has expired`);
+                        }
+                        throw new Error(`Token "${token}" is ${anyToken.status}`);
+                    }
+                    
+                    throw new Error(`Token "${token}" not found. Please check the spelling.`);
+                }
+                
+                // Check max uses
+                if (tokenData.max_uses && tokenData.used_count >= tokenData.max_uses) {
+                    throw new Error('This token has reached its maximum number of uses');
+                }
+                
+                // Check if user is already a member
+                const { data: existingMember } = await supabaseClient
+                    .from('project_members')
+                    .select('id, status, role')
+                    .eq('project_id', tokenData.project_id)
+                    .eq('user_id', currentUser.id)
+                    .maybeSingle();
+                
+                if (existingMember && existingMember.status === 'active') {
+                    throw new Error(`You are already a member of "${tokenData.projects.name}" as ${existingMember.role}`);
+                }
+                
+                // Add or update member
+                if (existingMember && existingMember.status === 'revoked') {
+                    await supabaseClient
+                        .from('project_members')
+                        .update({ 
+                            status: 'active', 
+                            role: tokenData.role,
+                            granted_at: new Date().toISOString()
+                        })
+                        .eq('id', existingMember.id);
+                } else {
+                    await supabaseClient
+                        .from('project_members')
+                        .insert({
+                            project_id: tokenData.project_id,
+                            user_id: currentUser.id,
+                            role: tokenData.role,
+                            granted_by: tokenData.granted_by,
+                            status: 'active',
+                            granted_at: new Date().toISOString()
+                        });
+                }
+                
+                // Update token usage count
+                await supabaseClient
+                    .from('invitation_tokens')
+                    .update({ used_count: (tokenData.used_count || 0) + 1 })
+                    .eq('id', tokenData.id);
+                
+                // Show success
+                document.getElementById('redeemForm').style.display = 'none';
+                document.getElementById('resultMessage').innerHTML = `
+                    <div class="success-box">
+                        <i class="fas fa-check-circle"></i>
+                        <h3>Successfully Joined!</h3>
+                        <p>You have been added to <strong>${tokenData.projects.name}</strong></p>
+                        <div class="role-badge ${tokenData.role}">Role: ${tokenData.role.replace('_', ' ').toUpperCase()}</div>
+                        <button onclick="window.location.href='index.html'" class="btn-primary" style="margin-top: 20px;">
+                            <i class="fas fa-home"></i> Go to Dashboard
+                        </button>
+                    </div>
+                `;
+                document.getElementById('resultMessage').style.display = 'block';
+                showNotification(`Successfully joined ${tokenData.projects.name}!`, 'success');
+                
+            } catch (error) {
+                console.error('Error:', error);
+                showNotification(error.message, 'error');
+                
+                document.getElementById('resultMessage').innerHTML = `
+                    <div class="error-box">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <strong>Failed to Redeem</strong><br>
+                        ${error.message}
+                    </div>
+                `;
+                document.getElementById('resultMessage').style.display = 'block';
+                
+                // Show debug info
+                document.getElementById('debugInfo').style.display = 'block';
+                document.getElementById('debugInfo').innerHTML = `
+                    <strong>Debug Info:</strong><br>
+                    Token attempted: ${token}<br>
+                    User ID: ${currentUser?.id}<br>
+                    Time: ${new Date().toLocaleString()}<br>
+                    Tip: Make sure the token exists in the database
+                `;
+                
+            } finally {
+                redeemBtn.disabled = false;
+                redeemBtn.innerHTML = originalText;
+            }
+        }
+        
+        function setupEventListeners() {
+            document.getElementById('redeemBtn').addEventListener('click', redeemToken);
+            document.getElementById('tokenInput').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') redeemToken();
+            });
+        }
+        
+        init();
+    </script>
+</body>
+</html>
