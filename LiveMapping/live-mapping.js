@@ -1,7 +1,68 @@
 // ===========================================
+// SIDEBAR TOGGLE LOGIC
+// ===========================================
+const sidebar = document.getElementById('sidebar');
+const burgerBtn = document.getElementById('burgerBtn');
+const sidebarToggle = document.getElementById('sidebarToggle');
+const sidebarOverlay = document.getElementById('sidebarOverlay');
+
+function toggleSidebar() {
+    if (window.innerWidth <= 768) {
+        sidebar.classList.toggle('mobile-open');
+        sidebarOverlay.classList.toggle('active');
+        document.body.style.overflow = sidebar.classList.contains('mobile-open') ? 'hidden' : '';
+    } else {
+        sidebar.classList.toggle('collapsed');
+        const icon = sidebarToggle.querySelector('i');
+        if (sidebar.classList.contains('collapsed')) {
+            icon.className = 'fas fa-chevron-right';
+        } else {
+            icon.className = 'fas fa-chevron-left';
+        }
+        localStorage.setItem('sidebarCollapsed', sidebar.classList.contains('collapsed'));
+    }
+}
+
+function closeMobileSidebar() {
+    sidebar.classList.remove('mobile-open');
+    sidebarOverlay.classList.remove('active');
+    document.body.style.overflow = '';
+}
+
+window.toggleMobileSidebar = toggleSidebar;
+window.closeMobileSidebar = closeMobileSidebar;
+
+burgerBtn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    toggleSidebar();
+});
+
+sidebarToggle.addEventListener('click', function(e) {
+    e.stopPropagation();
+    if (window.innerWidth > 768) {
+        toggleSidebar();
+    }
+});
+
+sidebarOverlay.addEventListener('click', closeMobileSidebar);
+
+if (window.innerWidth > 768) {
+    const saved = localStorage.getItem('sidebarCollapsed');
+    if (saved === 'true') {
+        sidebar.classList.add('collapsed');
+        sidebarToggle.querySelector('i').className = 'fas fa-chevron-right';
+    }
+}
+
+window.addEventListener('resize', function() {
+    if (window.innerWidth > 768) {
+        closeMobileSidebar();
+    }
+});
+
+// ===========================================
 // LIVE MAPPING - COMPLETE JAVASCRIPT
 // ===========================================
-
 console.log('🚀 Live Mapping initializing...');
 
 // ===========================================
@@ -21,7 +82,12 @@ let farmsData = [];
 let filteredFarms = [];
 let currentMap = null;
 let farmLayers = [];
-let currentAlerts = [];
+let protectedLayer = null;
+let protectedAreas = [];
+let protectedVisible = true;
+let mapInitialized = false;
+let overlapAlerts = [];
+let qualityAlerts = [];
 let uniqueSuppliers = [];
 let uniqueCooperatives = [];
 let supplierSearchTerm = '';
@@ -36,6 +102,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     await loadUserAndProjects();
     setupDropdown();
     setupEventListeners();
+    setupFileUpload();
 });
 
 async function loadUserAndProjects() {
@@ -48,7 +115,6 @@ async function loadUserAndProjects() {
     }
     currentUser = session.user;
     
-    // Get user profile
     const { data: profile } = await supabaseClient
         .from('user_profiles')
         .select('first_name, email')
@@ -60,7 +126,6 @@ async function loadUserAndProjects() {
     document.getElementById('userName').textContent = displayName;
     document.getElementById('userAvatar').textContent = (firstName.charAt(0) || currentUser.email.charAt(0)).toUpperCase();
     
-    // Get user's projects
     const { data: memberships } = await supabaseClient
         .from('project_members')
         .select('project_id, role, projects(*)')
@@ -69,31 +134,34 @@ async function loadUserAndProjects() {
     
     if (memberships && memberships.length > 0) {
         allUserProjects = memberships;
-        document.getElementById('userRole').textContent = memberships[0].role.replace('_', ' ').toUpperCase();
+        const userRole = memberships[0].role;
+        document.getElementById('userRole').textContent = userRole.replace('_', ' ').toUpperCase();
         
-        // Add role badge
         const roleBadge = document.createElement('span');
-        roleBadge.className = `role-badge ${memberships[0].role}`;
-        roleBadge.textContent = memberships[0].role.toUpperCase();
+        roleBadge.className = `role-badge ${userRole}`;
+        roleBadge.textContent = userRole.toUpperCase();
         document.querySelector('.user-info').insertBefore(roleBadge, document.querySelector('.sync-btn'));
         
-        // Get project from URL or localStorage
+        // Show admin section for owners and managers
+        const isAdmin = userRole === 'owner' || userRole === 'manager';
+        const adminSection = document.getElementById('adminSection');
+        if (adminSection) {
+            adminSection.style.display = isAdmin ? 'block' : 'none';
+        }
+        
         const urlParams = new URLSearchParams(window.location.search);
         let projectIdFromUrl = urlParams.get('project');
-        
         let targetProject = null;
         
         if (projectIdFromUrl && projectIdFromUrl !== 'all') {
             targetProject = memberships.find(m => m.projects.id === projectIdFromUrl);
         }
-        
         if (!targetProject) {
             const lastViewed = localStorage.getItem(`lastProject_${currentUser.id}`);
             if (lastViewed) targetProject = memberships.find(m => m.projects.id === lastViewed);
             if (!targetProject) targetProject = memberships[0];
         }
         
-        // Show project selector for owners with multiple projects
         const isOwner = memberships.some(m => m.role === 'owner');
         if (isOwner && memberships.length > 1) {
             document.getElementById('projectSelectorContainer').classList.remove('hidden');
@@ -102,30 +170,17 @@ async function loadUserAndProjects() {
         
         currentProject = targetProject.projects;
         document.getElementById('selectedProjectName').innerHTML = `📁 ${currentProject.name}`;
+        document.getElementById('projectBadge').textContent = currentProject.name;
         
-        // Update navigation links
-        updateNavigationLinks();
-        
-        // Load project data
         await loadProjectData(currentProject.id);
         localStorage.setItem(`lastProject_${currentUser.id}`, currentProject.id);
         
-        // Update URL
         const url = new URL(window.location);
         url.searchParams.set('project', currentProject.id);
         window.history.replaceState({}, '', url);
     }
     
     showLoading(false);
-}
-
-function updateNavigationLinks() {
-    const queryString = currentProject ? `?project=${currentProject.id}` : '';
-    document.querySelector('a[data-page="dashboard"]').href = `../Dashboard.html${queryString}`;
-    document.querySelector('a[data-page="submissions"]').href = `../Submissions/submissions.html${queryString}`;
-    document.querySelector('a[data-page="quality-alerts"]').href = `../QualityAlerts/quality-alerts.html${queryString}`;
-    document.querySelector('a[data-page="exports"]').href = `../Exports/exports.html${queryString}`;
-    document.getElementById('dataMgmtLink').href = `../DataManagement.html${queryString}`;
 }
 
 async function populateDropdown(memberships) {
@@ -148,9 +203,9 @@ async function populateDropdown(memberships) {
                 const selected = allUserProjects.find(p => p.projects.id === value);
                 if (selected) {
                     currentProject = selected.projects;
+                    document.getElementById('projectBadge').textContent = currentProject.name;
                     await loadProjectData(value);
                     localStorage.setItem(`lastProject_${currentUser.id}`, value);
-                    updateNavigationLinks();
                 }
             }
             
@@ -189,29 +244,6 @@ function filterDropdown(term) {
     });
 }
 
-async function loadProjectData(projectId) {
-    showLoading(true);
-    
-    const { data: farms } = await supabaseClient
-        .from('farms')
-        .select('*')
-        .eq('project_id', projectId);
-    
-    farmsData = farms || [];
-    filteredFarms = [...farmsData];
-    
-    // Update filter options
-    updateFilterOptions();
-    
-    // Update UI
-    updateMap(farmsData);
-    updateStats(farmsData);
-    updateTimeline(farmsData);
-    
-    showLoading(false);
-    document.querySelector('.header-title h1').innerHTML = `Live Mapping <span style="font-size:14px; background:#e2e8f0; padding:2px 10px; border-radius:20px;">${currentProject.name}</span>`;
-}
-
 async function loadAllProjectsData() {
     showLoading(true);
     
@@ -227,19 +259,265 @@ async function loadAllProjectsData() {
     farmsData = allFarms;
     filteredFarms = [...farmsData];
     
+    await loadProtectedAreas();
     updateFilterOptions();
-    updateMap(allFarms);
-    updateStats(allFarms);
-    updateTimeline(allFarms);
+    updateMap(farmsData);
+    updateStats(farmsData);
+    updateTimeline(farmsData);
+    updateOverlapCount();
     
+    document.getElementById('projectBadge').textContent = 'ALL PROJECTS';
     showLoading(false);
-    document.querySelector('.header-title h1').innerHTML = 'Live Mapping <span style="font-size:14px; background:#e2e8f0; padding:2px 10px; border-radius:20px;">ALL PROJECTS</span>';
 }
 
+async function loadProjectData(projectId) {
+    showLoading(true);
+    
+    const { data: farms } = await supabaseClient
+        .from('farms')
+        .select('*')
+        .eq('project_id', projectId);
+    
+    farmsData = farms || [];
+    filteredFarms = [...farmsData];
+    
+    await loadProtectedAreas();
+    updateFilterOptions();
+    updateMap(farmsData);
+    updateStats(farmsData);
+    updateTimeline(farmsData);
+    updateOverlapCount();
+    
+    showLoading(false);
+    document.querySelector('.header-title h1').innerHTML = `Live Mapping <span style="font-size:14px; background:#e2e8f0; padding:2px 10px; border-radius:20px;">${currentProject.name}</span>`;
+}
+
+async function loadProtectedAreas() {
+    try {
+        if (!currentProject) return;
+        const { data, error } = await supabaseClient
+            .from('protected_areas')
+            .select('*')
+            .eq('project_id', currentProject.id);
+        
+        if (!error && data) {
+            protectedAreas = data.map(area => ({ 
+                id: area.id, 
+                type: 'Feature', 
+                geometry: area.geometry, 
+                properties: { name: area.name, area_ha: area.area_ha } 
+            }));
+            console.log('✅ Loaded protected areas:', protectedAreas.length);
+            updateProtectedStatus();
+        }
+    } catch (error) {
+        console.error('❌ Error loading protected areas:', error);
+    }
+}
+
+function updateProtectedStatus() {
+    const statusEl = document.getElementById('protectedStatus');
+    const dot = statusEl?.querySelector('.status-dot');
+    const text = statusEl?.querySelector('span:last-child');
+    
+    if (protectedAreas.length > 0) {
+        if (dot) { dot.className = 'status-dot active'; }
+        if (text) { text.textContent = `${protectedAreas.length} areas loaded`; }
+    } else {
+        if (dot) { dot.className = 'status-dot'; }
+        if (text) { text.textContent = 'No areas loaded'; }
+    }
+}
+
+// ===========================================
+// FILE UPLOAD - GEOJSON (Admin Only)
+// ===========================================
+function setupFileUpload() {
+    document.getElementById('geoUpload').addEventListener('change', async function(e) {
+        if (e.target.files && e.target.files[0]) {
+            await uploadProtectedArea(e.target.files[0]);
+            e.target.value = '';
+        }
+    });
+}
+
+async function uploadProtectedArea(file) {
+    const uploadStatus = document.getElementById('uploadStatus');
+    uploadStatus.textContent = 'Uploading...';
+    uploadStatus.className = 'upload-status';
+    showLoading(true);
+    
+    try {
+        const text = await file.text();
+        const geojson = JSON.parse(text);
+        
+        if (!geojson.features || geojson.features.length === 0) {
+            throw new Error('No features found in GeoJSON');
+        }
+        
+        let savedCount = 0;
+        for (const feature of geojson.features) {
+            if (!feature.geometry) continue;
+            
+            let name = feature.properties?.nom || feature.properties?.name || 
+                       feature.properties?.Name || 'Protected Area';
+            let areaHa = null;
+            try { 
+                areaHa = turf.area(feature.geometry) / 10000; 
+            } catch(e) {}
+            
+            const { error } = await supabaseClient.from('protected_areas').insert({
+                project_id: currentProject.id,
+                name: name.toString().substring(0, 255),
+                geometry: feature.geometry,
+                area_ha: areaHa,
+                uploaded_by: currentUser.id
+            });
+            
+            if (!error) savedCount++;
+        }
+        
+        uploadStatus.textContent = `✅ Uploaded ${savedCount} protected areas`;
+        uploadStatus.className = 'upload-status success';
+        showNotification(`✅ Uploaded ${savedCount} protected areas`, 'success');
+        await loadProtectedAreas();
+        displayProtectedAreas();
+        updateProtectedStatus();
+        
+    } catch (err) {
+        console.error('❌ Upload error:', err);
+        uploadStatus.textContent = '❌ Error: ' + err.message;
+        uploadStatus.className = 'upload-status error';
+        showNotification('❌ Error: ' + err.message, 'error');
+    }
+    showLoading(false);
+}
+
+window.clearAllProtectedAreas = async function() {
+    if (!confirm('Delete ALL protected areas?')) return;
+    showLoading(true);
+    try {
+        await supabaseClient.from('protected_areas').delete().eq('project_id', currentProject.id);
+        protectedAreas = [];
+        if (protectedLayer && currentMap) {
+            currentMap.removeLayer(protectedLayer);
+            protectedLayer = null;
+        }
+        updateProtectedStatus();
+        document.getElementById('uploadStatus').textContent = 'All areas cleared';
+        document.getElementById('uploadStatus').className = 'upload-status';
+        showNotification('All protected areas deleted', 'success');
+    } catch (error) {
+        showNotification('Error deleting: ' + error.message, 'error');
+    }
+    showLoading(false);
+};
+
+// ===========================================
+// MAP FUNCTIONS
+// ===========================================
+function initMap() {
+    if (mapInitialized) return;
+    try {
+        currentMap = L.map('map', {
+            zoomControl: false
+        }).setView([7.539989, -5.547080], 7);
+        
+        L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', { 
+            maxZoom: 20, 
+            subdomains: ['mt0','mt1','mt2','mt3'] 
+        }).addTo(currentMap);
+        
+        mapInitialized = true;
+        console.log('✅ Map initialized');
+        displayProtectedAreas();
+    } catch(e) {
+        console.error('❌ Error initializing map:', e);
+    }
+}
+
+function updateMap(farms) {
+    if (!currentMap) {
+        initMap();
+        if (!currentMap) return;
+    }
+    
+    farmLayers.forEach(layer => { if (currentMap) currentMap.removeLayer(layer); });
+    farmLayers = [];
+    let bounds = L.latLngBounds();
+    
+    function convertCoords(c) {
+        if (!c || !Array.isArray(c)) return c;
+        if (c.length === 2 && typeof c[0] === 'number') return [c[1], c[0]];
+        return c.map(convertCoords);
+    }
+    
+    farms.forEach(farm => {
+        if (farm.geometry?.coordinates) {
+            try {
+                const color = farm.status === 'validated' ? '#4CAF50' : 
+                             farm.status === 'pending' ? '#FFC107' : '#F44336';
+                
+                const poly = L.polygon(convertCoords(farm.geometry.coordinates), { 
+                    color, weight: 2, fillColor: color, fillOpacity: 0.3 
+                }).addTo(currentMap);
+                
+                poly.farmData = farm;
+                poly.bindPopup(`
+                    <b>${farm.farmer_name || 'Unknown'}</b><br>
+                    Area: ${farm.area || 0} ha<br>
+                    Status: ${farm.status || 'pending'}
+                `);
+                poly.on('click', () => showFarmDetails(farm));
+                farmLayers.push(poly);
+                bounds.extend(poly.getBounds());
+            } catch(e) {}
+        }
+    });
+    
+    displayProtectedAreas();
+    
+    if (bounds.isValid()) {
+        currentMap.fitBounds(bounds, { padding: [50, 50] });
+    }
+}
+
+function displayProtectedAreas() {
+    if (!currentMap) return;
+    try {
+        if (protectedLayer) {
+            currentMap.removeLayer(protectedLayer);
+            protectedLayer = null;
+        }
+        
+        if (!protectedVisible || protectedAreas.length === 0) return;
+        
+        protectedLayer = L.geoJSON(protectedAreas, { 
+            style: { 
+                color: '#8B4513', 
+                weight: 2, 
+                fillColor: '#8B4513', 
+                fillOpacity: 0.15,
+                dashArray: '5,5'
+            },
+            onEachFeature: (feature, layer) => {
+                layer.bindPopup(`<b>🌳 Protected Area</b><br>${feature.properties.name || 'Unnamed'}`);
+            }
+        });
+        
+        if (protectedLayer) {
+            protectedLayer.addTo(currentMap);
+            protectedLayer.bringToBack();
+        }
+    } catch(e) { console.error('Error displaying protected areas:', e); }
+}
+
+// ===========================================
+// FILTER FUNCTIONS
+// ===========================================
 function updateFilterOptions() {
     uniqueSuppliers = [...new Set(farmsData.map(f => f.supplier).filter(Boolean))].sort();
     uniqueCooperatives = [...new Set(farmsData.map(f => f.cooperative).filter(Boolean))].sort();
-    
     updateSupplierFilter();
     updateCooperativeFilter();
 }
@@ -247,41 +525,26 @@ function updateFilterOptions() {
 function updateSupplierFilter() {
     const select = document.getElementById('supplierFilter');
     if (!select) return;
-    
-    const filtered = uniqueSuppliers.filter(s => 
-        s.toLowerCase().includes(supplierSearchTerm)
-    );
-    
+    const filtered = uniqueSuppliers.filter(s => s.toLowerCase().includes(supplierSearchTerm));
     let options = '<option value="all">All Suppliers</option>';
-    filtered.forEach(s => {
-        options += `<option value="${s}">${s}</option>`;
-    });
+    filtered.forEach(s => { options += `<option value="${s}">${s}</option>`; });
     select.innerHTML = options;
 }
 
 function updateCooperativeFilter() {
     const select = document.getElementById('cooperativeFilter');
     if (!select) return;
-    
-    const filtered = uniqueCooperatives.filter(c => 
-        c.toLowerCase().includes(coopSearchTerm)
-    );
-    
+    const filtered = uniqueCooperatives.filter(c => c.toLowerCase().includes(coopSearchTerm));
     let options = '<option value="all">All Cooperatives</option>';
-    filtered.forEach(c => {
-        options += `<option value="${c}">${c}</option>`;
-    });
+    filtered.forEach(c => { options += `<option value="${c}">${c}</option>`; });
     select.innerHTML = options;
 }
 
 function applyFilters() {
     const supplier = document.getElementById('supplierFilter')?.value || 'all';
     const cooperative = document.getElementById('cooperativeFilter')?.value || 'all';
-    
     const statuses = [];
-    document.querySelectorAll('.status-filter:checked').forEach(cb => {
-        statuses.push(cb.value);
-    });
+    document.querySelectorAll('.status-filter:checked').forEach(cb => statuses.push(cb.value));
     
     filteredFarms = farmsData.filter(farm => {
         if (supplier !== 'all' && farm.supplier !== supplier) return false;
@@ -293,21 +556,20 @@ function applyFilters() {
     updateMap(filteredFarms);
     updateStats(filteredFarms);
     updateTimeline(filteredFarms);
-    
     showNotification(`Showing ${filteredFarms.length} farms`, 'info');
 }
 
+// ===========================================
+// STATS FUNCTIONS
+// ===========================================
 function updateStats(farms) {
-    let totalArea = 0;
-    let validated = 0, pending = 0, rejected = 0;
-    
+    let totalArea = 0, validated = 0, pending = 0, rejected = 0;
     farms.forEach(f => {
         totalArea += f.area || 0;
         if (f.status === 'validated') validated++;
         else if (f.status === 'pending') pending++;
         else if (f.status === 'rejected') rejected++;
     });
-    
     document.getElementById('statTotal').textContent = farms.length;
     document.getElementById('statArea').textContent = totalArea.toFixed(1) + ' ha';
     document.getElementById('statAvg').textContent = farms.length ? (totalArea / farms.length).toFixed(1) + ' ha' : '0 ha';
@@ -318,142 +580,31 @@ function updateStats(farms) {
     document.getElementById('mapTotalArea').textContent = totalArea.toFixed(1) + ' ha';
 }
 
-function convertCoords(c) {
-    if (!c || !Array.isArray(c)) return c;
-    if (c.length === 2 && typeof c[0] === 'number') return [c[1], c[0]];
-    return c.map(convertCoords);
-}
-
-function updateMap(farms) {
-    if (currentMap) currentMap.remove();
-    
-    currentMap = L.map('map').setView([7.539989, -5.547080], 7);
-    L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', { 
-        maxZoom: 20, 
-        subdomains: ['mt0','mt1','mt2','mt3'] 
-    }).addTo(currentMap);
-    
-    farmLayers = [];
-    let bounds = L.latLngBounds();
-    
-    farms.forEach(farm => {
-        if (farm.geometry?.coordinates) {
+function updateOverlapCount() {
+    let overlaps = 0;
+    filteredFarms.forEach(farm => {
+        if (!farm.geometry?.coordinates) return;
+        protectedAreas.forEach(area => {
             try {
-                const coords = convertCoords(farm.geometry.coordinates);
-                const color = farm.status === 'validated' ? '#4CAF50' : 
-                             farm.status === 'pending' ? '#FFC107' : '#F44336';
-                
-                const poly = L.polygon(coords, { 
-                    color, 
-                    weight: 2, 
-                    fillColor: color, 
-                    fillOpacity: 0.3 
-                }).addTo(currentMap);
-                
-                poly.farmData = farm;
-                poly.bindPopup(`
-                    <b>${farm.farmer_name || 'Unknown'}</b><br>
-                    Area: ${farm.area || 0} ha<br>
-                    Status: ${farm.status || 'pending'}
-                `);
-                
-                poly.on('click', () => showFarmDetails(farm));
-                
-                farmLayers.push(poly);
-                bounds.extend(poly.getBounds());
-            } catch(e) {
-                console.error('Error adding farm polygon:', e);
-            }
-        }
+                const farmPoly = turf.polygon(farm.geometry.coordinates);
+                const areaPoly = turf.polygon(area.geometry.coordinates);
+                if (turf.booleanIntersects(farmPoly, areaPoly)) {
+                    overlaps++;
+                }
+            } catch(e) {}
+        });
     });
-    
-    if (bounds.isValid()) {
-        currentMap.fitBounds(bounds, { padding: [50, 50] });
-    }
+    document.getElementById('mapOverlapCount').textContent = overlaps;
 }
 
-function showFarmDetails(farm) {
-    const panel = document.getElementById('detailsPanel');
-    const content = document.getElementById('detailsContent');
-    
-    panel.classList.remove('hidden');
-    
-    const statusColor = farm.status === 'validated' ? '#4CAF50' : 
-                       farm.status === 'pending' ? '#FFC107' : '#F44336';
-    
-    content.innerHTML = `
-        <div class="farm-detail-card">
-            <div class="detail-header" style="background: ${statusColor}15;">
-                <i class="fas fa-tractor" style="color: ${statusColor};"></i>
-                <h3>${escapeHtml(farm.farmer_name || 'Unknown Farmer')}</h3>
-            </div>
-            
-            <div class="detail-section">
-                <h4><i class="fas fa-id-card"></i> Identification</h4>
-                <div class="detail-row">
-                    <span class="detail-label">Farm ID:</span>
-                    <span class="detail-value">${escapeHtml(farm.farmer_id || farm.id.slice(0,8))}</span>
-                </div>
-                <div class="detail-row">
-                    <span class="detail-label">Farmer ID:</span>
-                    <span class="detail-value">${escapeHtml(farm.farmer_id || 'N/A')}</span>
-                </div>
-            </div>
-            
-            <div class="detail-section">
-                <h4><i class="fas fa-building"></i> Organization</h4>
-                <div class="detail-row">
-                    <span class="detail-label">Cooperative:</span>
-                    <span class="detail-value">${escapeHtml(farm.cooperative || '-')}</span>
-                </div>
-                <div class="detail-row">
-                    <span class="detail-label">Supplier:</span>
-                    <span class="detail-value">${escapeHtml(farm.supplier || '-')}</span>
-                </div>
-            </div>
-            
-            <div class="detail-section">
-                <h4><i class="fas fa-ruler-combined"></i> Measurements</h4>
-                <div class="detail-row">
-                    <span class="detail-label">Area:</span>
-                    <span class="detail-value highlight">${(farm.area || 0).toFixed(2)} ha</span>
-                </div>
-                <div class="detail-row">
-                    <span class="detail-label">Status:</span>
-                    <span class="detail-value">
-                        <span class="status-badge ${farm.status || 'pending'}">${farm.status || 'pending'}</span>
-                    </span>
-                </div>
-            </div>
-            
-            <div class="detail-section">
-                <h4><i class="fas fa-calendar"></i> Submission</h4>
-                <div class="detail-row">
-                    <span class="detail-label">Date:</span>
-                    <span class="detail-value">${new Date(farm.created_at).toLocaleDateString()}</span>
-                </div>
-                <div class="detail-row">
-                    <span class="detail-label">Enumerator:</span>
-                    <span class="detail-value">${escapeHtml(farm.enumerator || 'N/A')}</span>
-                </div>
-            </div>
-            
-            <div class="detail-actions">
-                <button onclick="window.zoomToFarm('${farm.id}')">
-                    <i class="fas fa-search"></i> Zoom to Farm
-                </button>
-            </div>
-        </div>
-    `;
-}
-
+// ===========================================
+// TIMELINE FUNCTIONS
+// ===========================================
 function updateTimeline(farms) {
     const timeline = document.getElementById('timelineList');
     if (!timeline) return;
     
-    const recent = [...farms]
-        .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
-        .slice(0, 6);
+    const recent = [...farms].sort((a, b) => new Date(b.created_at) - new Date(a.created_at)).slice(0, 6);
     
     if (recent.length === 0) {
         timeline.innerHTML = '<div class="empty-state">No recent submissions</div>';
@@ -478,86 +629,109 @@ function updateTimeline(farms) {
 }
 
 // ===========================================
-// MAP CONTROL FUNCTIONS
+// FARM DETAILS
 // ===========================================
-window.zoomIn = () => currentMap?.zoomIn();
-window.zoomOut = () => currentMap?.zoomOut();
-window.resetView = () => currentMap?.setView([7.539989, -5.547080], 7);
-window.locateMe = () => currentMap?.locate({ setView: true, maxZoom: 16 });
-window.refreshMapData = () => currentProject ? loadProjectData(currentProject.id) : null;
-window.refreshTimeline = () => currentProject ? loadProjectData(currentProject.id) : null;
-window.closeDetails = () => document.getElementById('detailsPanel').classList.add('hidden');
+function showFarmDetails(farm) {
+    const panel = document.getElementById('detailsPanel');
+    const content = document.getElementById('detailsContent');
+    panel.classList.remove('hidden');
+    
+    const statusColor = farm.status === 'validated' ? '#4CAF50' : 
+                       farm.status === 'pending' ? '#FFC107' : '#F44336';
+    
+    content.innerHTML = `
+        <div class="farm-detail-card">
+            <div class="detail-header" style="background: ${statusColor}15;">
+                <i class="fas fa-tractor" style="color: ${statusColor};"></i>
+                <h3>${escapeHtml(farm.farmer_name || 'Unknown Farmer')}</h3>
+            </div>
+            <div class="detail-section">
+                <h4><i class="fas fa-id-card"></i> Identification</h4>
+                <div class="detail-row"><span class="detail-label">Farm ID:</span><span class="detail-value">${escapeHtml(farm.farmer_id || farm.id.slice(0,8))}</span></div>
+                <div class="detail-row"><span class="detail-label">Farmer ID:</span><span class="detail-value">${escapeHtml(farm.farmer_id || 'N/A')}</span></div>
+            </div>
+            <div class="detail-section">
+                <h4><i class="fas fa-building"></i> Organization</h4>
+                <div class="detail-row"><span class="detail-label">Cooperative:</span><span class="detail-value">${escapeHtml(farm.cooperative || '-')}</span></div>
+                <div class="detail-row"><span class="detail-label">Supplier:</span><span class="detail-value">${escapeHtml(farm.supplier || '-')}</span></div>
+            </div>
+            <div class="detail-section">
+                <h4><i class="fas fa-ruler-combined"></i> Measurements</h4>
+                <div class="detail-row"><span class="detail-label">Area:</span><span class="detail-value highlight">${(farm.area || 0).toFixed(2)} ha</span></div>
+                <div class="detail-row"><span class="detail-label">Status:</span><span class="detail-value"><span class="status-badge ${farm.status || 'pending'}">${farm.status || 'pending'}</span></span></div>
+            </div>
+            <div class="detail-actions">
+                <button onclick="window.zoomToFarm('${farm.id}')"><i class="fas fa-search"></i> Zoom to Farm</button>
+            </div>
+        </div>
+    `;
+}
 
-window.setBaseLayer = (type) => {
-    if (!currentMap) return;
-    
-    currentMap.eachLayer(layer => {
-        if (layer instanceof L.TileLayer) currentMap.removeLayer(layer);
-    });
-    
-    if (type === 'satellite') {
-        L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', { 
-            maxZoom: 20, 
-            subdomains: ['mt0','mt1','mt2','mt3'] 
-        }).addTo(currentMap);
-    } else if (type === 'streets') {
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { 
-            maxZoom: 19 
-        }).addTo(currentMap);
-    } else {
-        L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', { 
-            maxZoom: 17 
-        }).addTo(currentMap);
-    }
-    
-    // Update active button styling
-    document.querySelectorAll('.map-action-btn').forEach(btn => btn.classList.remove('active'));
-    event.target.classList.add('active');
+window.closeDetails = function() {
+    document.getElementById('detailsPanel').classList.add('hidden');
 };
 
-window.zoomToAllFarms = () => {
+window.zoomToFarm = function(farmId) {
+    const farm = filteredFarms.find(f => f.id === farmId);
+    if (farm && farm.geometry?.coordinates && currentMap) {
+        function convert(c) {
+            if (!Array.isArray(c)) return c;
+            if (c.length === 2 && typeof c[0] === 'number') return [c[1], c[0]];
+            return c.map(convert);
+        }
+        try {
+            const bounds = L.latLngBounds(convert(farm.geometry.coordinates));
+            currentMap.fitBounds(bounds, { padding: [30, 30] });
+            showFarmDetails(farm);
+            showNotification(`Zooming to ${farm.farmer_name || 'farm'}`, 'info');
+        } catch(e) {}
+    }
+};
+
+// ===========================================
+// MAP CONTROLS
+// ===========================================
+window.zoomIn = function() { currentMap?.zoomIn(); };
+window.zoomOut = function() { currentMap?.zoomOut(); };
+window.resetView = function() { currentMap?.setView([7.539989, -5.547080], 7); };
+window.locateMe = function() { currentMap?.locate({ setView: true, maxZoom: 16 }); };
+window.refreshMapData = function() { currentProject ? loadProjectData(currentProject.id) : null; };
+window.refreshTimeline = function() { currentProject ? loadProjectData(currentProject.id) : null; };
+
+window.zoomToAllFarms = function() {
     if (farmLayers.length === 0) return;
-    
     const bounds = L.latLngBounds();
     farmLayers.forEach(layer => bounds.extend(layer.getBounds()));
     currentMap?.fitBounds(bounds, { padding: [50, 50] });
 };
 
-window.zoomToFarm = (farmId) => {
-    const farm = filteredFarms.find(f => f.id === farmId);
-    if (farm && farm.geometry?.coordinates) {
-        const coords = convertCoords(farm.geometry.coordinates);
-        const bounds = L.latLngBounds(coords);
-        currentMap?.fitBounds(bounds, { padding: [30, 30] });
-        showFarmDetails(farm);
-    }
-};
-
-window.toggleLegend = () => {
+window.toggleLegend = function() {
     const legend = document.getElementById('mapLegend');
     legend.style.display = legend.style.display === 'none' ? 'block' : 'none';
 };
 
-window.performSearch = () => {
-    const term = document.getElementById('mapSearch').value.toLowerCase();
-    if (term.length < 2) {
-        showNotification('Enter at least 2 characters', 'warning');
-        return;
-    }
-    
-    const found = filteredFarms.filter(farm => 
-        (farm.farmer_name || '').toLowerCase().includes(term) ||
-        (farm.farmer_id || '').toLowerCase().includes(term)
-    );
-    
-    if (found.length === 1) {
-        zoomToFarm(found[0].id);
-        showNotification('Farm found', 'success');
-    } else if (found.length > 1) {
-        showNotification(`Found ${found.length} farms`, 'info');
+window.setBaseLayer = function(type) {
+    if (!currentMap) return;
+    currentMap.eachLayer(layer => {
+        if (layer instanceof L.TileLayer) currentMap.removeLayer(layer);
+    });
+    if (type === 'satellite') {
+        L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', { maxZoom: 20, subdomains: ['mt0','mt1','mt2','mt3'] }).addTo(currentMap);
+    } else if (type === 'streets') {
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(currentMap);
     } else {
-        showNotification('No farms found', 'warning');
+        L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', { maxZoom: 17 }).addTo(currentMap);
     }
+    document.querySelectorAll('.map-action-btn').forEach(btn => btn.classList.remove('active'));
+    if (event && event.target) event.target.classList.add('active');
+};
+
+window.performSearch = function() {
+    const term = document.getElementById('mapSearch').value.toLowerCase();
+    if (term.length < 2) { showNotification('Enter at least 2 characters', 'warning'); return; }
+    const found = filteredFarms.find(f => f.farmer_name?.toLowerCase().includes(term) || f.farmer_id?.toLowerCase().includes(term));
+    if (found) window.zoomToFarm(found.id);
+    else showNotification('Farm not found', 'warning');
 };
 
 // ===========================================
@@ -566,79 +740,45 @@ window.performSearch = () => {
 function setupEventListeners() {
     document.getElementById('applyFiltersBtn')?.addEventListener('click', applyFilters);
     document.getElementById('syncKoboBtn')?.addEventListener('click', () => {
-        showNotification('Syncing with Kobo...', 'info');
-        setTimeout(() => loadProjectData(currentProject.id), 1500);
+        showNotification('Refreshing data...', 'info');
+        refreshMapData();
+    });
+    document.getElementById('toggleProtectedLayer')?.addEventListener('change', (e) => {
+        protectedVisible = e.target.checked;
+        displayProtectedAreas();
+    });
+    document.getElementById('supplierSearch')?.addEventListener('input', (e) => {
+        supplierSearchTerm = e.target.value.toLowerCase();
+        updateSupplierFilter();
+    });
+    document.getElementById('coopSearch')?.addEventListener('input', (e) => {
+        coopSearchTerm = e.target.value.toLowerCase();
+        updateCooperativeFilter();
     });
     document.getElementById('logoutBtn')?.addEventListener('click', async () => {
         await supabaseClient.auth.signOut();
         localStorage.clear();
         window.location.href = '../login.html';
     });
-    
-    document.getElementById('supplierSearch')?.addEventListener('input', (e) => {
-        supplierSearchTerm = e.target.value.toLowerCase();
-        updateSupplierFilter();
-    });
-    
-    document.getElementById('coopSearch')?.addEventListener('input', (e) => {
-        coopSearchTerm = e.target.value.toLowerCase();
-        updateCooperativeFilter();
-    });
 }
 
 function showNotification(message, type = 'info') {
-    const colors = {
-        success: '#4CAF50',
-        error: '#F44336',
-        warning: '#FFC107',
-        info: '#2196F3'
-    };
-    
+    const colors = { success: '#4CAF50', error: '#F44336', warning: '#FFC107', info: '#2196F3' };
     const notification = document.createElement('div');
-    notification.style.cssText = `
-        position: fixed;
-        top: 20px;
-        right: 20px;
-        padding: 12px 24px;
-        background: ${colors[type]};
-        color: white;
-        border-radius: 8px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-        z-index: 10001;
-        animation: slideIn 0.3s ease;
-        font-size: 13px;
-        font-weight: 500;
-    `;
-    notification.textContent = message;
+    notification.style.cssText = `position:fixed;bottom:20px;right:20px;padding:12px 24px;background:${colors[type]};color:white;border-radius:8px;z-index:10001;font-size:13px;font-weight:500;display:flex;align-items:center;gap:8px;box-shadow:0 4px 12px rgba(0,0,0,0.15);`;
+    notification.innerHTML = `<i class="fas ${type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle'}"></i> ${message}`;
     document.body.appendChild(notification);
-    
-    setTimeout(() => {
-        notification.style.opacity = '0';
-        notification.style.transition = 'opacity 0.3s';
-        setTimeout(() => notification.remove(), 300);
-    }, 3000);
+    setTimeout(() => notification.remove(), 3000);
 }
 
 function showLoading(show) {
-    document.getElementById('loadingOverlay').style.display = show ? 'flex' : 'none';
+    const overlay = document.getElementById('loadingOverlay');
+    if (overlay) overlay.style.display = show ? 'flex' : 'none';
 }
 
 function escapeHtml(str) {
     if (!str) return '';
     return str.replace(/[&<>]/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[m] || m));
-}
-
-// Add animation styles if not present
-if (!document.getElementById('live-mapping-animations')) {
-    const style = document.createElement('style');
-    style.id = 'live-mapping-animations';
-    style.textContent = `
-        @keyframes slideIn {
-            from { transform: translateX(100%); opacity: 0; }
-            to { transform: translateX(0); opacity: 1; }
-        }
-    `;
-    document.head.appendChild(style);
 }
 
 console.log('✅ Live Mapping ready');
