@@ -10,33 +10,61 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css" />
     
-    <!-- CSS Files -->
-    <link rel="stylesheet" href="../globalCSS.css">
-    <link rel="stylesheet" href="../layoutCSS.css">
-    <link rel="stylesheet" href="../mapCSS.css">
     <link rel="stylesheet" href="live-mapping.css">
-    
     <link rel="icon" type="image/x-icon" href="../assets/favicon.ico">
 </head>
 <body>
+    <!-- Mobile Sidebar Overlay -->
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
     <div class="layout">
         <!-- SIDEBAR -->
-        <aside class="sidebar">
+        <aside class="sidebar" id="sidebar">
             <div class="sidebar-header">
-                <h2><i class="fas fa-map-marked-alt"></i><span>MappingTrace</span></h2>
-                <button class="sidebar-toggle" id="sidebarToggle"><i class="fas fa-bars"></i></button>
+                <h2>
+                    <i class="fas fa-map-marked-alt"></i>
+                    <span>MappingTrace</span>
+                </h2>
+                <button class="sidebar-toggle" id="sidebarToggle" title="Toggle sidebar">
+                    <i class="fas fa-chevron-left"></i>
+                </button>
             </div>
             <nav class="menu">
-                <a href="../Dashboard.html" data-page="dashboard"><i class="fas fa-tachometer-alt"></i><span>Dashboard</span></a>
-                <a href="#" class="active" data-page="live-mapping"><i class="fas fa-map"></i><span>Live Mapping</span></a>
-                <a href="../Submissions/submissions.html" data-page="submissions"><i class="fas fa-clipboard-list"></i><span>Submissions</span></a>
-                <a href="../QualityAlerts/quality-alerts.html" data-page="quality-alerts"><i class="fas fa-exclamation-triangle"></i><span>Quality Alerts</span></a>
-                <a href="../Exports/exports.html" data-page="exports"><i class="fas fa-file-export"></i><span>Exports</span></a>
+                <div class="menu-label">Main</div>
+                <a href="../Dashboard.html" data-page="dashboard">
+                    <i class="fas fa-tachometer-alt"></i>
+                    <span>Dashboard</span>
+                </a>
+                <a href="#" class="active" data-page="live-mapping">
+                    <i class="fas fa-map"></i>
+                    <span>Live Mapping</span>
+                </a>
+                <a href="../Submissions/submissions.html" data-page="submissions">
+                    <i class="fas fa-clipboard-list"></i>
+                    <span>Submissions</span>
+                </a>
+                <a href="../QualityAlerts/quality-alerts.html" data-page="quality-alerts">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <span>Quality Alerts</span>
+                </a>
+                <a href="../Exports/exports.html" data-page="exports">
+                    <i class="fas fa-file-export"></i>
+                    <span>Exports</span>
+                </a>
+                
+                <hr class="menu-divider">
                 <div class="data-mgmt-link">
-                    <a href="../DataManagement.html" id="dataMgmtLink"><i class="fas fa-database"></i><span>Data Management</span></a>
+                    <a href="../DataManagement.html" id="dataMgmtLink">
+                        <i class="fas fa-database"></i>
+                        <span>Data Management</span>
+                    </a>
                 </div>
+                
                 <div class="menu-bottom">
-                    <a href="#" id="logoutBtn"><i class="fas fa-sign-out-alt"></i><span>Logout</span></a>
+                    <a href="#" id="logoutBtn">
+                        <i class="fas fa-sign-out-alt"></i>
+                        <span>Logout</span>
+                    </a>
                 </div>
             </nav>
         </aside>
@@ -45,9 +73,19 @@
         <main class="main">
             <!-- HEADER -->
             <header class="main-header">
-                <div class="header-title">
-                    <h1>Live Mapping</h1>
-                    <div class="breadcrumb">Home / Live Mapping</div>
+                <div class="header-left">
+                    <button class="burger-btn" id="burgerBtn" aria-label="Toggle sidebar">
+                        <i class="fas fa-bars"></i>
+                    </button>
+                    <div class="header-title">
+                        <div>
+                            <h1>
+                                Live Mapping
+                                <span class="project-badge" id="projectBadge">Loading...</span>
+                            </h1>
+                            <div class="breadcrumb">Home / Live Mapping</div>
+                        </div>
+                    </div>
                 </div>
                 <div class="user-info">
                     <div class="project-selector-container hidden" id="projectSelectorContainer">
@@ -153,46 +191,101 @@
                             <strong id="statRejected">0</strong>
                         </div>
                     </div>
+                    
+                    <!-- Protected Areas Toggle Section -->
+                    <div class="protected-section">
+                        <h3><i class="fas fa-shield-alt"></i> Protected Areas</h3>
+                        <div class="protected-controls">
+                            <div class="protected-toggle">
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="toggleProtectedLayer" checked>
+                                    <span class="toggle-slider"></span>
+                                    <span class="toggle-label">Show on Map</span>
+                                </label>
+                            </div>
+                            <div id="protectedStatus" class="protected-status">
+                                <span class="status-dot"></span>
+                                <span>No areas loaded</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Admin Section - Only for Owners/Managers -->
+                    <div class="admin-section" id="adminSection" style="display: none;">
+                        <h3><i class="fas fa-user-cog"></i> Admin Controls</h3>
+                        <div class="admin-controls">
+                            <div class="admin-upload">
+                                <p class="admin-hint">Upload a GeoJSON file </p>
+                                <input type="file" id="geoUpload" accept=".geojson" style="display:none;">
+                                <div class="admin-upload-row">
+                                    <button class="btn-upload" onclick="document.getElementById('geoUpload').click()">
+                                        <i class="fas fa-upload"></i> Upload GeoJSON
+                                    </button>
+                                    <button class="btn-clear-protected" onclick="clearAllProtectedAreas()">
+                                        <i class="fas fa-trash-alt"></i> Clear All
+                                    </button>
+                                </div>
+                                <div id="uploadStatus" class="upload-status"></div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Map Container -->
                 <div class="map-container">
-                    <div class="map-header">
-                        <h3>LIVE MAP</h3>
-                        <div class="map-actions">
-                            <div class="base-layer-selector">
-                                <button class="map-action-btn active" onclick="window.setBaseLayer('satellite')"><i class="fas fa-satellite"></i> Satellite</button>
-                                <button class="map-action-btn" onclick="window.setBaseLayer('streets')"><i class="fas fa-road"></i> Streets</button>
-                                <button class="map-action-btn" onclick="window.setBaseLayer('terrain')"><i class="fas fa-mountain"></i> Terrain</button>
-                            </div>
-                            <button class="map-action-btn" onclick="window.refreshMapData()"><i class="fas fa-sync-alt"></i> Refresh</button>
-                        </div>
-                    </div>
-                    <div class="map-toolbar">
-                        <button class="map-btn" onclick="window.zoomIn()"><i class="fas fa-plus"></i></button>
-                        <button class="map-btn" onclick="window.zoomOut()"><i class="fas fa-minus"></i></button>
-                        <button class="map-btn" onclick="window.resetView()"><i class="fas fa-home"></i></button>
-                        <button class="map-btn" onclick="window.locateMe()"><i class="fas fa-location-crosshairs"></i></button>
-                        <button class="map-btn" onclick="window.toggleLegend()"><i class="fas fa-layer-group"></i></button>
-                        <button class="map-btn" onclick="window.zoomToAllFarms()"><i class="fas fa-globe"></i></button>
-                    </div>
                     <div id="map"></div>
-                    <div class="map-overlay">
-                        <div class="map-search-box">
-                            <input type="text" id="mapSearch" placeholder="Search farm by name...">
-                            <button onclick="window.performSearch()"><i class="fas fa-search"></i></button>
-                        </div>
-                        <div class="map-stats">
-                            <span>Farms: <span id="mapFarmsCount">0</span></span>
-                            <span>Area: <span id="mapTotalArea">0 ha</span></span>
+                    
+                    <!-- Map Controls -->
+                    <div class="map-controls-wrapper">
+                        <div class="map-controls">
+                            <button class="map-control-btn" onclick="window.zoomIn()" title="Zoom In">
+                                <i class="fas fa-plus"></i>
+                            </button>
+                            <button class="map-control-btn" onclick="window.zoomOut()" title="Zoom Out">
+                                <i class="fas fa-minus"></i>
+                            </button>
+                            <button class="map-control-btn" onclick="window.resetView()" title="Reset View">
+                                <i class="fas fa-home"></i>
+                            </button>
+                            <button class="map-control-btn" onclick="window.locateMe()" title="Locate Me">
+                                <i class="fas fa-location-crosshairs"></i>
+                            </button>
+                            <button class="map-control-btn" onclick="window.zoomToAllFarms()" title="Zoom to All">
+                                <i class="fas fa-globe"></i>
+                            </button>
+                            <button class="map-control-btn" onclick="window.toggleLegend()" title="Legend">
+                                <i class="fas fa-layer-group"></i>
+                            </button>
                         </div>
                     </div>
+                    
+                    <!-- Map Search & Stats -->
+                    <div class="map-search-box">
+                        <input type="text" id="mapSearch" placeholder="Search farm by name...">
+                        <button onclick="window.performSearch()"><i class="fas fa-search"></i></button>
+                    </div>
+                    
+                    <div class="map-stats">
+                        <span>Farms: <span id="mapFarmsCount">0</span></span>
+                        <span>Area: <span id="mapTotalArea">0 ha</span></span>
+                        <span style="color:#ff6b6b;">Overlaps: <span id="mapOverlapCount">0</span></span>
+                    </div>
+                    
+                    <!-- Legend -->
                     <div class="map-legend" id="mapLegend" style="display: none;">
-                        <div class="legend-header"><h4>Legend</h4><button onclick="window.toggleLegend()">✕</button></div>
+                        <div class="legend-header">
+                            <h4>Legend</h4>
+                            <button onclick="window.toggleLegend()">✕</button>
+                        </div>
                         <div class="legend-content">
                             <div class="legend-item"><div class="legend-color" style="background:#4CAF50;"></div><span>Validated</span></div>
                             <div class="legend-item"><div class="legend-color" style="background:#FFC107;"></div><span>Pending</span></div>
                             <div class="legend-item"><div class="legend-color" style="background:#F44336;"></div><span>Rejected</span></div>
+                            <div class="legend-item"><div class="legend-color" style="background:#FF0000;"></div><span>⚠️ Overlap</span></div>
+                            <div class="legend-item" style="border-top:1px solid #e2e8f0; padding-top:6px; margin-top:4px;">
+                                <div class="legend-color" style="background:#8B4513; opacity:0.4;"></div>
+                                <span>Protected Areas</span>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -225,7 +318,7 @@
         </main>
     </div>
 
-    <div id="loadingOverlay" class="loading-spinner" style="display: none;">
+    <div id="loadingOverlay" class="loading-spinner">
         <i class="fas fa-spinner fa-spin"></i><span>Loading...</span>
     </div>
 
@@ -235,7 +328,6 @@
     <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
     
-    <!-- JavaScript Files -->
     <script src="live-mapping.js"></script>
 </body>
 </html>
