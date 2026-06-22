@@ -1,7 +1,68 @@
 // ===========================================
-// SUBMISSIONS - MATCHING LIVE MAPPING STRUCTURE
+// SIDEBAR TOGGLE LOGIC - BURGER + COLLAPSE
 // ===========================================
+const sidebar = document.getElementById('sidebar');
+const burgerBtn = document.getElementById('burgerBtn');
+const sidebarToggle = document.getElementById('sidebarToggle');
+const sidebarOverlay = document.getElementById('sidebarOverlay');
 
+function toggleSidebar() {
+    if (window.innerWidth <= 768) {
+        sidebar.classList.toggle('mobile-open');
+        sidebarOverlay.classList.toggle('active');
+        document.body.style.overflow = sidebar.classList.contains('mobile-open') ? 'hidden' : '';
+    } else {
+        sidebar.classList.toggle('collapsed');
+        const icon = sidebarToggle.querySelector('i');
+        if (sidebar.classList.contains('collapsed')) {
+            icon.className = 'fas fa-chevron-right';
+        } else {
+            icon.className = 'fas fa-chevron-left';
+        }
+        localStorage.setItem('sidebarCollapsed', sidebar.classList.contains('collapsed'));
+    }
+}
+
+function closeMobileSidebar() {
+    sidebar.classList.remove('mobile-open');
+    sidebarOverlay.classList.remove('active');
+    document.body.style.overflow = '';
+}
+
+window.toggleMobileSidebar = toggleSidebar;
+window.closeMobileSidebar = closeMobileSidebar;
+
+burgerBtn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    toggleSidebar();
+});
+
+sidebarToggle.addEventListener('click', function(e) {
+    e.stopPropagation();
+    if (window.innerWidth > 768) {
+        toggleSidebar();
+    }
+});
+
+sidebarOverlay.addEventListener('click', closeMobileSidebar);
+
+if (window.innerWidth > 768) {
+    const saved = localStorage.getItem('sidebarCollapsed');
+    if (saved === 'true') {
+        sidebar.classList.add('collapsed');
+        sidebarToggle.querySelector('i').className = 'fas fa-chevron-right';
+    }
+}
+
+window.addEventListener('resize', function() {
+    if (window.innerWidth > 768) {
+        closeMobileSidebar();
+    }
+});
+
+// ===========================================
+// SUBMISSIONS - COMPLETE JAVASCRIPT
+// ===========================================
 console.log('🚀 Submissions page initializing...');
 
 // ===========================================
@@ -67,7 +128,8 @@ async function loadUserAndProjects() {
     
     if (memberships && memberships.length > 0) {
         allUserProjects = memberships;
-        document.getElementById('userRole').textContent = memberships[0].role.replace('_', ' ').toUpperCase();
+        const roleText = memberships[0].role.replace('_', ' ').toUpperCase();
+        document.getElementById('userRole').textContent = roleText;
         
         // Add role badge
         const roleBadge = document.createElement('span');
@@ -100,6 +162,7 @@ async function loadUserAndProjects() {
         
         currentProject = targetProject.projects;
         document.getElementById('selectedProjectName').innerHTML = `📁 ${currentProject.name}`;
+        document.getElementById('projectBadge').textContent = currentProject.name;
         
         // Update navigation links
         updateNavigationLinks();
@@ -122,16 +185,11 @@ async function loadUserAndProjects() {
 
 function updateNavigationLinks() {
     const queryString = currentProject ? `?project=${currentProject.id}` : '';
-    document.querySelector('a[href="../Dashboard.html"]').href = `../Dashboard.html${queryString}`;
-    document.querySelector('a[href="../LiveMapping/live-mapping.html"]').href = `../LiveMapping/live-mapping.html${queryString}`;
-    document.querySelector('a[href="../QualityAlerts/quality-alerts.html"]').href = `../QualityAlerts/quality-alerts.html${queryString}`;
-    document.querySelector('a[href="../Exports/exports.html"]').href = `../Exports/exports.html${queryString}`;
-    
-    // This is correct for Submissions folder (one level up)
-    const dataMgmtLink = document.querySelector('.data-mgmt-link a');
-    if (dataMgmtLink) {
-        dataMgmtLink.href = `../DataManagement.html${queryString}`;
-    }
+    document.querySelector('a[data-page="dashboard"]').href = `../Dashboard.html${queryString}`;
+    document.querySelector('a[data-page="live-mapping"]').href = `../LiveMapping/live-mapping.html${queryString}`;
+    document.querySelector('a[data-page="quality-alerts"]').href = `../QualityAlerts/quality-alerts.html${queryString}`;
+    document.querySelector('a[data-page="exports"]').href = `../Exports/exports.html${queryString}`;
+    document.getElementById('dataMgmtLink').href = `../DataManagement.html${queryString}`;
 }
 
 async function populateDropdown(memberships) {
@@ -154,6 +212,7 @@ async function populateDropdown(memberships) {
                 const selected = allUserProjects.find(p => p.projects.id === value);
                 if (selected) {
                     currentProject = selected.projects;
+                    document.getElementById('projectBadge').textContent = currentProject.name;
                     await loadSubmissions(value);
                     localStorage.setItem(`lastProject_${currentUser.id}`, value);
                     updateNavigationLinks();
@@ -209,9 +268,8 @@ async function loadAllProjectsSubmissions() {
     }
     
     processSubmissionsData(allFarms);
-    
     document.querySelector('.header-title h1').innerHTML = 'Submissions <span style="font-size:14px; background:#e2e8f0; padding:2px 10px; border-radius:20px;">ALL PROJECTS</span>';
-    
+    document.getElementById('projectBadge').textContent = 'ALL PROJECTS';
     showLoading(false);
 }
 
@@ -339,17 +397,17 @@ function renderTable() {
     tbody.innerHTML = pageData.map(sub => `
         <tr>
             <td><strong>${escapeHtml(sub.farmer_name)}</strong></td>
-            <td>${escapeHtml(sub.farmer_id)}</span></div></td>
-            <td>${escapeHtml(sub.cooperative)}</span></div></td>
-            <td>${escapeHtml(sub.supplier)}</span></div></td>
-            <td>${sub.area.toFixed(2)}</span></div></td>
-            <td>${formatDate(sub.created_at)}</span></div></td>
+            <td>${escapeHtml(sub.farmer_id)}</td>
+            <td>${escapeHtml(sub.cooperative)}</td>
+            <td>${escapeHtml(sub.supplier)}</td>
+            <td>${sub.area.toFixed(2)}</td>
+            <td>${formatDate(sub.created_at)}</td>
             <td><span class="status-badge ${sub.status}">${sub.status}</span></td>
             <td class="action-buttons">
-                <button class="action-btn view-map" onclick="viewOnMap('${sub.id}')"><i class="fas fa-map-marker-alt"></i> View Map</button>
+                <button class="action-btn view-map" onclick="window.viewOnMap('${sub.id}')"><i class="fas fa-map-marker-alt"></i> View Map</button>
                 ${canModify && sub.status === 'pending' ? `
-                    <button class="action-btn validate" onclick="updateStatus('${sub.id}', 'validated')"><i class="fas fa-check"></i> Validate</button>
-                    <button class="action-btn reject" onclick="updateStatus('${sub.id}', 'rejected')"><i class="fas fa-times"></i> Reject</button>
+                    <button class="action-btn validate" onclick="window.updateStatus('${sub.id}', 'validated')"><i class="fas fa-check"></i> Validate</button>
+                    <button class="action-btn reject" onclick="window.updateStatus('${sub.id}', 'rejected')"><i class="fas fa-times"></i> Reject</button>
                 ` : ''}
             </td>
         </tr>
@@ -378,7 +436,7 @@ function updatePagination() {
         }
         
         for (let i = startPage; i <= endPage; i++) {
-            pagesHtml += `<button class="page-number ${i === currentPage ? 'active' : ''}" onclick="goToPage(${i})">${i}</button>`;
+            pagesHtml += `<button class="page-number ${i === currentPage ? 'active' : ''}" onclick="window.goToPage(${i})">${i}</button>`;
         }
         pageNumbers.innerHTML = pagesHtml;
     }
@@ -503,7 +561,18 @@ function formatDate(dateString) {
     return date.toLocaleDateString();
 }
 
+function canExport() {
+    const roleText = document.getElementById('userRole')?.textContent?.toLowerCase() || '';
+    const allowedRoles = ['owner', 'manager', 'validator'];
+    return allowedRoles.includes(roleText);
+}
+
 function exportToCSV() {
+    if (!canExport()) {
+        showNotification('Export permission denied. Only Owners, Managers, and Validators can export data.', 'error');
+        return;
+    }
+    
     if (filteredSubmissions.length === 0) {
         showNotification('No data to export', 'warning');
         return;
@@ -511,8 +580,13 @@ function exportToCSV() {
     
     const headers = ['Farmer Name', 'Farmer ID', 'Cooperative', 'Supplier', 'Area (ha)', 'Status', 'Submission Date'];
     const rows = filteredSubmissions.map(sub => [
-        sub.farmer_name, sub.farmer_id, sub.cooperative, sub.supplier,
-        sub.area.toFixed(2), sub.status, sub.created_at ? new Date(sub.created_at).toLocaleDateString() : 'N/A'
+        sub.farmer_name,
+        sub.farmer_id,
+        sub.cooperative,
+        sub.supplier,
+        sub.area.toFixed(2),
+        sub.status,
+        sub.created_at ? new Date(sub.created_at).toLocaleDateString() : 'N/A'
     ]);
     
     const csvContent = [headers, ...rows].map(row => 
@@ -520,8 +594,20 @@ function exportToCSV() {
     ).join('\n');
     
     const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
-    saveAs(blob, `submissions_${currentProject?.name}_${new Date().toISOString().split('T')[0]}.csv`);
-    showNotification('Export completed', 'success');
+    const filename = `submissions_${currentProject?.name || 'export'}_${new Date().toISOString().split('T')[0]}.csv`;
+    
+    // Use FileSaver or fallback
+    if (typeof saveAs !== 'undefined') {
+        saveAs(blob, filename);
+    } else {
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = filename;
+        link.click();
+        URL.revokeObjectURL(link.href);
+    }
+    
+    showNotification(`Exported ${filteredSubmissions.length} records to CSV`, 'success');
 }
 
 function clearFilters() {
@@ -561,7 +647,6 @@ function setupEventListeners() {
     document.getElementById('applyFiltersBtn')?.addEventListener('click', applyFilters);
     document.getElementById('clearFiltersBtn')?.addEventListener('click', clearFilters);
     document.getElementById('exportBtn')?.addEventListener('click', exportToCSV);
-    document.getElementById('refreshBtn')?.addEventListener('click', refreshData);
     document.getElementById('refreshTableBtn')?.addEventListener('click', refreshData);
     document.getElementById('syncKoboBtn')?.addEventListener('click', () => {
         showNotification('Refreshing data...', 'info');
@@ -582,97 +667,8 @@ function setupEventListeners() {
         window.location.href = '../login.html';
     });
 }
-// ===========================================
-// EXPORT PERMISSION CHECK
-// ===========================================
 
-function canExport() {
-    const roleText = document.getElementById('userRole')?.textContent?.toLowerCase() || '';
-    // Allow owners, managers, and validators to export
-    const allowedRoles = ['owner', 'manager', 'validator'];
-    return allowedRoles.includes(roleText);
-}
-
-function updateExportButtonVisibility() {
-    const exportBtn = document.getElementById('exportBtn');
-    if (exportBtn) {
-        if (canExport()) {
-            exportBtn.style.display = 'flex';
-            exportBtn.disabled = false;
-        } else {
-            exportBtn.style.display = 'none';
-        }
-    }
-}
-
-// ===========================================
-// EXPORT FUNCTION
-// ===========================================
-
-function exportToCSV() {
-    if (!canExport()) {
-        showNotification('Export permission denied. Only Owners, Managers, and Validators can export data.', 'error');
-        return;
-    }
-    
-    if (filteredSubmissions.length === 0) {
-        showNotification('No data to export', 'warning');
-        return;
-    }
-    
-    const headers = ['Farmer Name', 'Farmer ID', 'Cooperative', 'Supplier', 'Area (ha)', 'Status', 'Submission Date'];
-    const rows = filteredSubmissions.map(sub => [
-        sub.farmer_name,
-        sub.farmer_id,
-        sub.cooperative,
-        sub.supplier,
-        sub.area.toFixed(2),
-        sub.status,
-        sub.created_at ? new Date(sub.created_at).toLocaleDateString() : 'N/A'
-    ]);
-    
-    const csvContent = [headers, ...rows].map(row => 
-        row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')
-    ).join('\n');
-    
-    const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
-    const filename = `submissions_${currentProject?.name || 'export'}_${new Date().toISOString().split('T')[0]}.csv`;
-    saveAs(blob, filename);
-    
-    showNotification(`Exported ${filteredSubmissions.length} records to CSV`, 'success');
-    addToExportHistory(filename, filteredSubmissions.length);
-}
-
-function addToExportHistory(filename, count) {
-    const historyKey = 'submissions_export_history';
-    let history = JSON.parse(localStorage.getItem(historyKey) || '[]');
-    history.unshift({ filename, count, date: new Date().toISOString() });
-    if (history.length > 10) history.pop();
-    localStorage.setItem(historyKey, JSON.stringify(history));
-}
-
-// ===========================================
-// UPDATE EVENT LISTENERS
-// ===========================================
-
-// Add this to your existing setupEventListeners function:
-function setupEventListeners() {
-    // ... existing event listeners ...
-    
-    // Add export button listener
-    document.getElementById('exportBtn')?.addEventListener('click', exportToCSV);
-    
-    // ... rest of existing code ...
-}
-
-// Call updateExportButtonVisibility after user role is loaded
-// Add this after setting the user role:
-function updateUserRole(role) {
-    document.getElementById('userRole').textContent = role;
-    updateExportButtonVisibility();
-}
-
-// Make functions global
+// Make functions global for inline onclick handlers
 window.applyFilters = applyFilters;
 window.sortTable = sortTable;
 window.viewOnMap = viewOnMap;
@@ -680,5 +676,6 @@ window.updateStatus = updateStatus;
 window.exportToCSV = exportToCSV;
 window.clearFilters = clearFilters;
 window.refreshData = refreshData;
+window.goToPage = goToPage;
 
 console.log('✅ Submissions page ready');
