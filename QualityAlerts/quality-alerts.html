@@ -5,51 +5,86 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Quality Alerts | MappingTrace</title>
     
-    <!-- Fonts & Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    
-    <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     
-    <!-- CSS Files -->
-    <link rel="stylesheet" href="../globalCSS.css">
-    <link rel="stylesheet" href="../layoutCSS.css">
     <link rel="stylesheet" href="quality-alerts.css">
-    
     <link rel="icon" type="image/x-icon" href="../assets/favicon.ico">
 </head>
 <body>
+    <!-- Mobile Sidebar Overlay -->
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
     <div class="layout">
-        <!-- SIDEBAR - Same as Live Mapping -->
-        <aside class="sidebar">
+        <!-- SIDEBAR -->
+        <aside class="sidebar" id="sidebar">
             <div class="sidebar-header">
-                <h2><i class="fas fa-map-marked-alt"></i><span>MappingTrace</span></h2>
-                <button class="sidebar-toggle" id="sidebarToggle"><i class="fas fa-bars"></i></button>
+                <h2>
+                    <i class="fas fa-map-marked-alt"></i>
+                    <span>MappingTrace</span>
+                </h2>
+                <button class="sidebar-toggle" id="sidebarToggle" title="Toggle sidebar">
+                    <i class="fas fa-chevron-left"></i>
+                </button>
             </div>
             <nav class="menu">
-                <a href="../Dashboard.html"><i class="fas fa-tachometer-alt"></i><span>Dashboard</span></a>
-                <a href="../LiveMapping/live-mapping.html"><i class="fas fa-map"></i><span>Live Mapping</span></a>
-                <a href="../Submissions/submissions.html"><i class="fas fa-clipboard-list"></i><span>Submissions</span></a>
-                <a href="#" class="active"><i class="fas fa-exclamation-triangle"></i><span>Quality Alerts</span></a>
-                <a href="../Exports/exports.html"><i class="fas fa-file-export"></i><span>Exports</span></a>
-                <!-- Data Management Link -->
+                <div class="menu-label">Main</div>
+                <a href="../Dashboard.html" data-page="dashboard">
+                    <i class="fas fa-tachometer-alt"></i>
+                    <span>Dashboard</span>
+                </a>
+                <a href="../LiveMapping/live-mapping.html" data-page="live-mapping">
+                    <i class="fas fa-map"></i>
+                    <span>Live Mapping</span>
+                </a>
+                <a href="../Submissions/submissions.html" data-page="submissions">
+                    <i class="fas fa-clipboard-list"></i>
+                    <span>Submissions</span>
+                </a>
+                <a href="#" class="active" data-page="quality-alerts">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <span>Quality Alerts</span>
+                </a>
+                <a href="../Exports/exports.html" data-page="exports">
+                    <i class="fas fa-file-export"></i>
+                    <span>Exports</span>
+                </a>
+                
+                <hr class="menu-divider">
                 <div class="data-mgmt-link">
-                    <a href="../DataManagement.html"><i class="fas fa-database"></i><span>Data Management</span></a>
+                    <a href="../DataManagement.html" id="dataMgmtLink">
+                        <i class="fas fa-database"></i>
+                        <span>Data Management</span>
+                    </a>
                 </div>
+                
                 <div class="menu-bottom">
-                    <a href="#" id="logoutBtn"><i class="fas fa-sign-out-alt"></i><span>Logout</span></a>
+                    <a href="#" id="logoutBtn">
+                        <i class="fas fa-sign-out-alt"></i>
+                        <span>Logout</span>
+                    </a>
                 </div>
             </nav>
         </aside>
 
         <!-- MAIN CONTENT -->
         <main class="main">
-            <!-- HEADER - Same as Live Mapping -->
+            <!-- HEADER -->
             <header class="main-header">
-                <div class="header-title">
-                    <h1>Quality Alerts</h1>
-                    <div class="breadcrumb">Home / Quality Alerts</div>
+                <div class="header-left">
+                    <button class="burger-btn" id="burgerBtn" aria-label="Toggle sidebar">
+                        <i class="fas fa-bars"></i>
+                    </button>
+                    <div class="header-title">
+                        <div>
+                            <h1>
+                                Quality Alerts
+                                <span class="project-badge" id="projectBadge">Loading...</span>
+                            </h1>
+                            <div class="breadcrumb">Home / Quality Alerts</div>
+                        </div>
+                    </div>
                 </div>
                 <div class="user-info">
                     <div class="project-selector-container hidden" id="projectSelectorContainer">
@@ -117,67 +152,149 @@
                     </div>
                 </div>
 
-                <!-- Filters Bar -->
-                <div class="filters-bar">
-                    <div class="filter-group">
-                        <label>Alert Type</label>
-                        <select id="alertTypeFilter" class="filter-select">
-                            <option value="all">All Types</option>
-                            <option value="overlap">Overlap</option>
-                            <option value="data">Missing Data</option>
-                            <option value="area">Area Issue</option>
-                        </select>
+                <!-- Tab Navigation -->
+                <div class="tabs-container">
+                    <button class="tab-btn active" data-tab="protected" onclick="switchTab('protected')">
+                        <i class="fas fa-shield-alt"></i> Protected Area Quality
+                        <span class="tab-badge" id="protectedBadge">0</span>
+                    </button>
+                    <button class="tab-btn" data-tab="polygon" onclick="switchTab('polygon')">
+                        <i class="fas fa-draw-polygon"></i> Polygon Quality
+                        <span class="tab-badge" id="polygonBadge">0</span>
+                    </button>
+                </div>
+
+                <!-- Protected Area Quality Section -->
+                <div class="tab-content active" id="protectedTab">
+                    <!-- Protected Area Filters -->
+                    <div class="filters-bar">
+                        <div class="filter-group">
+                            <label>Severity</label>
+                            <select id="protectedSeverityFilter" class="filter-select">
+                                <option value="all">All Severities</option>
+                                <option value="critical">Critical</option>
+                                <option value="high">High</option>
+                                <option value="medium">Medium</option>
+                                <option value="low">Low</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label>Supplier</label>
+                            <select id="protectedSupplierFilter" class="filter-select">
+                                <option value="all">All Suppliers</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label>Status</label>
+                            <select id="protectedStatusFilter" class="filter-select">
+                                <option value="all">All Status</option>
+                                <option value="new">New</option>
+                                <option value="acknowledged">Acknowledged</option>
+                                <option value="resolved">Resolved</option>
+                            </select>
+                        </div>
+                        <div class="filter-actions">
+                            <button class="btn-primary" onclick="applyProtectedFilters()"><i class="fas fa-search"></i> Apply</button>
+                            <button class="btn-secondary" onclick="clearProtectedFilters()"><i class="fas fa-times"></i> Clear</button>
+                            <button class="btn-secondary" onclick="markProtectedRead()"><i class="fas fa-check-double"></i> Mark All Read</button>
+                        </div>
                     </div>
-                    <div class="filter-group">
-                        <label>Severity</label>
-                        <select id="severityFilter" class="filter-select">
-                            <option value="all">All Severities</option>
-                            <option value="critical">Critical</option>
-                            <option value="high">High</option>
-                            <option value="medium">Medium</option>
-                            <option value="low">Low</option>
-                        </select>
-                    </div>
-                    <div class="filter-group">
-                        <label>Supplier</label>
-                        <select id="supplierFilter" class="filter-select">
-                            <option value="all">All Suppliers</option>
-                        </select>
-                    </div>
-                    <div class="filter-group">
-                        <label>Status</label>
-                        <select id="statusFilter" class="filter-select">
-                            <option value="all">All Status</option>
-                            <option value="new">New</option>
-                            <option value="acknowledged">Acknowledged</option>
-                            <option value="resolved">Resolved</option>
-                        </select>
-                    </div>
-                    <div class="filter-actions">
-                        <button class="btn-primary" id="applyFiltersBtn"><i class="fas fa-search"></i> Apply</button>
-                        <button class="btn-secondary" id="clearFiltersBtn"><i class="fas fa-times"></i> Clear</button>
-                        <button class="btn-secondary" id="markAllReadBtn"><i class="fas fa-check-double"></i> Mark All Read</button>
+
+                    <!-- Protected Area Alerts List -->
+                    <div class="alerts-list-container">
+                        <div class="list-header">
+                            <h3><i class="fas fa-shield-alt"></i> Protected Area Alerts</h3>
+                            <div class="list-actions">
+                                <span class="alert-count" id="protectedAlertCount">0 alerts</span>
+                                <button class="btn-icon" onclick="refreshProtectedAlerts()" title="Refresh"><i class="fas fa-redo-alt"></i></button>
+                            </div>
+                        </div>
+                        <div id="protectedAlertsList" class="alerts-list">
+                            <div class="empty-state">
+                                <i class="fas fa-check-circle"></i>
+                                <h3>No Protected Area Alerts</h3>
+                                <p>All farms are outside protected areas.</p>
+                            </div>
+                        </div>
+                        <div class="list-footer">
+                            <div class="list-stats">Showing <span id="protectedShowingCount">0</span> alerts</div>
+                            <div class="pagination">
+                                <button class="pagination-btn" id="protectedPrevBtn" disabled onclick="protectedPrevPage()"><i class="fas fa-chevron-left"></i></button>
+                                <span id="protectedPageInfo">Page 1 of 1</span>
+                                <button class="pagination-btn" id="protectedNextBtn" disabled onclick="protectedNextPage()"><i class="fas fa-chevron-right"></i></button>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
-                <!-- Alerts List Container -->
-                <div class="alerts-list-container">
-                    <div class="list-header">
-                        <h3><i class="fas fa-list"></i> Quality Alerts</h3>
-                        <button class="btn-icon" id="refreshListBtn" title="Refresh"><i class="fas fa-redo-alt"></i></button>
-                    </div>
-                    <div id="alertsList" class="alerts-list">
-                        <div class="empty-state">
-                            <i class="fas fa-spinner fa-spin"></i>
-                            <p>Loading alerts...</p>
+                <!-- Polygon Quality Section -->
+                <div class="tab-content" id="polygonTab">
+                    <!-- Polygon Quality Filters -->
+                    <div class="filters-bar">
+                        <div class="filter-group">
+                            <label>Alert Type</label>
+                            <select id="polygonTypeFilter" class="filter-select">
+                                <option value="all">All Types</option>
+                                <option value="overlap">Overlap</option>
+                                <option value="duplicate">Duplicate</option>
+                                <option value="self_intersection">Self-Intersection</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label>Severity</label>
+                            <select id="polygonSeverityFilter" class="filter-select">
+                                <option value="all">All Severities</option>
+                                <option value="critical">Critical</option>
+                                <option value="high">High</option>
+                                <option value="medium">Medium</option>
+                                <option value="low">Low</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label>Supplier</label>
+                            <select id="polygonSupplierFilter" class="filter-select">
+                                <option value="all">All Suppliers</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label>Status</label>
+                            <select id="polygonStatusFilter" class="filter-select">
+                                <option value="all">All Status</option>
+                                <option value="new">New</option>
+                                <option value="acknowledged">Acknowledged</option>
+                                <option value="resolved">Resolved</option>
+                            </select>
+                        </div>
+                        <div class="filter-actions">
+                            <button class="btn-primary" onclick="applyPolygonFilters()"><i class="fas fa-search"></i> Apply</button>
+                            <button class="btn-secondary" onclick="clearPolygonFilters()"><i class="fas fa-times"></i> Clear</button>
+                            <button class="btn-secondary" onclick="markPolygonRead()"><i class="fas fa-check-double"></i> Mark All Read</button>
                         </div>
                     </div>
-                    <div class="list-footer">
-                        <div class="list-stats">Showing <span id="showingCount">0</span> alerts</div>
-                        <div class="pagination">
-                            <button class="pagination-btn" id="prevPageBtn" disabled><i class="fas fa-chevron-left"></i></button>
-                            <span id="pageInfo">Page 1 of 1</span>
-                            <button class="pagination-btn" id="nextPageBtn" disabled><i class="fas fa-chevron-right"></i></button>
+
+                    <!-- Polygon Quality Alerts List -->
+                    <div class="alerts-list-container">
+                        <div class="list-header">
+                            <h3><i class="fas fa-draw-polygon"></i> Polygon Quality Alerts</h3>
+                            <div class="list-actions">
+                                <span class="alert-count" id="polygonAlertCount">0 alerts</span>
+                                <button class="btn-icon" onclick="refreshPolygonAlerts()" title="Refresh"><i class="fas fa-redo-alt"></i></button>
+                            </div>
+                        </div>
+                        <div id="polygonAlertsList" class="alerts-list">
+                            <div class="empty-state">
+                                <i class="fas fa-check-circle"></i>
+                                <h3>No Polygon Quality Alerts</h3>
+                                <p>All polygons pass quality checks.</p>
+                            </div>
+                        </div>
+                        <div class="list-footer">
+                            <div class="list-stats">Showing <span id="polygonShowingCount">0</span> alerts</div>
+                            <div class="pagination">
+                                <button class="pagination-btn" id="polygonPrevBtn" disabled onclick="polygonPrevPage()"><i class="fas fa-chevron-left"></i></button>
+                                <span id="polygonPageInfo">Page 1 of 1</span>
+                                <button class="pagination-btn" id="polygonNextBtn" disabled onclick="polygonNextPage()"><i class="fas fa-chevron-right"></i></button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -185,10 +302,11 @@
         </main>
     </div>
 
-    <div id="loadingOverlay" class="loading-spinner" style="display: none;">
+    <div id="loadingOverlay" class="loading-spinner">
         <i class="fas fa-spinner fa-spin"></i><span>Loading...</span>
     </div>
 
+    <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
