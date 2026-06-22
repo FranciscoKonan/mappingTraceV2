@@ -5,51 +5,86 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Exports | MappingTrace</title>
     
-    <!-- Fonts & Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    
-    <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     
-    <!-- CSS Files -->
-    <link rel="stylesheet" href="../globalCSS.css">
-    <link rel="stylesheet" href="../layoutCSS.css">
     <link rel="stylesheet" href="exports.css">
-    
     <link rel="icon" type="image/x-icon" href="../assets/favicon.ico">
 </head>
 <body>
+    <!-- Mobile Sidebar Overlay -->
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
     <div class="layout">
-        <!-- SIDEBAR - Same as Live Mapping -->
-        <aside class="sidebar">
+        <!-- SIDEBAR -->
+        <aside class="sidebar" id="sidebar">
             <div class="sidebar-header">
-                <h2><i class="fas fa-map-marked-alt"></i><span>MappingTrace</span></h2>
-                <button class="sidebar-toggle" id="sidebarToggle"><i class="fas fa-bars"></i></button>
+                <h2>
+                    <i class="fas fa-map-marked-alt"></i>
+                    <span>MappingTrace</span>
+                </h2>
+                <button class="sidebar-toggle" id="sidebarToggle" title="Toggle sidebar">
+                    <i class="fas fa-chevron-left"></i>
+                </button>
             </div>
             <nav class="menu">
-                <a href="../Dashboard.html"><i class="fas fa-tachometer-alt"></i><span>Dashboard</span></a>
-                <a href="../LiveMapping/live-mapping.html"><i class="fas fa-map"></i><span>Live Mapping</span></a>
-                <a href="../Submissions/submissions.html"><i class="fas fa-clipboard-list"></i><span>Submissions</span></a>
-                <a href="../QualityAlerts/quality-alerts.html"><i class="fas fa-exclamation-triangle"></i><span>Quality Alerts</span></a>
-                <a href="#" class="active"><i class="fas fa-file-export"></i><span>Exports</span></a>
-                <!-- Data Management Link -->
+                <div class="menu-label">Main</div>
+                <a href="../Dashboard.html" data-page="dashboard">
+                    <i class="fas fa-tachometer-alt"></i>
+                    <span>Dashboard</span>
+                </a>
+                <a href="../LiveMapping/live-mapping.html" data-page="live-mapping">
+                    <i class="fas fa-map"></i>
+                    <span>Live Mapping</span>
+                </a>
+                <a href="../Submissions/submissions.html" data-page="submissions">
+                    <i class="fas fa-clipboard-list"></i>
+                    <span>Submissions</span>
+                </a>
+                <a href="../QualityAlerts/quality-alerts.html" data-page="quality-alerts">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <span>Quality Alerts</span>
+                </a>
+                <a href="#" class="active" data-page="exports">
+                    <i class="fas fa-file-export"></i>
+                    <span>Exports</span>
+                </a>
+                
+                <hr class="menu-divider">
                 <div class="data-mgmt-link">
-                    <a href="../DataManagement.html"><i class="fas fa-database"></i><span>Data Management</span></a>
+                    <a href="../DataManagement.html" id="dataMgmtLink">
+                        <i class="fas fa-database"></i>
+                        <span>Data Management</span>
+                    </a>
                 </div>
+                
                 <div class="menu-bottom">
-                    <a href="#" id="logoutBtn"><i class="fas fa-sign-out-alt"></i><span>Logout</span></a>
+                    <a href="#" id="logoutBtn">
+                        <i class="fas fa-sign-out-alt"></i>
+                        <span>Logout</span>
+                    </a>
                 </div>
             </nav>
         </aside>
 
         <!-- MAIN CONTENT -->
         <main class="main">
-            <!-- HEADER - Same as Live Mapping -->
+            <!-- HEADER -->
             <header class="main-header">
-                <div class="header-title">
-                    <h1>Exports</h1>
-                    <div class="breadcrumb">Home / Exports</div>
+                <div class="header-left">
+                    <button class="burger-btn" id="burgerBtn" aria-label="Toggle sidebar">
+                        <i class="fas fa-bars"></i>
+                    </button>
+                    <div class="header-title">
+                        <div>
+                            <h1>
+                                Exports
+                                <span class="project-badge" id="projectBadge">Loading...</span>
+                            </h1>
+                            <div class="breadcrumb">Home / Exports</div>
+                        </div>
+                    </div>
                 </div>
                 <div class="user-info">
                     <div class="project-selector-container hidden" id="projectSelectorContainer">
@@ -226,10 +261,11 @@
         </main>
     </div>
 
-    <div id="loadingOverlay" class="loading-spinner" style="display: none;">
+    <div id="loadingOverlay" class="loading-spinner">
         <i class="fas fa-spinner fa-spin"></i><span>Loading...</span>
     </div>
 
+    <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
