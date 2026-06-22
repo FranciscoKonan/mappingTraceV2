@@ -1,7 +1,68 @@
 // ===========================================
-// EXPORTS - COMPLETE WITH VALIDATOR PERMISSION
+// SIDEBAR TOGGLE LOGIC
 // ===========================================
+const sidebar = document.getElementById('sidebar');
+const burgerBtn = document.getElementById('burgerBtn');
+const sidebarToggle = document.getElementById('sidebarToggle');
+const sidebarOverlay = document.getElementById('sidebarOverlay');
 
+function toggleSidebar() {
+    if (window.innerWidth <= 768) {
+        sidebar.classList.toggle('mobile-open');
+        sidebarOverlay.classList.toggle('active');
+        document.body.style.overflow = sidebar.classList.contains('mobile-open') ? 'hidden' : '';
+    } else {
+        sidebar.classList.toggle('collapsed');
+        const icon = sidebarToggle.querySelector('i');
+        if (sidebar.classList.contains('collapsed')) {
+            icon.className = 'fas fa-chevron-right';
+        } else {
+            icon.className = 'fas fa-chevron-left';
+        }
+        localStorage.setItem('sidebarCollapsed', sidebar.classList.contains('collapsed'));
+    }
+}
+
+function closeMobileSidebar() {
+    sidebar.classList.remove('mobile-open');
+    sidebarOverlay.classList.remove('active');
+    document.body.style.overflow = '';
+}
+
+window.toggleMobileSidebar = toggleSidebar;
+window.closeMobileSidebar = closeMobileSidebar;
+
+burgerBtn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    toggleSidebar();
+});
+
+sidebarToggle.addEventListener('click', function(e) {
+    e.stopPropagation();
+    if (window.innerWidth > 768) {
+        toggleSidebar();
+    }
+});
+
+sidebarOverlay.addEventListener('click', closeMobileSidebar);
+
+if (window.innerWidth > 768) {
+    const saved = localStorage.getItem('sidebarCollapsed');
+    if (saved === 'true') {
+        sidebar.classList.add('collapsed');
+        sidebarToggle.querySelector('i').className = 'fas fa-chevron-right';
+    }
+}
+
+window.addEventListener('resize', function() {
+    if (window.innerWidth > 768) {
+        closeMobileSidebar();
+    }
+});
+
+// ===========================================
+// EXPORTS - COMPLETE JAVASCRIPT
+// ===========================================
 console.log('🚀 Exports page initializing...');
 
 // ===========================================
@@ -29,45 +90,22 @@ let supplierSearchTerm = '';
 let coopSearchTerm = '';
 
 // ===========================================
-// PERMISSION CHECK FUNCTIONS
+// PERMISSION FUNCTIONS
 // ===========================================
 function getUserRole() {
     const roleText = document.getElementById('userRole')?.textContent?.toLowerCase() || '';
-    // Handle both formats: "OWNER" and "owner"
-    const role = roleText.toLowerCase();
-    return role;
+    return roleText.toLowerCase();
 }
 
 function canExport() {
-    const role = getUserRole();
-    // Allow owners, managers, and validators to export
-    const allowedRoles = ['owner', 'manager', 'validator'];
-    const hasPermission = allowedRoles.includes(role);
-    
-    if (!hasPermission) {
-        console.log(`Export denied: User role "${role}" does not have export permission`);
-    }
-    
-    return hasPermission;
-}
-
-function canPreview() {
     const role = getUserRole();
     const allowedRoles = ['owner', 'manager', 'validator'];
     return allowedRoles.includes(role);
 }
 
-// ===========================================
-// INITIALIZATION
-// ===========================================
-document.addEventListener('DOMContentLoaded', async function() {
-    console.log('📌 DOM Content Loaded');
-    supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-    await loadUserAndProjects();
-    setupDropdown();
-    setupEventListeners();
-    updateExportUIByRole();
-});
+function canPreview() {
+    return canExport();
+}
 
 function updateExportUIByRole() {
     const hasPermission = canExport();
@@ -103,6 +141,18 @@ function updateExportUIByRole() {
         }
     }
 }
+
+// ===========================================
+// INITIALIZATION
+// ===========================================
+document.addEventListener('DOMContentLoaded', async function() {
+    console.log('📌 DOM Content Loaded');
+    supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    await loadUserAndProjects();
+    setupDropdown();
+    setupEventListeners();
+    updateExportUIByRole();
+});
 
 async function loadUserAndProjects() {
     showLoading(true);
@@ -148,7 +198,6 @@ async function loadUserAndProjects() {
         if (projectIdFromUrl && projectIdFromUrl !== 'all') {
             targetProject = memberships.find(m => m.projects.id === projectIdFromUrl);
         }
-        
         if (!targetProject) {
             const lastViewed = localStorage.getItem(`lastProject_${currentUser.id}`);
             if (lastViewed) targetProject = memberships.find(m => m.projects.id === lastViewed);
@@ -163,7 +212,7 @@ async function loadUserAndProjects() {
         
         currentProject = targetProject.projects;
         document.getElementById('selectedProjectName').innerHTML = `📁 ${currentProject.name}`;
-        document.querySelector('.header-title h1').innerHTML = `Exports <span style="font-size:14px; background:#e2e8f0; padding:2px 10px; border-radius:20px; margin-left:10px;">${currentProject.name}</span>`;
+        document.getElementById('projectBadge').textContent = currentProject.name;
         
         await loadFarms(currentProject.id);
         localStorage.setItem(`lastProject_${currentUser.id}`, currentProject.id);
@@ -196,9 +245,9 @@ async function populateDropdown(memberships) {
                 const selected = allUserProjects.find(p => p.projects.id === value);
                 if (selected) {
                     currentProject = selected.projects;
+                    document.getElementById('projectBadge').textContent = currentProject.name;
                     await loadFarms(value);
                     localStorage.setItem(`lastProject_${currentUser.id}`, value);
-                    document.querySelector('.header-title h1').innerHTML = `Exports <span style="font-size:14px; background:#e2e8f0; padding:2px 10px; border-radius:20px; margin-left:10px;">${currentProject.name}</span>`;
                 }
             }
             
@@ -250,7 +299,7 @@ async function loadAllProjectsFarms() {
     }
     
     processFarmsData(allFarmsData);
-    document.querySelector('.header-title h1').innerHTML = 'Exports <span style="font-size:14px; background:#e2e8f0; padding:2px 10px; border-radius:20px; margin-left:10px;">ALL PROJECTS</span>';
+    document.getElementById('projectBadge').textContent = 'ALL PROJECTS';
     showLoading(false);
 }
 
@@ -426,9 +475,9 @@ function updateExportCount() {
 }
 
 // ===========================================
-// PREVIEW FUNCTION WITH PERMISSION CHECK
+// PREVIEW FUNCTION
 // ===========================================
-function previewData() {
+window.previewData = function() {
     if (!canPreview()) {
         showNotification('Preview permission denied. Only Owners, Managers, and Validators can preview data.', 'error');
         return;
@@ -444,14 +493,14 @@ function previewData() {
         return;
     }
     
-    previewHeader.innerHTML = `<tr><th>Farm ID</th><th>Farmer Name</th><th>Supplier</th><th>Cooperative</th><th>Area (ha)</th><th>Status</th><tr>`;
+    previewHeader.innerHTML = `<tr><th>Farm ID</th><th>Farmer Name</th><th>Supplier</th><th>Cooperative</th><th>Area (ha)</th><th>Status</th></tr>`;
     previewBody.innerHTML = filteredFarms.slice(0, 10).map(farm => `
         <tr>
-            <td>${farm.farm_id}</span></div></td>
-            <td>${farm.farmer_name}</span></div></td>
-            <td>${farm.supplier}</span></div></td>
-            <td>${farm.cooperative}</span></div></td>
-            <td>${farm.area.toFixed(2)}</span></div></td>
+            <td>${farm.farm_id}</td>
+            <td>${farm.farmer_name}</td>
+            <td>${farm.supplier}</td>
+            <td>${farm.cooperative}</td>
+            <td>${farm.area.toFixed(2)}</td>
             <td><span class="status-badge ${farm.status}">${farm.status}</span></td>
         </tr>
     `).join('');
@@ -459,14 +508,14 @@ function previewData() {
     previewTotal.textContent = filteredFarms.length;
     previewSection.style.display = 'block';
     previewSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-}
+};
 
 window.hidePreview = function() {
     document.getElementById('previewSection').style.display = 'none';
 };
 
 // ===========================================
-// EXPORT FUNCTION WITH PERMISSION CHECK
+// EXPORT FUNCTIONS
 // ===========================================
 function exportData() {
     if (!canExport()) {
@@ -484,6 +533,7 @@ function exportData() {
         case 'excel': exportToExcel(); break;
         case 'geojson': exportToGeoJSON(); break;
         case 'kml': exportToKML(); break;
+        default: exportToCSV();
     }
 }
 
@@ -613,7 +663,7 @@ function showLoading(show) {
 
 function setupEventListeners() {
     document.getElementById('exportBtn')?.addEventListener('click', exportData);
-    document.getElementById('previewBtn')?.addEventListener('click', previewData);
+    document.getElementById('previewBtn')?.addEventListener('click', window.previewData);
     document.getElementById('resetBtn')?.addEventListener('click', resetFilters);
     document.getElementById('refreshBtn')?.addEventListener('click', refreshData);
     document.getElementById('logoutBtn')?.addEventListener('click', async () => {
@@ -622,5 +672,11 @@ function setupEventListeners() {
         window.location.href = '../login.html';
     });
 }
+
+// Make functions global
+window.exportData = exportData;
+window.previewData = window.previewData;
+window.resetFilters = resetFilters;
+window.refreshData = refreshData;
 
 console.log('✅ Exports page ready - Owners, Managers, and Validators can export data');
