@@ -66,11 +66,14 @@
             const parts = accessToken.split('.');
             log(`🔐 Token parts: ${parts.length} ${parts.length === 3 ? '(valid JWT)' : '(INVALID - should have 3 parts)'}`, parts.length === 3 ? 'success' : 'error');
             log(`📏 Token part lengths: ${parts.map(p => p.length).join(', ')}`, 'info');
+            
+            // Show token preview
+            log(`📝 Token preview: ${accessToken.substring(0, 30)}...${accessToken.substring(accessToken.length - 10)}`, 'info');
         }
         
         // Initialize Supabase
         log('📡 Initializing Supabase...', 'info');
-        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+        const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
             auth: {
                 autoRefreshToken: true,
                 persistSession: true,
@@ -81,7 +84,7 @@
         
         // Step 1: Check current session
         log('🔄 Step 1: Checking current session...', 'info');
-        supabase.auth.getSession().then(({ data, error }) => {
+        supabaseClient.auth.getSession().then(({ data, error }) => {
             if (error) {
                 log(`❌ Session error: ${error.message}`, 'error');
                 logData('Session Error', error);
@@ -95,14 +98,13 @@
                     access_token: data.session.access_token.substring(0, 20) + '...',
                     expires_at: new Date(data.session.expires_at * 1000).toLocaleString()
                 });
-                document.getElementById('sessionStatus').innerHTML = '✅ Session Active';
             } else {
                 log('ℹ️ No active session', 'info');
                 
                 // Step 2: Try to set session with token
                 if (accessToken) {
                     log('🔄 Step 2: Trying setSession with token...', 'info');
-                    supabase.auth.setSession({
+                    supabaseClient.auth.setSession({
                         access_token: accessToken,
                         refresh_token: refreshToken || accessToken
                     }).then(({ data, error }) => {
@@ -112,14 +114,13 @@
                             
                             // Step 3: Try exchangeCodeForSession
                             log('🔄 Step 3: Trying exchangeCodeForSession...', 'info');
-                            supabase.auth.exchangeCodeForSession(accessToken).then(({ data, error }) => {
+                            supabaseClient.auth.exchangeCodeForSession(accessToken).then(({ data, error }) => {
                                 if (error) {
                                     log(`❌ exchangeCodeForSession failed: ${error.message}`, 'error');
                                     logData('exchangeCodeForSession Error', error);
                                     
                                     // Step 4: Try to recover with email
                                     log('🔄 Step 4: Trying to get user with token...', 'info');
-                                    // Try to verify the token
                                     fetch(`${SUPABASE_URL}/auth/v1/user`, {
                                         headers: {
                                             'Authorization': `Bearer ${accessToken}`,
@@ -150,19 +151,21 @@
         });
         
         // Test with a direct password reset request (this will send a new email)
-        log('📧 Testing: Send new reset email...', 'info');
-        supabase.auth.resetPasswordForEmail('franciscokonan1@gmail.com', {
-            redirectTo: 'https://mappingtrace.com/reset-password.html'
-        }).then(({ data, error }) => {
-            if (error) {
-                log(`❌ Reset email failed: ${error.message}`, 'error');
-                logData('Reset Email Error', error);
-            } else {
-                log(`✅ Reset email sent successfully!`, 'success');
-                logData('Reset Email Response', data);
-                log(`📧 Check your inbox for a new reset link`, 'info');
-            }
-        });
+        setTimeout(() => {
+            log('📧 Testing: Send new reset email...', 'info');
+            supabaseClient.auth.resetPasswordForEmail('franciscokonan1@gmail.com', {
+                redirectTo: 'https://mappingtrace.com/reset-password.html'
+            }).then(({ data, error }) => {
+                if (error) {
+                    log(`❌ Reset email failed: ${error.message}`, 'error');
+                    logData('Reset Email Error', error);
+                } else {
+                    log(`✅ Reset email sent successfully!`, 'success');
+                    logData('Reset Email Response', data);
+                    log(`📧 Check your inbox for a new reset link`, 'info');
+                }
+            });
+        }, 1000);
     </script>
 </body>
 </html>
