@@ -1457,6 +1457,48 @@
         // ============================================
         // INITIALIZATION
         // ============================================
+
+        function verifyRoleDataScope() {
+            try {
+                const role = currentProjectRole || 'unknown';
+                const farms = Array.isArray(farmsData) ? farmsData : [];
+
+                const totalArea = farms.reduce(
+                    (sum, farm) => sum + Number(farm.area || 0), 0
+                );
+
+                const approved = farms.filter(f =>
+                    String(f.submission_status || '').toLowerCase() === 'approved'
+                ).length;
+
+                const pending = farms.filter(f =>
+                    ['submitted', 'under_review', 'correction_required']
+                        .includes(String(f.submission_status || '').toLowerCase())
+                ).length;
+
+                console.group(`🔎 ROLE DATA VERIFICATION: ${role}`);
+                console.log('Role:', role);
+                console.log('Project:', currentProject?.id || currentProjectId || null);
+                console.log('Visible farms:', farms.length);
+                console.log('Visible area (ha):', Number(totalArea.toFixed(6)));
+                console.log('Approved farms:', approved);
+                console.log('Pending validation/correction:', pending);
+                console.log('Visible farm IDs:', farms.map(f => f.id));
+                console.groupEnd();
+
+                window.roleVerification = {
+                    role,
+                    project_id: currentProject?.id || currentProjectId || null,
+                    visible_farms: farms.length,
+                    visible_area_ha: Number(totalArea.toFixed(6)),
+                    approved_farms: approved,
+                    pending_validation_or_correction: pending
+                };
+            } catch (error) {
+                console.warn('⚠️ Role verification failed:', error);
+            }
+        }
+
         async function init() {
             try {
                 console.log('🚀 Initializing Dashboard...');
@@ -2303,6 +2345,7 @@
                 }).eq('id', id);
                 closeEditModal();
                 await loadProjectData(currentProject.id);
+        verifyRoleDataScope();
             } catch (error) {
                 showNotification('Error saving: ' + error.message, 'error');
             }
