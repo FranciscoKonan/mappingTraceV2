@@ -2179,6 +2179,11 @@
             updateAlertsUI();
         }
 
+        function dismissOverlapAlerts() {
+            overlapAlerts = [];
+            updateAlertsUI();
+        }
+
         function updateAlertsUI() {
             const totalAlerts = overlapAlerts.length + qualityAlerts.length;
 
