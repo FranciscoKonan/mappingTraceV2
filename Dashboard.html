@@ -1417,10 +1417,20 @@
             return [];
         }
 
+        function getPolygonCoordinateSets(geometry) {
+            const g = normalizeGeometry(geometry);
+            if (!g || !g.type || !g.coordinates) return [];
+            if (g.type === 'Polygon') return [g.coordinates];
+            if (g.type === 'MultiPolygon') return g.coordinates;
+            return [];
+        }
+
         function checkOverlap(geom1, geom2) {
-            const polys1 = getPolygons(geom1);
-            const polys2 = getPolygons(geom2);
-            let totalOverlapArea = 0, foundOverlap = false;
+            const polys1 = getPolygonCoordinateSets(geom1);
+            const polys2 = getPolygonCoordinateSets(geom2);
+            let totalOverlapArea = 0;
+            let foundOverlap = false;
+
             for (const coords1 of polys1) {
                 try {
                     const poly1 = turf.polygon(coords1);
@@ -1434,10 +1444,15 @@
                                     foundOverlap = true;
                                 }
                             }
-                        } catch(e) {}
+                        } catch (e) {
+                            console.warn('Overlap comparison failed for polygon pair:', e);
+                        }
                     }
-                } catch(e) {}
+                } catch (e) {
+                    console.warn('Invalid polygon during overlap check:', e);
+                }
             }
+
             return { overlaps: foundOverlap, area: totalOverlapArea };
         }
 
@@ -1645,6 +1660,8 @@
                     document.getElementById('selectedProjectName').innerHTML = value === 'all' ? '📊 ALL PROJECTS' : `📁 ${item.textContent.slice(2)}`;
                     document.getElementById('dropdownMenu').classList.remove('show');
                     if (value === 'all') {
+                        currentProject = null;
+                        setCurrentProjectMembership(null);
                         await loadAllProjectsData();
                     } else {
                         const selected = allUserProjects.find(p => p.projects.id === value);
@@ -1745,7 +1762,7 @@
                 filteredFarms = [...farmsData];
                 document.getElementById('submissionBadge').textContent = farmsData.length;
                 
-                await loadProtectedAreas();
+                protectedAreas = [];
                 updateKPIs();
                 updateCooperativeStats();
                 updateTable();
@@ -1774,7 +1791,7 @@
                     protectedAreas = data.map(area => ({ 
                         id: area.id, 
                         type: 'Feature', 
-                        geometry: area.geometry, 
+                        geometry: normalizeGeometry(area.geometry), 
                         properties: { name: area.name, area_ha: area.area_ha } 
                     }));
                     console.log('✅ Loaded protected areas:', protectedAreas.length);
@@ -1788,6 +1805,30 @@
         // ============================================
         // MAP FUNCTIONS
         // ============================================
+        // ============================================
+        // GEOJSON GEOMETRY HELPERS
+        // ============================================
+        function normalizeGeometry(geometry) {
+            if (!geometry) return null;
+            if (typeof geometry === 'string') {
+                try { return JSON.parse(geometry); }
+                catch (e) { console.warn('Invalid geometry JSON:', e); return null; }
+            }
+            return geometry;
+        }
+
+        function getGeometryLayer(geometry, style, popupHtml) {
+            const normalized = normalizeGeometry(geometry);
+            if (!normalized || !normalized.type || !normalized.coordinates) return null;
+            const layer = L.geoJSON({
+                type: 'Feature',
+                properties: {},
+                geometry: normalized
+            }, { style });
+            if (popupHtml) layer.bindPopup(popupHtml);
+            return layer;
+        }
+
         function initMap() {
             if (mapInitialized) return;
             try {
@@ -1798,6 +1839,7 @@
                     maxZoom: 19 
                 }).addTo(currentMap);
                 mapInitialized = true;
+                setTimeout(() => currentMap?.invalidateSize(), 100);
                 console.log('✅ Map initialized');
             } catch(e) {
                 console.error('❌ Error initializing map:', e);
@@ -1806,40 +1848,52 @@
 
         function updateMap() {
             if (!currentMap) return;
-            farmLayers.forEach(layer => { if (currentMap) currentMap.removeLayer(layer); });
+
+            farmLayers.forEach(layer => {
+                try { currentMap.removeLayer(layer); } catch (e) {}
+            });
             farmLayers = [];
-            let bounds = L.latLngBounds();
-            
-            function convertCoords(c) {
-                if (!Array.isArray(c)) return c;
-                if (c.length === 2 && typeof c[0] === 'number') return [c[1], c[0]];
-                return c.map(convertCoords);
-            }
-            
+
+            const bounds = L.latLngBounds();
             const overlapFarmIds = new Set(overlapAlerts.map(a => a.farmId));
-            
+
             filteredFarms.forEach(farm => {
-                if (farm.geometry?.coordinates) {
-                    try {
-                        const hasOverlap = overlapFarmIds.has(farm.id);
-                        const color = hasOverlap ? '#FF0000' : 
-                                     farm.status === 'validated' ? '#4CAF50' : 
-                                     farm.status === 'pending' ? '#FFC107' : '#F44336';
-                        const poly = L.polygon(convertCoords(farm.geometry.coordinates), { 
-                            color, weight: hasOverlap ? 3 : 2, 
-                            fillColor: color, fillOpacity: hasOverlap ? 0.6 : 0.3 
-                        });
-                        const warning = hasOverlap ? '<br><span style="color:#ff0000;font-weight:bold;">⚠️ OVERLAPS PROTECTED AREA</span>' : '';
-                        poly.bindPopup(`<b>${escapeHtml(farm.farmer_name || 'Unknown')}</b><br>Area: ${(farm.area || 0).toFixed(1)} ha<br>Enumerator: ${escapeHtml(farm.enumerator || 'N/A')}${warning}`);
-                        poly.addTo(currentMap);
-                        farmLayers.push(poly);
-                        bounds.extend(poly.getBounds());
-                    } catch(e) {}
+                const geometry = normalizeGeometry(farm.geometry);
+                if (!geometry || !geometry.coordinates) return;
+
+                try {
+                    const hasOverlap = overlapFarmIds.has(farm.id);
+                    const color = hasOverlap ? '#FF0000' :
+                        farm.status === 'validated' ? '#4CAF50' :
+                        farm.status === 'pending' ? '#FFC107' : '#F44336';
+
+                    const layer = getGeometryLayer(
+                        geometry,
+                        {
+                            color,
+                            weight: hasOverlap ? 3 : 2,
+                            fillColor: color,
+                            fillOpacity: hasOverlap ? 0.6 : 0.3
+                        },
+                        `<b>${escapeHtml(farm.farmer_name || 'Unknown')}</b>
+                         <br>Area: ${(Number(farm.area) || 0).toFixed(1)} ha
+                         <br>Enumerator: ${escapeHtml(farm.enumerator || 'N/A')}
+                         ${hasOverlap ? '<br><span style="color:#ff0000;font-weight:bold;">⚠️ OVERLAPS PROTECTED AREA</span>' : ''}`
+                    );
+
+                    if (!layer) return;
+                    layer.addTo(currentMap);
+                    farmLayers.push(layer);
+
+                    const layerBounds = layer.getBounds();
+                    if (layerBounds.isValid()) bounds.extend(layerBounds);
+                } catch (e) {
+                    console.error('Failed to draw farm geometry:', farm.id, e);
                 }
             });
-            
-            if (protectedVisible && protectedAreas.length) { displayProtectedAreas(); }
-            if (bounds.isValid()) { currentMap.fitBounds(bounds, { padding: [50,50] }); }
+
+            if (protectedVisible && protectedAreas.length) displayProtectedAreas();
+            if (bounds.isValid()) currentMap.fitBounds(bounds, { padding: [50, 50] });
         }
 
         function displayProtectedAreas() {
@@ -1980,7 +2034,7 @@
         function fallbackCheckOverlaps() {
             console.log('📊 Running overlap detection...');
             overlapAlerts = [];
-            const geoFarms = farmsData.filter(f => f.geometry?.coordinates);
+            const geoFarms = farmsData.map(f => ({ ...f, geometry: normalizeGeometry(f.geometry) })).filter(f => f.geometry?.coordinates);
             if (protectedAreas.length === 0) {
                 updateAlertsUI();
                 return;
@@ -2013,7 +2067,7 @@
 
         function checkQualityAlerts() {
             qualityAlerts = [];
-            const geoFarms = farmsData.filter(f => f.geometry?.coordinates);
+            const geoFarms = farmsData.map(f => ({ ...f, geometry: normalizeGeometry(f.geometry) })).filter(f => f.geometry?.coordinates);
             for (const farm of geoFarms) {
                 if (!farm.area || farm.area === 0) {
                     const alertId = `zero_${farm.id}`;
@@ -2120,17 +2174,18 @@
 
         function zoomToFarm(farmId) {
             const farm = farmsData.find(f => f.id === farmId);
-            if (farm?.geometry?.coordinates && currentMap) {
-                function convert(c) {
-                    if (!Array.isArray(c)) return c;
-                    if (c.length === 2 && typeof c[0] === 'number') return [c[1], c[0]];
-                    return c.map(convert);
-                }
-                try {
-                    const bounds = L.latLngBounds(convert(farm.geometry.coordinates));
-                    currentMap.fitBounds(bounds, { padding: [30,30] });
+            const geometry = normalizeGeometry(farm?.geometry);
+            if (!geometry || !currentMap) return;
+
+            try {
+                const layer = L.geoJSON({ type: 'Feature', properties: {}, geometry });
+                const bounds = layer.getBounds();
+                if (bounds.isValid()) {
+                    currentMap.fitBounds(bounds, { padding: [30, 30], maxZoom: 18 });
                     showNotification(`Zooming to ${farm.farmer_name || 'farm'}`, 'info');
-                } catch(e) {}
+                }
+            } catch (e) {
+                console.error('Error zooming to farm:', farmId, e);
             }
         }
 
@@ -2371,7 +2426,14 @@
         function openEditModal(farmId) {
             if (!ensureOperationalPermission('edit farms')) return;
             const f = farmsData.find(f => f.id === farmId);
-            if (!f) return;
+            if (!f) {
+                showNotification('Farm not found.', 'warning');
+                return;
+            }
+            if (f.project_id !== currentProject?.id) {
+                showNotification('This farm does not belong to the selected project.', 'error');
+                return;
+            }
             document.getElementById('editFarmId').value = f.id;
             document.getElementById('editFarmerName').value = f.farmer_name || '';
             document.getElementById('editFarmerId').value = f.farmer_id || '';
@@ -2387,42 +2449,92 @@
 
         document.getElementById('editFarmForm')?.addEventListener('submit', async (e) => {
             e.preventDefault();
+
             if (!ensureOperationalPermission('edit farms')) return;
+            if (!currentProject?.id) {
+                showNotification('No active project selected.', 'error');
+                return;
+            }
+
+            const id = document.getElementById('editFarmId').value;
+            if (!id) {
+                showNotification('Farm ID is missing.', 'error');
+                return;
+            }
+
+            const saveBtn = document.querySelector('#editFarmForm .btn-save');
+            if (saveBtn) {
+                saveBtn.disabled = true;
+                saveBtn.textContent = 'Saving...';
+            }
+
             showLoading(true);
+
             try {
-                const id = document.getElementById('editFarmId').value;
-                const { error } = await supabaseClient.from('farms').update({
-                    farmer_name: document.getElementById('editFarmerName').value,
-                    farmer_id: document.getElementById('editFarmerId').value,
-                    cooperative: document.getElementById('editCooperative').value,
-                    supplier: document.getElementById('editSupplier').value,
-                    enumerator: document.getElementById('editEnumerator').value,
+                const payload = {
+                    farmer_name: document.getElementById('editFarmerName').value.trim(),
+                    farmer_id: document.getElementById('editFarmerId').value.trim(),
+                    cooperative: document.getElementById('editCooperative').value.trim(),
+                    supplier: document.getElementById('editSupplier').value.trim(),
+                    enumerator: document.getElementById('editEnumerator').value.trim(),
                     area: parseFloat(document.getElementById('editArea').value) || 0,
                     status: document.getElementById('editStatus').value,
-                    updated_at: new Date()
-                }).eq('id', id).eq('project_id', currentProject.id);
+                    updated_at: new Date().toISOString()
+                };
+
+                const { data, error } = await supabaseClient
+                    .from('farms')
+                    .update(payload)
+                    .eq('id', id)
+                    .eq('project_id', currentProject.id)
+                    .select('id, project_id')
+                    .maybeSingle();
+
                 if (error) throw error;
+
+                if (!data) {
+                    throw new Error(
+                        'No farm was updated. The farm may not belong to this project, ' +
+                        'or your role does not have UPDATE permission.'
+                    );
+                }
+
                 closeEditModal();
+                showNotification('Farm updated successfully.', 'success');
                 await loadProjectData(currentProject.id);
+
             } catch (error) {
-                showNotification('Error saving: ' + error.message, 'error');
+                console.error('Farm update failed:', error);
+                showNotification('Error saving farm: ' + (error.message || 'Unknown error'), 'error');
+            } finally {
+                showLoading(false);
+                if (saveBtn) {
+                    saveBtn.disabled = false;
+                    saveBtn.textContent = 'Save Changes';
+                }
             }
-            showLoading(false);
         });
 
         function redirectToMap(farmId) {
             const farm = farmsData.find(f => f.id === farmId);
-            if (farm?.geometry?.coordinates && currentMap) {
-                function convert(c) {
-                    if (!Array.isArray(c)) return c;
-                    if (c.length === 2 && typeof c[0] === 'number') return [c[1], c[0]];
-                    return c.map(convert);
+            const geometry = normalizeGeometry(farm?.geometry);
+            if (!geometry || !currentMap) {
+                showNotification('Farm geometry is not available.', 'warning');
+                return;
+            }
+
+            try {
+                const layer = L.geoJSON({ type: 'Feature', properties: {}, geometry });
+                const bounds = layer.getBounds();
+                if (!bounds.isValid()) {
+                    showNotification('Farm geometry is invalid or empty.', 'warning');
+                    return;
                 }
-                try {
-                    const bounds = L.latLngBounds(convert(farm.geometry.coordinates));
-                    currentMap.fitBounds(bounds, { padding: [30,30] });
-                    showNotification(`Zooming to ${farm.farmer_name || 'farm'}`, 'info');
-                } catch(e) {}
+                currentMap.fitBounds(bounds, { padding: [30, 30], maxZoom: 18 });
+                showNotification(`Zooming to ${farm.farmer_name || 'farm'}`, 'info');
+            } catch (e) {
+                console.error('Error zooming to farm:', farmId, e);
+                showNotification('Unable to zoom to this farm.', 'error');
             }
         }
 
@@ -2467,12 +2579,27 @@
                 L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', { maxZoom: 17 }).addTo(currentMap);
             }
             document.querySelectorAll('.map-action-btn').forEach(btn => btn.classList.remove('active'));
-            if (event?.target) event.target.classList.add('active');
         };
         
         window.zoomIn = () => currentMap?.zoomIn();
         window.zoomOut = () => currentMap?.zoomOut();
-        window.resetView = () => currentMap?.setView([7.54, -5.55], 7);
+        window.resetView = () => {
+            if (!currentMap) return;
+            if (farmLayers.length) {
+                const b = L.latLngBounds();
+                farmLayers.forEach(layer => {
+                    try {
+                        const lb = layer.getBounds();
+                        if (lb.isValid()) b.extend(lb);
+                    } catch (e) {}
+                });
+                if (b.isValid()) {
+                    currentMap.fitBounds(b, { padding: [50, 50] });
+                    return;
+                }
+            }
+            currentMap.setView([7.54, -5.55], 7);
+        };
         window.locateMe = () => currentMap?.locate({ setView: true, maxZoom: 16 });
         window.zoomToAllFarms = () => { if (farmLayers.length) { let b = L.latLngBounds(); farmLayers.forEach(l => b.extend(l.getBounds())); currentMap?.fitBounds(b, { padding: [50,50] }); } };
         window.toggleLegend = () => { 
