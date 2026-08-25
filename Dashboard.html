@@ -1648,40 +1648,7 @@ window.applySuperManagerView = window.applySuperManagerView || function () {};
     // PROJECT ROLE & PERMISSIONS
     // ============================================
     function normalizeRole(role) { return String(role || '').toLowerCase().trim(); }
-
-        // Super Manager UI helper — defined in the main application script scope.
-        // Uses window so initialization can safely call it from any function.
-        window.applySuperManagerView = function applySuperManagerView() {
-            try {
-                const isSuperManager =
-                    typeof currentProjectRole !== 'undefined' &&
-                    currentProjectRole === 'super_manager';
-
-                [
-                    '#farmTableSection',
-                    '#tableSection',
-                    '#farmDataTable'
-                ].forEach(selector => {
-                    const el = document.querySelector(selector);
-                    if (el) el.style.display = isSuperManager ? 'none' : '';
-                });
-
-                if (isSuperManager) {
-                    document.querySelectorAll(
-                        '.edit-farm, .delete-farm, .assign-farm, .validate-farm,' +
-                        '[data-action="edit"], [data-action="delete"],' +
-                        '[data-action="assign"], [data-action="validate"]'
-                    ).forEach(el => {
-                        el.style.display = 'none';
-                    });
-                }
-            } catch (e) {
-                console.warn('⚠️ applySuperManagerView skipped:', e);
-            }
-        };
-
-
-    function setCurrentProjectMembership(membership) {
+function setCurrentProjectMembership(membership) {
         currentProjectMembership = membership || null;
         currentProjectRole = normalizeRole(membership?.role);
         isProjectArchived = normalizeRole(currentProject?.status) === 'archived';
@@ -1709,7 +1676,11 @@ window.applySuperManagerView = window.applySuperManagerView || function () {};
         canSyncKobo = activeProject && ['owner','manager','field_officer','enumerator'].includes(currentProjectRole);
 
         updateRoleAndProjectUI();
-                if (typeof applySuperManagerView === 'function') window.applySuperManagerView();
+            document.body.classList.add('summary-only-mode');
+            document.querySelectorAll(
+                '#farmTableSection, #tableSection, #farmDataTable, .edit-farm, .delete-farm, .assign-farm, .validate-farm'
+            ).forEach(el => el.style.display = 'none');
+        }
                 applyRoleSpecificKPILabels();
     }
 
