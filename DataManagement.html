@@ -508,6 +508,15 @@
             }
         }
         
+        function getProjectStatusBanner() {
+            if (!currentProject || currentProject.status !== 'archived') return '';
+            return `<div class="permission-banner" style="margin-bottom:16px;">
+                <i class="fas fa-box-archive"></i>
+                <strong>Archived Project — Read Only:</strong>
+                Existing data can be viewed and exported, but operational changes are disabled.
+            </div>`;
+        }
+
         function setupUI() {
             if (currentUserRole === 'owner' || currentUserRole === 'manager') {
                 document.getElementById('teamLink').classList.remove('hidden');
@@ -549,7 +558,7 @@
             ` : '';
             
             const dataManagementHtml = `
-                ${permissionBanner}${requestBanner}
+                ${permissionBanner}${requestBanner}${getProjectStatusBanner()}
                 <div class="welcome-banner"><div class="welcome-text"><h2>${greeting}, ${escapeHtml(userName)}! 👋</h2><p>Welcome to ${escapeHtml(currentProject.name)}.</p></div><div class="welcome-image"><i class="fas fa-chart-line"></i><span>Last updated: ${now.toLocaleDateString()}</span></div></div>
                 <div class="kpis"><div class="kpi-card"><div class="kpi-info"><h3>0</h3><p>Total Farms</p></div><div class="kpi-icon"><i class="fas fa-tractor"></i></div></div>
                 <div class="kpi-card"><div class="kpi-info"><h3>0</h3><p>Total Area (ha)</p></div><div class="kpi-icon"><i class="fas fa-chart-line"></i></div></div>
@@ -557,6 +566,10 @@
                 <div class="kpi-card"><div class="kpi-info"><h3>0</h3><p>Pending Review</p></div><div class="kpi-icon"><i class="fas fa-clock"></i></div></div></div>
                 <div class="dashboard-grid"><div class="dashboard-card"><h3><i class="fas fa-chart-pie"></i> Farm Status Distribution</h3><div class="chart-container"><canvas id="statusChart"></canvas></div></div>
                 <div class="dashboard-card"><h3><i class="fas fa-chart-bar"></i> Farm Area Distribution</h3><div class="chart-container"><canvas id="farmChart"></canvas></div></div></div>
+                <div class="section-heading" style="margin: 28px 0 14px;">
+                    <h2 style="margin:0; font-size:20px;"><i class="fas fa-layer-group"></i> Project Navigation</h2>
+                    <p style="margin:6px 0 0; color:#64748b;">Manage the project, team access, and view farm data.</p>
+                </div>
                 <div class="action-buttons">
                     <div class="action-card" onclick="goToProjectStatistics()">
                         <div class="action-icon"><i class="fas fa-chart-line"></i></div>
@@ -704,6 +717,11 @@
         }
         
         // ============================================
+        // PROJECT ADMINISTRATION
+        // Team Management, Invitation Tokens, and Access Requests remain
+        // project-level administrative functions and are intentionally kept
+        // out of the farm Dashboard.
+
         // TEAM MANAGEMENT
         // ============================================
         
