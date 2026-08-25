@@ -440,9 +440,8 @@
                     .select('*', { count: 'exact', head: true })
                     .eq('project_id', project.id);
                 
-                html += `
                 const isArchived = project.status === 'archived';
-                const isProjectOwner = role === 'owner' && project.owner_id === currentUser.id;
+                const isProjectOwner = project.owner_id === currentUser.id;
 
                 html += `
                     <div class="project-card ${isArchived ? 'archived-card' : ''}" onclick="openProject('${project.id}')">
