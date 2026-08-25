@@ -482,29 +482,13 @@
             btn.textContent = 'Creating...';
             
             try {
-                const { data: project, error: projectError } = await supabaseClient
-                    .from('projects')
-                    .insert({ name, description, owner_id: currentUser.id })
-                    .select()
-                    .single();
-                
+                const { data: project, error: projectError } =
+                    await supabaseClient.rpc('create_project_with_owner', {
+                        p_name: name,
+                        p_description: description || null
+                    });
+
                 if (projectError) throw projectError;
-                
-                await supabaseClient.from('project_members').insert({
-                    project_id: project.id,
-                    user_id: currentUser.id,
-                    role: 'owner',
-                    granted_by: currentUser.id,
-                    status: 'active'
-                });
-                
-                await supabaseClient.from('delegation_log').insert({
-                    project_id: project.id,
-                    granter_id: currentUser.id,
-                    granted_user_id: currentUser.id,
-                    role_granted: 'owner',
-                    action: 'create'
-                });
                 
                 alert('Project created successfully!');
                 closeModal();
