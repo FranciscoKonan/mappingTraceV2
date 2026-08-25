@@ -11,28 +11,7 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css" />
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js">
-
-        // Global, null-safe Super Manager UI helper.
-        // Must remain at top-level script scope because setCurrentProjectMembership()
-        // calls it during initialization.
-        function applySuperManagerView() {
-            try {
-                const isSuperManager =
-                    typeof currentProjectRole !== 'undefined' &&
-                    currentProjectRole === 'super_manager';
-
-                const selectorsToHide = [
-                    '#farmTableSection',
-                    '#tableSection',
-                    '#farmDataTable'
-                ];
-
-                selectorsToHide.forEach(selector => {
-                    const el = document.querySelector(selector);
-                    if (el) {
-                        el.style.display = isSuperManager ? 'none' : '';
-                    }
-                });
+});
 
                 if (isSuperManager) {
                     document.querySelectorAll(
@@ -1533,6 +1512,9 @@ async function loadSuperManagerApprovedFarms(projectId) {
 <div id="loadingOverlay" class="loading-spinner"><i class="fas fa-spinner fa-spin"></i><span>Loading...</span></div>
 
 <script>
+window.applySuperManagerView = window.applySuperManagerView || function () {};
+</script>
+<script>
     // ============================================
     // SIDEBAR TOGGLE LOGIC - BURGER + COLLAPSE
     // ============================================
@@ -1667,6 +1649,38 @@ async function loadSuperManagerApprovedFarms(projectId) {
     // ============================================
     function normalizeRole(role) { return String(role || '').toLowerCase().trim(); }
 
+        // Super Manager UI helper — defined in the main application script scope.
+        // Uses window so initialization can safely call it from any function.
+        window.applySuperManagerView = function applySuperManagerView() {
+            try {
+                const isSuperManager =
+                    typeof currentProjectRole !== 'undefined' &&
+                    currentProjectRole === 'super_manager';
+
+                [
+                    '#farmTableSection',
+                    '#tableSection',
+                    '#farmDataTable'
+                ].forEach(selector => {
+                    const el = document.querySelector(selector);
+                    if (el) el.style.display = isSuperManager ? 'none' : '';
+                });
+
+                if (isSuperManager) {
+                    document.querySelectorAll(
+                        '.edit-farm, .delete-farm, .assign-farm, .validate-farm,' +
+                        '[data-action="edit"], [data-action="delete"],' +
+                        '[data-action="assign"], [data-action="validate"]'
+                    ).forEach(el => {
+                        el.style.display = 'none';
+                    });
+                }
+            } catch (e) {
+                console.warn('⚠️ applySuperManagerView skipped:', e);
+            }
+        };
+
+
     function setCurrentProjectMembership(membership) {
         currentProjectMembership = membership || null;
         currentProjectRole = normalizeRole(membership?.role);
@@ -1695,7 +1709,7 @@ async function loadSuperManagerApprovedFarms(projectId) {
         canSyncKobo = activeProject && ['owner','manager','field_officer','enumerator'].includes(currentProjectRole);
 
         updateRoleAndProjectUI();
-                if (typeof applySuperManagerView === 'function') if (typeof applySuperManagerView === 'function') applySuperManagerView();
+                if (typeof applySuperManagerView === 'function') window.applySuperManagerView();
                 applyRoleSpecificKPILabels();
     }
 
