@@ -1242,7 +1242,7 @@
                     </div>
                     <div class="alerts-footer">
                         <button onclick="checkOverlaps()" class="btn-primary">Check Now</button>
-                        <button onclick="dismissOverlapAlerts()" class="btn-secondary">Dismiss</button>
+                        <button onclick="window.dismissOverlapAlerts()" class="btn-secondary">Dismiss</button>
                     </div>
                 </div>
 
@@ -1260,7 +1260,7 @@
                     </div>
                     <div class="alerts-footer">
                         <button onclick="checkQualityAlerts()" class="btn-primary">Check Now</button>
-                        <button onclick="dismissQualityAlerts()" class="btn-secondary">Dismiss</button>
+                        <button onclick="window.dismissQualityAlerts()" class="btn-secondary">Dismiss</button>
                     </div>
                 </div>
             </div>
@@ -2359,22 +2359,22 @@
         }
     }
 
-    function dismissOverlapAlerts() {
+    window.dismissOverlapAlerts = function () {
         overlapAlerts.forEach(a => dismissedAlertIds.push(a.id));
         saveDismissedAlerts();
         overlapAlerts = [];
         updateAlertsUI();
-        if (currentMap) { updateMap(); }
+        if (currentMap) updateMap();
         showNotification('Overlap alerts dismissed', 'success');
-    }
+    };
 
-    function dismissQualityAlerts() {
+    window.dismissQualityAlerts = function () {
         qualityAlerts.forEach(a => dismissedAlertIds.push(a.id));
         saveDismissedAlerts();
         qualityAlerts = [];
         updateAlertsUI();
         showNotification('Quality alerts dismissed', 'success');
-    }
+    };
 
     function zoomToFarm(farmId) {
         const farm = farmsData.find(f => f.id === farmId);
@@ -2783,9 +2783,7 @@
     window.viewAllAlerts = () => { if (overlapAlerts.length === 0 && qualityAlerts.length === 0) alert('No alerts'); else alert('Overlaps: ' + overlapAlerts.length + '\nQuality: ' + qualityAlerts.length); };
     window.checkOverlaps = checkOverlaps;
     window.checkQualityAlerts = checkQualityAlerts;
-    window.dismissOverlapAlerts = dismissOverlapAlerts;
-    window.dismissQualityAlerts = dismissQualityAlerts;
-    window.toggleCooperativeStats = toggleCooperativeStats;
+window.toggleCooperativeStats = toggleCooperativeStats;
     window.openEditModal = openEditModal;
     window.closeEditModal = closeEditModal;
     window.redirectToMap = redirectToMap;
@@ -2881,6 +2879,22 @@
         document.addEventListener('DOMContentLoaded', init);
     } else {
         init();
+    }
+
+    // Global alert handlers: required by the alert-panel buttons.
+    if (typeof window.dismissOverlapAlerts !== 'function') {
+        window.dismissOverlapAlerts = function () {
+            overlapAlerts = [];
+            updateAlertsUI();
+            if (currentMap) updateMap();
+        };
+    }
+
+    if (typeof window.dismissQualityAlerts !== 'function') {
+        window.dismissQualityAlerts = function () {
+            qualityAlerts = [];
+            updateAlertsUI();
+        };
     }
 </script>
 </body>
