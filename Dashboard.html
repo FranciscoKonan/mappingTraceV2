@@ -1210,6 +1210,9 @@
                 <!-- Download Section -->
                 <div id="downloadSection" class="download-section hidden">
                     <h4><i class="fas fa-download"></i> <span id="downloadSectionTitle">Export Data</span></h4>
+                    <p id="downloadSectionHelp" style="margin:0 0 10px;color:#64748b;font-size:12px;">
+                        Export permissions follow your project role.
+                    </p>
                     <div class="download-actions">
                         <button onclick="exportData('csv')" class="btn-download csv"><i class="fas fa-file-csv"></i> CSV</button>
                         <button onclick="exportData('geojson')" class="btn-download geojson"><i class="fas fa-globe"></i> GeoJSON</button>
@@ -1269,7 +1272,7 @@
                             <select id="supplierFilter" class="filter-select"><option value="all">All Suppliers</option></select>
                             <select id="statusFilter" class="filter-select"><option value="all">All Status</option></select>
                             <button onclick="refreshTable()" class="btn-icon"><i class="fas fa-redo-alt"></i></button>
-                            <button onclick="exportTableData()" class="btn-icon"><i class="fas fa-download"></i></button>
+                            <button id="tableExportBtn" onclick="exportTableData()" class="btn-icon" title="Export filtered table"><i class="fas fa-download"></i></button>
                         </div>
                     </div>
                     <div class="table-container">
@@ -1470,8 +1473,21 @@
             const activeProject = !isProjectArchived && !isAllProjectsView;
             canEditFarms = activeProject && ['owner','manager','validator','field_officer'].includes(currentProjectRole);
             canManageProtectedAreas = activeProject && currentProjectRole === 'owner';
-            canExport = !isAllProjectsView || allUserProjects.length > 0;
-            exportValidatedOnly = currentProjectRole === 'super_manager';
+            // Least-privilege export policy:
+            // Owner / Manager      -> full project export
+            // Super Manager       -> validated farms only
+            // Validator           -> validated farms only
+            // Field Officer       -> no export
+            // Enumerator          -> no export
+            // Viewer              -> no export
+            const fullExportRoles = ['owner', 'manager'];
+            const validatedExportRoles = ['super_manager', 'validator'];
+
+            canExport = !isAllProjectsView &&
+                [...fullExportRoles, ...validatedExportRoles].includes(currentProjectRole);
+
+            exportValidatedOnly = validatedExportRoles.includes(currentProjectRole);
+
             canSyncKobo = activeProject && ['owner','manager','field_officer','enumerator'].includes(currentProjectRole);
 
             updateRoleAndProjectUI();
@@ -1483,6 +1499,8 @@
             const protectedControl = document.getElementById('protectedAreaControl');
             const downloadSection = document.getElementById('downloadSection');
             const downloadTitle = document.getElementById('downloadSectionTitle');
+            const downloadHelp = document.getElementById('downloadSectionHelp');
+            const tableExportBtn = document.getElementById('tableExportBtn');
             const banner = document.getElementById('projectOversightBanner');
             const bannerText = document.getElementById('projectOversightText');
 
@@ -1498,7 +1516,25 @@
             if (syncBtn) syncBtn.style.display = canSyncKobo ? 'inline-flex' : 'none';
             if (protectedControl) protectedControl.style.display = canManageProtectedAreas ? 'block' : 'none';
             if (downloadSection) downloadSection.classList.toggle('hidden', !canExport);
-            if (downloadTitle) downloadTitle.textContent = exportValidatedOnly ? 'Export Validated Data' : 'Export Data';
+            if (tableExportBtn) tableExportBtn.style.display = canExport ? 'inline-flex' : 'none';
+
+            if (downloadTitle) {
+                downloadTitle.textContent = exportValidatedOnly
+                    ? 'Export Validated Data'
+                    : 'Export Project Data';
+            }
+
+            if (downloadHelp) {
+                if (currentProjectRole === 'owner' || currentProjectRole === 'manager') {
+                    downloadHelp.textContent = 'Full project export is available for Owner and Manager roles.';
+                } else if (currentProjectRole === 'super_manager') {
+                    downloadHelp.textContent = 'Oversight export: only validated farms are included.';
+                } else if (currentProjectRole === 'validator') {
+                    downloadHelp.textContent = 'Validation export: only validated farms are included.';
+                } else {
+                    downloadHelp.textContent = 'Export is not available for this role.';
+                }
+            }
 
             if (banner) {
                 banner.classList.remove('show', 'archived');
@@ -1507,11 +1543,31 @@
                     bannerText.textContent = 'This project is archived. Data can be viewed and exported, but operational changes are disabled.';
                 } else if (currentProjectRole === 'super_manager') {
                     banner.classList.add('show');
-                    bannerText.textContent = 'Super Manager oversight mode: progress, validated farms, reporting and permitted exports are available. Operational editing is disabled.';
+                    bannerText.textContent = 'Super Manager oversight mode: progress, validated farms, reporting and validated-only exports are available. Operational editing is disabled.';
+                } else if (currentProjectRole === 'validator') {
+                    banner.classList.add('show');
+                    bannerText.textContent = 'Validator mode: validation work is available. Export is limited to validated farms.';
+                } else if (['enumerator', 'field_officer', 'viewer'].includes(currentProjectRole)) {
+                    banner.classList.add('show');
+                    bannerText.textContent = currentProjectRole === 'viewer'
+                        ? 'View-only mode: project data can be reviewed, but editing and export are disabled.'
+                        : 'Operational field mode: project data can be reviewed according to your role. Export is disabled.';
                 }
             }
 
             updateTable();
+        }
+
+        function ensureExportPermission() {
+            if (!canExport) {
+                showNotification('Export is not available for your project role.', 'warning');
+                return false;
+            }
+            if (!currentProject?.id || isAllProjectsView) {
+                showNotification('Select a specific project before exporting.', 'warning');
+                return false;
+            }
+            return true;
         }
 
         function ensureOperationalPermission(action) {
@@ -2193,10 +2249,13 @@
         // EXPORT FUNCTIONS
         // ============================================
         async function exportData(format) {
-            if (!canExport) { showNotification('Export is not available for this project.', 'warning'); return; }
+            if (!ensureExportPermission()) return;
+
             showLoading(true);
             try {
-                const sourceFarms = exportValidatedOnly ? filteredFarms.filter(f => f.status === 'validated') : filteredFarms;
+                const sourceFarms = exportValidatedOnly
+                    ? filteredFarms.filter(f => String(f.status || '').toLowerCase() === 'validated')
+                    : filteredFarms;
                 const data = sourceFarms.map(f => ({
                     farmer_id: f.farmer_id || f.id.slice(0,8),
                     farmer_name: f.farmer_name || 'Unknown',
@@ -2273,8 +2332,11 @@
         }
 
         function exportTableData() {
-            if (!canExport) { showNotification('Export is not available for this project.', 'warning'); return; }
-            const exportRows = exportValidatedOnly ? filteredFarms.filter(f => f.status === 'validated') : filteredFarms;
+            if (!ensureExportPermission()) return;
+
+            const exportRows = exportValidatedOnly
+                ? filteredFarms.filter(f => String(f.status || '').toLowerCase() === 'validated')
+                : filteredFarms;
             const csv = [['Farmer ID','Farmer Name','Cooperative','Supplier','Enumerator','Area','Status']];
             exportRows.forEach(f => csv.push([f.farmer_id||'', f.farmer_name||'', f.cooperative||'', f.supplier||'', f.enumerator||'', f.area||'', f.status||'']));
             const csvContent = csv.map(row => row.join(',')).join('\n');
@@ -2451,6 +2513,7 @@
             e.preventDefault();
 
             if (!ensureOperationalPermission('edit farms')) return;
+
             if (!currentProject?.id) {
                 showNotification('No active project selected.', 'error');
                 return;
@@ -2482,21 +2545,22 @@
                     updated_at: new Date().toISOString()
                 };
 
-                const { data, error } = await supabaseClient
+                // Keep the UPDATE request simple. Do not request a returned row;
+                // this avoids unnecessary PostgREST SELECT/RLS interaction.
+                const { error } = await supabaseClient
                     .from('farms')
                     .update(payload)
                     .eq('id', id)
-                    .eq('project_id', currentProject.id)
-                    .select('id, project_id')
-                    .maybeSingle();
+                    .eq('project_id', currentProject.id);
 
-                if (error) throw error;
-
-                if (!data) {
-                    throw new Error(
-                        'No farm was updated. The farm may not belong to this project, ' +
-                        'or your role does not have UPDATE permission.'
-                    );
+                if (error) {
+                    console.error('Farm update failed:', {
+                        message: error.message,
+                        details: error.details,
+                        hint: error.hint,
+                        code: error.code
+                    });
+                    throw error;
                 }
 
                 closeEditModal();
@@ -2504,10 +2568,20 @@
                 await loadProjectData(currentProject.id);
 
             } catch (error) {
-                console.error('Farm update failed:', error);
-                showNotification('Error saving farm: ' + (error.message || 'Unknown error'), 'error');
+                console.error('Farm update failed:', {
+                    message: error?.message,
+                    details: error?.details,
+                    hint: error?.hint,
+                    code: error?.code
+                });
+
+                showNotification(
+                    'Error saving farm: ' + (error?.message || 'Unknown database error'),
+                    'error'
+                );
             } finally {
                 showLoading(false);
+
                 if (saveBtn) {
                     saveBtn.disabled = false;
                     saveBtn.textContent = 'Save Changes';
