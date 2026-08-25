@@ -277,6 +277,34 @@
             text-align: center;
         }
         
+        .project-card.archived-card {
+            opacity: 0.82;
+            border: 2px dashed #94a3b8;
+        }
+        .project-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            margin-top: 12px;
+            padding: 5px 10px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+        .project-status.active { background: #dcfce7; color: #166534; }
+        .project-status.archived { background: #e2e8f0; color: #475569; }
+        .project-actions { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
+        .project-action-btn {
+            border: none;
+            padding: 8px 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+        .archive-btn { background: #fee2e2; color: #991b1b; }
+        .restore-btn { background: #dcfce7; color: #166534; }
+
         @media (max-width: 768px) {
             .projects-grid { grid-template-columns: 1fr; }
             .header { flex-direction: column; gap: 16px; text-align: center; }
@@ -413,14 +441,36 @@
                     .eq('project_id', project.id);
                 
                 html += `
-                    <div class="project-card" onclick="openProject('${project.id}')">
-                        <div class="project-icon"><i class="fas fa-folder-open"></i></div>
+                const isArchived = project.status === 'archived';
+                const isProjectOwner = role === 'owner' && project.owner_id === currentUser.id;
+
+                html += `
+                    <div class="project-card ${isArchived ? 'archived-card' : ''}" onclick="openProject('${project.id}')">
+                        <div class="project-icon">
+                            <i class="fas ${isArchived ? 'fa-box-archive' : 'fa-folder-open'}"></i>
+                        </div>
                         <div class="project-name">${escapeHtml(project.name)}</div>
                         <div class="project-description">${escapeHtml(project.description || 'No description')}</div>
                         <div class="project-stats">
                             <span><i class="fas fa-tractor"></i> ${count || 0} farms</span>
                         </div>
                         <div class="project-role ${role}">${roleDisplay}</div>
+                        <div class="project-status ${isArchived ? 'archived' : 'active'}">
+                            <i class="fas ${isArchived ? 'fa-box-archive' : 'fa-circle-check'}"></i>
+                            ${isArchived ? 'Archived' : 'Active'}
+                        </div>
+                        ${isProjectOwner ? `
+                            <div class="project-actions" onclick="event.stopPropagation()">
+                                ${isArchived
+                                    ? `<button class="project-action-btn restore-btn" onclick="restoreProject('${project.id}', event)">
+                                        <i class="fas fa-box-open"></i> Restore
+                                       </button>`
+                                    : `<button class="project-action-btn archive-btn" onclick="archiveProject('${project.id}', event)">
+                                        <i class="fas fa-box-archive"></i> Archive
+                                       </button>`
+                                }
+                            </div>
+                        ` : ''}
                     </div>
                 `;
             }
@@ -453,6 +503,52 @@
             projectsGrid.innerHTML = html;
         }
         
+        async function archiveProject(projectId, event) {
+            if (event) event.stopPropagation();
+
+            if (!confirm(
+                'Archive this project?\n\n' +
+                'Historical data will be preserved, but operational changes will be blocked until the project is restored.'
+            )) return;
+
+            try {
+                const { error } = await supabaseClient.rpc('archive_project', {
+                    p_project_id: projectId
+                });
+
+                if (error) throw error;
+
+                alert('Project archived successfully.');
+                await loadProjects();
+            } catch (error) {
+                console.error('Archive project error:', error);
+                alert('Unable to archive project: ' + error.message);
+            }
+        }
+
+        async function restoreProject(projectId, event) {
+            if (event) event.stopPropagation();
+
+            if (!confirm(
+                'Restore this project?\n\n' +
+                'Operational access will be enabled again according to the project roles.'
+            )) return;
+
+            try {
+                const { error } = await supabaseClient.rpc('restore_project', {
+                    p_project_id: projectId
+                });
+
+                if (error) throw error;
+
+                alert('Project restored successfully.');
+                await loadProjects();
+            } catch (error) {
+                console.error('Restore project error:', error);
+                alert('Unable to restore project: ' + error.message);
+            }
+        }
+
         function openProject(projectId) {
             localStorage.setItem('currentProjectId', projectId);
             window.location.href = `DataManagement.html?project=${projectId}`;
@@ -517,6 +613,8 @@
         window.closeModal = closeModal;
         window.openProject = openProject;
         window.goToRequestAccess = goToRequestAccess;
+        window.archiveProject = archiveProject;
+        window.restoreProject = restoreProject;
         
         init();
     </script>
