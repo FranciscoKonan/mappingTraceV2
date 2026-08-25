@@ -1114,10 +1114,10 @@
                 </div>
                 <!-- KPIs -->
                 <section class="kpis">
-                    <div class="kpi"><div class="kpi-icon"><i class="fas fa-tractor"></i></div><div class="kpi-content"><h4>Farms Mapped</h4><p class="kpi-value" id="farmsCount">0</p></div></div>
+                    <div class="kpi"><div class="kpi-icon"><i class="fas fa-tractor"></i></div><div class="kpi-content"><h4>Total Farms</h4><p class="kpi-value" id="farmsCount">0</p></div></div>
+                    <div class="kpi"><div class="kpi-icon"><i class="fas fa-hourglass-half"></i></div><div class="kpi-content"><h4>Pending Farms</h4><p class="kpi-value" id="pendingFarms">0</p></div></div>
+                    <div class="kpi"><div class="kpi-icon"><i class="fas fa-check-circle"></i></div><div class="kpi-content"><h4>Approved Farms</h4><p class="kpi-value" id="approvedFarms">0</p></div></div>
                     <div class="kpi"><div class="kpi-icon"><i class="fas fa-vector-square"></i></div><div class="kpi-content"><h4>Total Area (ha)</h4><p class="kpi-value" id="totalArea">0</p></div></div>
-                    <div class="kpi"><div class="kpi-icon"><i class="fas fa-th-large"></i></div><div class="kpi-content"><h4>Active Plots</h4><p class="kpi-value" id="activePlots">0</p></div></div>
-                    <div class="kpi"><div class="kpi-icon"><i class="fas fa-exclamation-triangle"></i></div><div class="kpi-content"><h4>Quality Alerts</h4><p class="kpi-value" id="alertsCount">0</p></div></div>
                 </section>
 
                 <!-- Cooperative Stats -->
@@ -1323,7 +1323,7 @@
                 <div class="form-group"><label>Supplier</label><input type="text" id="editSupplier"></div>
                 <div class="form-group"><label>Enumerator</label><input type="text" id="editEnumerator"></div>
                 <div class="form-group"><label>Area (ha)</label><input type="number" step="0.01" id="editArea"></div>
-                <div class="form-group"><label>Status</label><select id="editStatus"><option value="pending">Pending</option><option value="validated">Validated</option><option value="rejected">Rejected</option></select></div>
+                <div class="form-group"><label>Status</label><select id="editStatus"><option value="pending">Pending</option><option value="active">Active</option><option value="archived">Archived</option></select></div>
                 <div class="modal-buttons"><button type="button" class="btn-cancel" onclick="closeEditModal()">Cancel</button><button type="submit" class="btn-save">Save Changes</button></div>
             </form>
         </div>
@@ -1405,6 +1405,7 @@
         let currentMap = null, farmLayers = [], protectedLayer = null, protectedAreas = [];
         let isProjectArchived = false, isAllProjectsView = false;
         let canEditFarms = false, canManageProtectedAreas = false, canExport = false, exportValidatedOnly = false, canSyncKobo = false;
+        let dashboardSummary = null;
         let currentPage = 1, rowsPerPage = 10, coopChart = null;
         let overlapAlerts = [], qualityAlerts = [];
         let protectedVisible = true, mapInitialized = false, pendingFile = null;
@@ -1774,6 +1775,20 @@
                 farmsData = farms || [];
                 filteredFarms = [...farmsData];
                 console.log('✅ Loaded farms:', farmsData.length);
+
+                // Use the database RPC as the source of truth for project KPIs.
+                const { data: summary, error: summaryError } = await supabaseClient.rpc(
+                    'get_project_dashboard_summary',
+                    { p_project_id: projectId }
+                );
+
+                if (summaryError) {
+                    console.error('❌ Dashboard summary error:', summaryError);
+                    throw summaryError;
+                }
+
+                dashboardSummary = summary || null;
+                console.log('✅ Dashboard summary:', dashboardSummary);
                 
                 document.getElementById('submissionBadge').textContent = farmsData.length;
                 
@@ -1808,6 +1823,7 @@
                 canExport = true;
                 exportValidatedOnly = false;
                 canSyncKobo = false;
+                dashboardSummary = null;
                 updateRoleAndProjectUI();
                 let allFarms = [];
                 for (const m of allUserProjects) {
@@ -2450,11 +2466,35 @@
         // UI FUNCTIONS
         // ============================================
         function updateKPIs() {
-            document.getElementById('farmsCount').textContent = farmsData.length;
-            document.getElementById('totalArea').textContent = farmsData.reduce((s,f) => s + (f.area || 0), 0).toFixed(1);
-            document.getElementById('activePlots').textContent = farmsData.filter(f => f.status === 'validated').length;
+            // Selected project: use the authoritative dashboard RPC.
+            if (dashboardSummary) {
+                document.getElementById('farmsCount').textContent =
+                    Number(dashboardSummary.total_farms || 0);
+
+                document.getElementById('pendingFarms').textContent =
+                    Number(dashboardSummary.pending_farms || 0);
+
+                document.getElementById('approvedFarms').textContent =
+                    Number(dashboardSummary.approved_farms || 0);
+
+                document.getElementById('totalArea').textContent =
+                    Number(dashboardSummary.total_area_ha || 0).toFixed(1);
+            } else {
+                // ALL PROJECTS fallback: calculate farm-level metrics locally.
+                const pending = farmsData.filter(
+                    f => String(f.status || '').toLowerCase() === 'pending'
+                ).length;
+
+                document.getElementById('farmsCount').textContent = farmsData.length;
+                document.getElementById('pendingFarms').textContent = pending;
+                document.getElementById('approvedFarms').textContent = 0;
+                document.getElementById('totalArea').textContent =
+                    farmsData.reduce((s, f) => s + (Number(f.area) || 0), 0).toFixed(1);
+            }
+
             document.getElementById('mapFarmsCount').textContent = filteredFarms.length;
-            document.getElementById('mapTotalArea').textContent = filteredFarms.reduce((s,f) => s + (f.area || 0), 0).toFixed(1) + ' ha';
+            document.getElementById('mapTotalArea').textContent =
+                filteredFarms.reduce((s, f) => s + (Number(f.area) || 0), 0).toFixed(1) + ' ha';
         }
 
         function updateCooperativeStats() {
