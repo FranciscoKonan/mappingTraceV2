@@ -2223,7 +2223,18 @@
                 `).join('');
             }
             
-            document.getElementById('alertsCount').textContent = overlapAlerts.length + qualityAlerts.length;
+            const totalAlerts = overlapAlerts.length + qualityAlerts.length;
+            
+            const alertsCount = document.getElementById('alertsCount');
+            if (alertsCount) {
+                alertsCount.textContent = totalAlerts;
+            }
+            
+            const alertBadge = document.getElementById('alertBadge');
+            if (alertBadge) {
+                alertBadge.textContent = totalAlerts;
+            }
+            
             document.getElementById('alertBadge').textContent = overlapAlerts.length + qualityAlerts.length;
         }
 
