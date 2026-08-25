@@ -23,7 +23,6 @@
                     });
                 }
             } catch (e) {
-                console.warn('⚠️ applySuperManagerView skipped:', e);
             }
         }
 
@@ -1512,7 +1511,6 @@ async function loadSuperManagerApprovedFarms(projectId) {
 <div id="loadingOverlay" class="loading-spinner"><i class="fas fa-spinner fa-spin"></i><span>Loading...</span></div>
 
 <script>
-window.applySuperManagerView = window.applySuperManagerView || function () {};
 </script>
 <script>
     // ============================================
@@ -1676,17 +1674,19 @@ function setCurrentProjectMembership(membership) {
         canSyncKobo = activeProject && ['owner','manager','field_officer','enumerator'].includes(currentProjectRole);
 
         updateRoleAndProjectUI();
-
         if (currentProjectRole === 'super_manager') {
             document.body.classList.add('summary-only-mode');
             document.querySelectorAll(
                 '#farmTableSection, #tableSection, #farmDataTable, ' +
                 '.edit-farm, .delete-farm, .assign-farm, .validate-farm'
-            ).forEach(el => el.style.display = 'none');
+            ).forEach(el => {
+                el.style.display = 'none';
+            });
         }
 
         applyRoleSpecificKPILabels();
     }
+
 
     function updateRoleAndProjectUI() {
         const roleEl = document.getElementById('userRole');
