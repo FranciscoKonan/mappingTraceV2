@@ -1682,7 +1682,7 @@ async function loadSuperManagerApprovedFarms(projectId) {
         canSyncKobo = activeProject && ['owner','manager','field_officer','enumerator'].includes(currentProjectRole);
 
         updateRoleAndProjectUI();
-                applySuperManagerView();
+                if (typeof applySuperManagerView === 'function') applySuperManagerView();
                 applyRoleSpecificKPILabels();
     }
 
