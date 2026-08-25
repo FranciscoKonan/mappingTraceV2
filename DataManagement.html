@@ -174,6 +174,66 @@
         .hidden { display: none; }
         
         @media (max-width: 1024px) { .dashboard-grid { grid-template-columns: 1fr; } }
+        
+        .dm-section-title {
+            margin: 28px 0 14px;
+            font-size: 20px;
+            color: #1e293b;
+            display: flex;
+            align-items: center;
+            gap: 9px;
+        }
+        .dm-section-subtitle {
+            margin: -7px 0 16px;
+            color: #64748b;
+            font-size: 13px;
+        }
+        .dm-project-info {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 12px;
+            margin-top: 18px;
+        }
+        .dm-info-card {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 14px 16px;
+        }
+        .dm-info-label {
+            display: block;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: .05em;
+            color: #64748b;
+            margin-bottom: 5px;
+        }
+        .dm-info-value {
+            font-weight: 700;
+            color: #0f172a;
+            word-break: break-word;
+        }
+        .dm-archived-banner {
+            background: #fff7ed;
+            border: 1px solid #fed7aa;
+            color: #9a3412;
+            border-radius: 10px;
+            padding: 12px 14px;
+            margin-bottom: 16px;
+        }
+        .dm-active-banner {
+            background: #f0fdf4;
+            border: 1px solid #bbf7d0;
+            color: #166534;
+            border-radius: 10px;
+            padding: 12px 14px;
+            margin-bottom: 16px;
+        }
+        .dm-disabled {
+            opacity: .55;
+            pointer-events: none;
+        }
+        
         @media (max-width: 768px) { 
             .sidebar { width: 70px; } 
             .sidebar a span { display: none; } 
@@ -509,11 +569,18 @@
         }
         
         function getProjectStatusBanner() {
-            if (!currentProject || currentProject.status !== 'archived') return '';
-            return `<div class="permission-banner" style="margin-bottom:16px;">
-                <i class="fas fa-box-archive"></i>
-                <strong>Archived Project — Read Only:</strong>
-                Existing data can be viewed and exported, but operational changes are disabled.
+            if (!currentProject) return '';
+            if (currentProject.status === 'archived') {
+                return `<div class="dm-archived-banner">
+                    <i class="fas fa-box-archive"></i>
+                    <strong>Archived Project — Read Only.</strong>
+                    Existing data can be viewed and exported, but operational changes are disabled.
+                </div>`;
+            }
+            return `<div class="dm-active-banner">
+                <i class="fas fa-circle-check"></i>
+                <strong>Active Project.</strong>
+                Operational project functions are available according to your role.
             </div>`;
         }
 
@@ -528,6 +595,16 @@
             }
         }
         
+        function goToTokens() {
+            const projectId = getProjectIdFromUrl();
+            window.location.href = `invitation-tokens.html${projectId ? `?project=${projectId}` : ''}`;
+        }
+
+        function goToRequests() {
+            const projectId = getProjectIdFromUrl();
+            window.location.href = `access-requests.html${projectId ? `?project=${projectId}` : ''}`;
+        }
+
         function goToDashboard() { 
             const projectId = getProjectIdFromUrl();
             window.location.href = `Dashboard.html${projectId ? `?project=${projectId}` : ''}`; 
@@ -566,24 +643,87 @@
                 <div class="kpi-card"><div class="kpi-info"><h3>0</h3><p>Pending Review</p></div><div class="kpi-icon"><i class="fas fa-clock"></i></div></div></div>
                 <div class="dashboard-grid"><div class="dashboard-card"><h3><i class="fas fa-chart-pie"></i> Farm Status Distribution</h3><div class="chart-container"><canvas id="statusChart"></canvas></div></div>
                 <div class="dashboard-card"><h3><i class="fas fa-chart-bar"></i> Farm Area Distribution</h3><div class="chart-container"><canvas id="farmChart"></canvas></div></div></div>
-                <div class="section-heading" style="margin: 28px 0 14px;">
-                    <h2 style="margin:0; font-size:20px;"><i class="fas fa-layer-group"></i> Project Navigation</h2>
-                    <p style="margin:6px 0 0; color:#64748b;">Manage the project, team access, and view farm data.</p>
+                <div class="dm-section-title">
+                    <i class="fas fa-database"></i> Data Workspace
                 </div>
+                <p class="dm-section-subtitle">Open the operational farm workspace or review project-level analytics.</p>
+
                 <div class="action-buttons">
+                    <div class="action-card" onclick="goToDashboard()">
+                        <div class="action-icon"><i class="fas fa-map-marked-alt"></i></div>
+                        <h3>Farm Dashboard</h3>
+                        <p>View the farm map, farm data, filters, details, validation and exports.</p>
+                        <div class="action-btn">Go to Dashboard <i class="fas fa-arrow-right"></i></div>
+                    </div>
+
                     <div class="action-card" onclick="goToProjectStatistics()">
                         <div class="action-icon"><i class="fas fa-chart-line"></i></div>
                         <h3>Project Statistics</h3>
-                        <p>View enumerator performance, Gantt charts, and cooperative analytics</p>
-                    </div>
-                    ${showSettingsButton}
-                    <div class="action-card" onclick="goToDashboard()">
-                        <div class="action-icon"><i class="fas fa-chart-line"></i></div>
-                        <h3>Go to Dashboard</h3>
-                        <p>View all farms and analytics</p>
-                        <div class="action-btn">Go to Dashboard <i class="fas fa-arrow-right"></i></div>
+                        <p>View enumerator performance, progress, Gantt charts and cooperative analytics.</p>
+                        <div class="action-btn">View Statistics <i class="fas fa-arrow-right"></i></div>
                     </div>
                 </div>
+
+                <div class="dm-section-title">
+                    <i class="fas fa-users-cog"></i> Project Administration
+                </div>
+                <p class="dm-section-subtitle">Manage people, invitations and access requests for this project.</p>
+
+                <div class="action-buttons">
+                    ${(currentUserRole === 'owner' || currentUserRole === 'manager') ? `
+                    <div class="action-card" onclick="loadTeamPage()">
+                        <div class="action-icon"><i class="fas fa-users"></i></div>
+                        <h3>Team Management</h3>
+                        <p>Manage project members, roles and access.</p>
+                        <div class="action-btn">Manage Team <i class="fas fa-arrow-right"></i></div>
+                    </div>
+
+                    <div class="action-card" onclick="goToTokens()">
+                        <div class="action-icon"><i class="fas fa-key"></i></div>
+                        <h3>Invitation Tokens</h3>
+                        <p>Create and manage secure project invitations.</p>
+                        <div class="action-btn">Manage Invitations <i class="fas fa-arrow-right"></i></div>
+                    </div>
+
+                    <div class="action-card" onclick="goToRequests()">
+                        <div class="action-icon"><i class="fas fa-inbox"></i></div>
+                        <h3>Access Requests</h3>
+                        <p>Review and manage requests to join this project.</p>
+                        <div class="action-btn">Review Requests <i class="fas fa-arrow-right"></i></div>
+                    </div>
+                    ` : `
+                    <div class="action-card" onclick="loadTeamPage()">
+                        <div class="action-icon"><i class="fas fa-users"></i></div>
+                        <h3>Team</h3>
+                        <p>View the members and roles associated with this project.</p>
+                        <div class="action-btn">View Team <i class="fas fa-arrow-right"></i></div>
+                    </div>
+                    `}
+                </div>
+
+                <div class="dm-section-title">
+                    <i class="fas fa-info-circle"></i> Project Information
+                </div>
+                <p class="dm-section-subtitle">Key information about the current project.</p>
+
+                <div class="dm-project-info">
+                    <div class="dm-info-card">
+                        <span class="dm-info-label">Project</span>
+                        <span class="dm-info-value">${escapeHtml(currentProject.name)}</span>
+                    </div>
+                    <div class="dm-info-card">
+                        <span class="dm-info-label">Status</span>
+                        <span class="dm-info-value">${currentProject.status === 'archived' ? 'Archived — Read Only' : 'Active'}</span>
+                    </div>
+                    <div class="dm-info-card">
+                        <span class="dm-info-label">Your Role</span>
+                        <span class="dm-info-value">${escapeHtml(currentUserRole.replace('_', ' ').toUpperCase())}</span>
+                    </div>
+                    <div class="dm-info-card">
+                        <span class="dm-info-label">Project ID</span>
+                        <span class="dm-info-value">${escapeHtml(currentProject.id)}</span>
+                    </div>
+                </div>           </div>
             `;
             document.getElementById('pageContent').innerHTML = dataManagementHtml;
             
@@ -717,11 +857,6 @@
         }
         
         // ============================================
-        // PROJECT ADMINISTRATION
-        // Team Management, Invitation Tokens, and Access Requests remain
-        // project-level administrative functions and are intentionally kept
-        // out of the farm Dashboard.
-
         // TEAM MANAGEMENT
         // ============================================
         
