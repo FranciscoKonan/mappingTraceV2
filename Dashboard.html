@@ -387,6 +387,23 @@
         .role-badge.validator { background: #fef3c7; color: #92400e; }
         .role-badge.field_officer { background: #e0e7ff; color: #3730a3; }
         .role-badge.viewer { background: #f1f5f9; color: #475569; }
+        .role-badge.super_manager { background: #ede9fe; color: #6d28d9; }
+        .project-status-badge {
+            display: inline-flex; align-items: center; gap: 5px; margin-left: 8px;
+            padding: 3px 9px; border-radius: 999px; font-size: 10px; font-weight: 700;
+            text-transform: uppercase; letter-spacing: .3px; vertical-align: middle;
+        }
+        .project-status-badge.active { background: #dcfce7; color: #166534; }
+        .project-status-badge.archived { background: #e2e8f0; color: #475569; }
+        .project-status-badge.readonly { background: #fef3c7; color: #92400e; }
+        .project-oversight-banner {
+            display: none; background: #f5f3ff; border: 1px solid #ddd6fe; color: #5b21b6;
+            border-radius: 10px; padding: 10px 14px; margin-bottom: 15px; font-size: 12px;
+            align-items: center; gap: 9px;
+        }
+        .project-oversight-banner.show { display: flex; }
+        .project-oversight-banner.archived { background:#f8fafc; border-color:#cbd5e1; color:#475569; }
+        .readonly-control { opacity: .65; }
         
         .sync-btn {
             background: #2c6e49;
@@ -1091,6 +1108,10 @@
 
             <!-- SCROLLABLE CONTENT -->
             <div class="scrollable-content">
+                <div id="projectOversightBanner" class="project-oversight-banner">
+                    <i class="fas fa-eye"></i>
+                    <span id="projectOversightText">Read-only project oversight mode.</span>
+                </div>
                 <!-- KPIs -->
                 <section class="kpis">
                     <div class="kpi"><div class="kpi-icon"><i class="fas fa-tractor"></i></div><div class="kpi-content"><h4>Farms Mapped</h4><p class="kpi-value" id="farmsCount">0</p></div></div>
@@ -1188,7 +1209,7 @@
 
                 <!-- Download Section -->
                 <div id="downloadSection" class="download-section hidden">
-                    <h4><i class="fas fa-download"></i> Export Data</h4>
+                    <h4><i class="fas fa-download"></i> <span id="downloadSectionTitle">Export Data</span></h4>
                     <div class="download-actions">
                         <button onclick="exportData('csv')" class="btn-download csv"><i class="fas fa-file-csv"></i> CSV</button>
                         <button onclick="exportData('geojson')" class="btn-download geojson"><i class="fas fa-globe"></i> GeoJSON</button>
@@ -1377,8 +1398,10 @@
         const SUPABASE_URL = 'https://crvnohvudurqfukjpisv.supabase.co';
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNydm5vaHZ1ZHVycWZ1a2pwaXN2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg0NTUxNzMsImV4cCI6MjA5NDAzMTE3M30.Qp8E57yAN4LnO4A-yirf-Z3QufGZw9OKjBfcQxG7fo8';
         
-        let supabaseClient, currentUser, currentProject, allUserProjects = [], farmsData = [], filteredFarms = [], dismissedAlertIds = [];
+        let supabaseClient, currentUser, currentProject, currentProjectMembership = null, currentProjectRole = null, allUserProjects = [], farmsData = [], filteredFarms = [], dismissedAlertIds = [];
         let currentMap = null, farmLayers = [], protectedLayer = null, protectedAreas = [];
+        let isProjectArchived = false, isAllProjectsView = false;
+        let canEditFarms = false, canManageProtectedAreas = false, canExport = false, exportValidatedOnly = false, canSyncKobo = false;
         let currentPage = 1, rowsPerPage = 10, coopChart = null;
         let overlapAlerts = [], qualityAlerts = [];
         let protectedVisible = true, mapInitialized = false, pendingFile = null;
@@ -1416,6 +1439,76 @@
                 } catch(e) {}
             }
             return { overlaps: foundOverlap, area: totalOverlapArea };
+        }
+
+        // ============================================
+        // PROJECT ROLE & PERMISSIONS
+        // ============================================
+        function normalizeRole(role) { return String(role || '').toLowerCase().trim(); }
+
+        function setCurrentProjectMembership(membership) {
+            currentProjectMembership = membership || null;
+            currentProjectRole = normalizeRole(membership?.role);
+            isProjectArchived = normalizeRole(currentProject?.status) === 'archived';
+            isAllProjectsView = !currentProjectMembership || !currentProject;
+
+            const activeProject = !isProjectArchived && !isAllProjectsView;
+            canEditFarms = activeProject && ['owner','manager','validator','field_officer'].includes(currentProjectRole);
+            canManageProtectedAreas = activeProject && currentProjectRole === 'owner';
+            canExport = !isAllProjectsView || allUserProjects.length > 0;
+            exportValidatedOnly = currentProjectRole === 'super_manager';
+            canSyncKobo = activeProject && ['owner','manager','field_officer','enumerator'].includes(currentProjectRole);
+
+            updateRoleAndProjectUI();
+        }
+
+        function updateRoleAndProjectUI() {
+            const roleEl = document.getElementById('userRole');
+            const syncBtn = document.getElementById('syncKoboBtn');
+            const protectedControl = document.getElementById('protectedAreaControl');
+            const downloadSection = document.getElementById('downloadSection');
+            const downloadTitle = document.getElementById('downloadSectionTitle');
+            const banner = document.getElementById('projectOversightBanner');
+            const bannerText = document.getElementById('projectOversightText');
+
+            document.querySelectorAll('.user-info .role-badge').forEach(el => el.remove());
+            if (currentProjectRole) {
+                const roleBadge = document.createElement('span');
+                roleBadge.className = `role-badge ${currentProjectRole}`;
+                roleBadge.textContent = currentProjectRole.replace(/_/g, ' ').toUpperCase();
+                document.querySelector('.user-info').insertBefore(roleBadge, syncBtn);
+            }
+            if (roleEl) roleEl.textContent = currentProjectRole ? currentProjectRole.replace(/_/g, ' ').toUpperCase() : 'PROJECT OVERVIEW';
+
+            if (syncBtn) syncBtn.style.display = canSyncKobo ? 'inline-flex' : 'none';
+            if (protectedControl) protectedControl.style.display = canManageProtectedAreas ? 'block' : 'none';
+            if (downloadSection) downloadSection.classList.toggle('hidden', !canExport);
+            if (downloadTitle) downloadTitle.textContent = exportValidatedOnly ? 'Export Validated Data' : 'Export Data';
+
+            if (banner) {
+                banner.classList.remove('show', 'archived');
+                if (isProjectArchived) {
+                    banner.classList.add('show', 'archived');
+                    bannerText.textContent = 'This project is archived. Data can be viewed and exported, but operational changes are disabled.';
+                } else if (currentProjectRole === 'super_manager') {
+                    banner.classList.add('show');
+                    bannerText.textContent = 'Super Manager oversight mode: progress, validated farms, reporting and permitted exports are available. Operational editing is disabled.';
+                }
+            }
+
+            updateTable();
+        }
+
+        function ensureOperationalPermission(action) {
+            if (isProjectArchived) {
+                showNotification('This project is archived and is read-only.', 'warning');
+                return false;
+            }
+            if (!canEditFarms) {
+                showNotification(`Your ${currentProjectRole ? currentProjectRole.replace(/_/g,' ') : 'role'} role cannot ${action}.`, 'warning');
+                return false;
+            }
+            return true;
         }
 
         // ============================================
@@ -1460,6 +1553,18 @@
             } catch(e) {}
         }
 
+        function updateProjectHeader() {
+            const title = document.querySelector('.header-title h1');
+            if (!title) return;
+            if (isAllProjectsView) {
+                title.innerHTML = `Dashboard <span class="project-badge">ALL PROJECTS</span><span class="project-status-badge readonly"><i class="fas fa-eye"></i> Read-only</span>`;
+                return;
+            }
+            const name = escapeHtml(currentProject?.name || 'Loading...');
+            const status = isProjectArchived ? 'archived' : 'active';
+            title.innerHTML = `Dashboard <span class="project-badge">${name}</span><span class="project-status-badge ${status}"><i class="fas ${isProjectArchived ? 'fa-archive' : 'fa-circle'}"></i> ${status}</span>`;
+        }
+
         async function loadUserAndProjects() {
             showLoading(true);
             try {
@@ -1483,41 +1588,31 @@
                     .eq('status', 'active');
                 
                 if (memberships && memberships.length > 0) {
-                    allUserProjects = memberships;
-                    const isOwner = memberships.some(m => m.role === 'owner');
-                    document.getElementById('userRole').textContent = memberships[0].role.replace('_', ' ').toUpperCase();
-                    
-                    const roleBadge = document.createElement('span');
-                    roleBadge.className = `role-badge ${memberships[0].role}`;
-                    roleBadge.textContent = memberships[0].role.toUpperCase();
-                    document.querySelector('.user-info').insertBefore(roleBadge, document.querySelector('.sync-btn'));
-                    
+                    allUserProjects = memberships.filter(m => m.projects);
                     const urlParams = new URLSearchParams(window.location.search);
                     let projectIdFromUrl = urlParams.get('project');
                     let targetProject = null;
                     
                     if (projectIdFromUrl && projectIdFromUrl !== 'all') {
-                        targetProject = memberships.find(m => m.projects.id === projectIdFromUrl);
+                        targetProject = allUserProjects.find(m => m.projects.id === projectIdFromUrl);
                     }
                     if (!targetProject) {
                         const lastViewed = localStorage.getItem(`lastProject_${currentUser.id}`);
-                        if (lastViewed) targetProject = memberships.find(m => m.projects.id === lastViewed);
-                        if (!targetProject) targetProject = memberships[0];
+                        if (lastViewed) targetProject = allUserProjects.find(m => m.projects.id === lastViewed);
+                        if (!targetProject) targetProject = allUserProjects[0];
                     }
                     
-                    // Always show project selector
                     document.getElementById('projectSelectorContainer').classList.remove('hidden');
-                    await populateDropdown(memberships);
+                    await populateDropdown(allUserProjects);
                     
+                    currentProjectMembership = targetProject;
                     currentProject = targetProject.projects;
+                    setCurrentProjectMembership(currentProjectMembership);
                     document.getElementById('selectedProjectName').innerHTML = `📁 ${currentProject.name}`;
                     document.getElementById('projectBadge').textContent = currentProject.name;
+                    updateProjectHeader();
                     
-                    if (isOwner) {
-                        document.getElementById('protectedAreaControl').style.display = 'block';
-                        document.getElementById('downloadSection').classList.remove('hidden');
-                        setupFileUpload();
-                    }
+                    if (canManageProtectedAreas) setupFileUpload();
                     
                     await loadProjectData(currentProject.id);
                     localStorage.setItem(`lastProject_${currentUser.id}`, currentProject.id);
@@ -1553,12 +1648,16 @@
                         await loadAllProjectsData();
                     } else {
                         const selected = allUserProjects.find(p => p.projects.id === value);
-                        if (selected) { 
-                            currentProject = selected.projects; 
+                        if (selected) {
+                            currentProjectMembership = selected;
+                            currentProject = selected.projects;
+                            setCurrentProjectMembership(currentProjectMembership);
                             document.getElementById('projectBadge').textContent = currentProject.name;
-                            await loadProjectData(value); 
-                            localStorage.setItem(`lastProject_${currentUser.id}`, value); 
-                            updateNavigationLinks(); 
+                            document.getElementById('selectedProjectName').innerHTML = `📁 ${currentProject.name}`;
+                            if (canManageProtectedAreas) setupFileUpload();
+                            await loadProjectData(value);
+                            localStorage.setItem(`lastProject_${currentUser.id}`, value);
+                            updateNavigationLinks();
                         }
                     }
                     const url = new URL(window.location);
@@ -1620,12 +1719,23 @@
                 showNotification('Error loading data: ' + error.message, 'error');
             }
             showLoading(false);
-            document.querySelector('.header-title h1').innerHTML = `Dashboard <span style="font-size:14px; background:#e2e8f0; padding:2px 10px; border-radius:20px;">${currentProject?.name || 'Loading...'}</span>`;
+            updateProjectHeader();
         }
 
         async function loadAllProjectsData() {
             showLoading(true);
             try {
+                currentProject = null;
+                currentProjectMembership = null;
+                currentProjectRole = null;
+                isProjectArchived = false;
+                isAllProjectsView = true;
+                canEditFarms = false;
+                canManageProtectedAreas = false;
+                canExport = true;
+                exportValidatedOnly = false;
+                canSyncKobo = false;
+                updateRoleAndProjectUI();
                 let allFarms = [];
                 for (const m of allUserProjects) {
                     const { data: farms } = await supabaseClient.from('farms').select('*').eq('project_id', m.projects.id);
@@ -1650,7 +1760,7 @@
                 console.error('❌ Error loading all projects:', error);
             }
             showLoading(false);
-            document.querySelector('.header-title h1').innerHTML = 'Dashboard <span style="font-size:14px; background:#e2e8f0; padding:2px 10px; border-radius:20px;">ALL PROJECTS</span>';
+            updateProjectHeader();
         }
 
         async function loadProtectedAreas() {
@@ -1777,7 +1887,10 @@
         // PROTECTED AREA UPLOAD
         // ============================================
         function setupFileUpload() {
-            document.getElementById('geoUpload').addEventListener('change', async function(e) {
+            const input = document.getElementById('geoUpload');
+            if (!input || input.dataset.bound === 'true') return;
+            input.dataset.bound = 'true';
+            input.addEventListener('change', async function(e) {
                 if (e.target.files && e.target.files[0]) {
                     pendingFile = e.target.files[0];
                     document.getElementById('protectedStatus').innerHTML = `📄 ${pendingFile.name}`;
@@ -1787,6 +1900,7 @@
         }
 
         async function uploadProtectedArea(file) {
+            if (!canManageProtectedAreas) { showNotification('Only the project owner can manage protected areas.', 'warning'); return; }
             showLoading(true);
             try {
                 const text = await file.text();
@@ -1821,6 +1935,7 @@
         }
 
         async function deleteAndReupload() {
+            if (!canManageProtectedAreas) { showNotification('Only the project owner can manage protected areas.', 'warning'); return; }
             if (!pendingFile) {
                 alert('Please select a GeoJSON file first using the "Upload" button.');
                 return;
@@ -1831,6 +1946,7 @@
         }
 
         async function clearAllProtectedAreas() {
+            if (!canManageProtectedAreas) { showNotification('Only the project owner can manage protected areas.', 'warning'); return; }
             if (!confirm('Delete ALL protected areas?')) return;
             showLoading(true);
             try {
@@ -2022,9 +2138,11 @@
         // EXPORT FUNCTIONS
         // ============================================
         async function exportData(format) {
+            if (!canExport) { showNotification('Export is not available for this project.', 'warning'); return; }
             showLoading(true);
             try {
-                const data = filteredFarms.map(f => ({
+                const sourceFarms = exportValidatedOnly ? filteredFarms.filter(f => f.status === 'validated') : filteredFarms;
+                const data = sourceFarms.map(f => ({
                     farmer_id: f.farmer_id || f.id.slice(0,8),
                     farmer_name: f.farmer_name || 'Unknown',
                     cooperative: f.cooperative || '',
@@ -2100,8 +2218,10 @@
         }
 
         function exportTableData() {
+            if (!canExport) { showNotification('Export is not available for this project.', 'warning'); return; }
+            const exportRows = exportValidatedOnly ? filteredFarms.filter(f => f.status === 'validated') : filteredFarms;
             const csv = [['Farmer ID','Farmer Name','Cooperative','Supplier','Enumerator','Area','Status']];
-            filteredFarms.forEach(f => csv.push([f.farmer_id||'', f.farmer_name||'', f.cooperative||'', f.supplier||'', f.enumerator||'', f.area||'', f.status||'']));
+            exportRows.forEach(f => csv.push([f.farmer_id||'', f.farmer_name||'', f.cooperative||'', f.supplier||'', f.enumerator||'', f.area||'', f.status||'']));
             const csvContent = csv.map(row => row.join(',')).join('\n');
             const blob = new Blob([csvContent], { type: 'text/csv' });
             const url = URL.createObjectURL(blob);
@@ -2186,7 +2306,7 @@
                         <td>
                             <div class="action-buttons-group">
                                 <button class="action-btn view" onclick="viewFarm('${f.id}')" title="View Details"><i class="fas fa-eye"></i></button>
-                                <button class="action-btn edit-btn" onclick="openEditModal('${f.id}')" title="Edit Farm"><i class="fas fa-edit"></i></button>
+                                ${canEditFarms ? `<button class="action-btn edit-btn" onclick="openEditModal('${f.id}')" title="Edit Farm"><i class="fas fa-edit"></i></button>` : ''}
                                 <button class="action-btn map-btn-action" onclick="redirectToMap('${f.id}')" title="View on Map"><i class="fas fa-map-marker-alt"></i></button>
                             </div>
                         </td>
@@ -2249,6 +2369,7 @@
         }
 
         function openEditModal(farmId) {
+            if (!ensureOperationalPermission('edit farms')) return;
             const f = farmsData.find(f => f.id === farmId);
             if (!f) return;
             document.getElementById('editFarmId').value = f.id;
@@ -2266,10 +2387,11 @@
 
         document.getElementById('editFarmForm')?.addEventListener('submit', async (e) => {
             e.preventDefault();
+            if (!ensureOperationalPermission('edit farms')) return;
             showLoading(true);
             try {
                 const id = document.getElementById('editFarmId').value;
-                await supabaseClient.from('farms').update({
+                const { error } = await supabaseClient.from('farms').update({
                     farmer_name: document.getElementById('editFarmerName').value,
                     farmer_id: document.getElementById('editFarmerId').value,
                     cooperative: document.getElementById('editCooperative').value,
@@ -2278,7 +2400,8 @@
                     area: parseFloat(document.getElementById('editArea').value) || 0,
                     status: document.getElementById('editStatus').value,
                     updated_at: new Date()
-                }).eq('id', id);
+                }).eq('id', id).eq('project_id', currentProject.id);
+                if (error) throw error;
                 closeEditModal();
                 await loadProjectData(currentProject.id);
             } catch (error) {
@@ -2385,8 +2508,9 @@
             localStorage.clear(); 
             window.location.href = '../login.html'; 
         });
-        document.getElementById('syncKoboBtn')?.addEventListener('click', () => { 
-            showNotification('Syncing with Kobo...', 'info'); 
+        document.getElementById('syncKoboBtn')?.addEventListener('click', () => {
+            if (!canSyncKobo) { showNotification('Kobo sync is not available for this project role.', 'warning'); return; }
+            showNotification('Syncing with Kobo...', 'info');
             setTimeout(() => loadProjectData(currentProject.id), 1500); 
         });
 
