@@ -137,6 +137,11 @@
         .btn-danger:hover { background: #b91c1c; }
         .btn-success { background: #22c55e; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; }
         .btn-success:hover { background: #16a34a; }
+        .btn-role { background: #eef2ff; color: #3730a3; border: 1px solid #c7d2fe; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 12px; }
+        .btn-role:hover { background: #e0e7ff; }
+        .role-select { padding: 6px 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 12px; background: white; }
+        .role-help { color: #64748b; font-size: 12px; margin: 0 0 16px; }
+
         
         .welcome-banner { background: linear-gradient(135deg, #2c6e49 0%, #4CAF50 100%); border-radius: 16px; padding: 24px; margin-bottom: 30px; color: white; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 20px; }
         .welcome-text h2 { font-size: 24px; margin-bottom: 8px; }
@@ -591,13 +596,21 @@
         }
 
         function setupUI() {
-            if (currentUserRole === 'owner') {
+            if (currentUserRole === 'owner' && currentProject?.status !== 'archived') {
                 document.getElementById('settingsLink').classList.remove('hidden');
             }
-            if (currentUserRole === 'owner' || currentUserRole === 'manager') {
+            if ((currentUserRole === 'owner' || currentUserRole === 'manager') && currentProject?.status !== 'archived') {
                 document.getElementById('teamLink').classList.remove('hidden');
                 document.getElementById('tokensLink').classList.remove('hidden');
                 document.getElementById('requestsLink').classList.remove('hidden');
+            }
+
+            // Super Manager is an oversight role, not an administrative role.
+            if (currentUserRole === 'super_manager') {
+                document.getElementById('teamLink').classList.add('hidden');
+                document.getElementById('tokensLink').classList.add('hidden');
+                document.getElementById('requestsLink').classList.add('hidden');
+                document.getElementById('settingsLink').classList.add('hidden');
             }
             if (currentUserRole === 'field_officer' || currentUserRole === 'viewer') {
                 document.getElementById('requestAccessLink').classList.remove('hidden');
@@ -629,6 +642,7 @@
             
             let permissionBanner = '';
             if (currentUserRole === 'viewer') permissionBanner = `<div class="permission-banner"><i class="fas fa-eye"></i> <strong>View-Only Access:</strong> You can view data but cannot make changes.</div>`;
+            else if (currentUserRole === 'super_manager') permissionBanner = `<div class="permission-banner info"><i class="fas fa-binoculars"></i> <strong>Super Manager Oversight:</strong> You can monitor project progress, review project data and validated farms, and export permitted data. Operational changes are not available.</div>`;
             else if (currentUserRole === 'field_officer') permissionBanner = `<div class="permission-banner info"><i class="fas fa-pen"></i> <strong>Field Officer Access:</strong> You can add and edit farms, view data.</div>`;
             
             const { data: pendingRequest } = await supabaseClient.from('access_requests').select('*').eq('project_id', currentProject.id).eq('requester_id', currentUser.id).eq('status', 'pending').maybeSingle();
@@ -833,60 +847,181 @@
         // ============================================
         
         async function loadTeamPage() {
-            const { data: members } = await supabaseClient
+            const { data: members, error: membersError } = await supabaseClient
                 .from('project_members')
                 .select('*')
                 .eq('project_id', currentProject.id)
                 .eq('status', 'active');
-            
+
+            if (membersError) {
+                document.getElementById('pageContent').innerHTML = `
+                    <div class="dashboard-card">
+                        <h3><i class="fas fa-users"></i> Team Management</h3>
+                        <p style="color:#dc2626;">Unable to load team members: ${escapeHtml(membersError.message)}</p>
+                    </div>`;
+                return;
+            }
+
             const userIds = members?.map(m => m.user_id) || [];
             let userProfiles = {};
-            
+
             if (userIds.length > 0) {
                 const { data: profiles } = await supabaseClient
                     .from('user_profiles')
                     .select('id, email, full_name, first_name, last_name')
                     .in('id', userIds);
-                
+
                 if (profiles) {
                     userProfiles = Object.fromEntries(profiles.map(p => [p.id, p]));
                 }
             }
-            
+
+            const isOwner = currentUserRole === 'owner';
+            const isManager = currentUserRole === 'manager';
+
+            const manageableRoles = [
+                ['super_manager', 'Super Manager'],
+                ['manager', 'Manager'],
+                ['validator', 'Validator'],
+                ['field_officer', 'Field Officer'],
+                ['enumerator', 'Enumerator'],
+                ['viewer', 'Viewer']
+            ];
+
             let html = `
                 <div class="dashboard-card">
-                    <h3><i class="fas fa-users"></i> Team Members (${members?.length || 0})</h3>
+                    <h3><i class="fas fa-users"></i> Team Management (${members?.length || 0})</h3>
+                    <p class="role-help">
+                        ${isOwner
+                            ? 'As Owner, you can change the role of non-owner members. Super Manager is an oversight role and does not receive operational farm-editing permissions.'
+                            : 'Managers can manage eligible lower-level members. Super Managers have oversight access but cannot manage the project team.'}
+                    </p>
                     <div style="overflow-x: auto;">
                         <table class="team-table">
                             <thead>
-                                <tr><th>User</th><th>Email</th><th>Role</th><th>Added By</th><th>Added Date</th><th>Actions</th></tr>
+                                <tr>
+                                    <th>User</th>
+                                    <th>Email</th>
+                                    <th>Role</th>
+                                    <th>Added By</th>
+                                    <th>Added Date</th>
+                                    <th>Actions</th>
+                                </tr>
                             </thead>
                             <tbody>
             `;
-            
+
             for (const member of members || []) {
                 const profile = userProfiles[member.user_id];
                 const fullName = profile?.full_name || profile?.first_name || 'Unknown User';
                 const email = profile?.email || 'No email';
                 const avatarInitial = (fullName.charAt(0) || 'U').toUpperCase();
-                const canRevoke = (currentUserRole === 'owner') || (currentUserRole === 'manager' && member.role !== 'owner');
                 const isCurrentUser = member.user_id === currentUser.id;
                 const addedDate = member.granted_at ? new Date(member.granted_at).toLocaleDateString() : 'Unknown';
-                
-                html += `<tr>
-                    <td><div class="user-cell"><div class="user-avatar-small">${avatarInitial}</div><div class="user-info-text"><div class="user-name-text">${escapeHtml(fullName)}</div>${isCurrentUser ? '<span style="font-size: 10px; color: #2c6e49;">(You)</span>' : ''}</div></div></td>
-                    <td class="user-email-text">${escapeHtml(email)}</span></div></td>
-                    <td><span class="role-badge ${member.role}">${member.role}</span></td>
-                    <td>${member.granted_by === currentUser.id ? 'You' : 'System'}</td>
-                    <td>${addedDate}</td>
-                    <td>${canRevoke && !isCurrentUser ? `<button onclick="revokeUser('${member.user_id}')" class="btn-danger"><i class="fas fa-trash"></i> Remove</button>` : ''}</td>
-                </tr>`;
+
+                const ownerCanManage =
+                    isOwner &&
+                    !isCurrentUser &&
+                    member.role !== 'owner';
+
+                const managerCanManage =
+                    isManager &&
+                    !isCurrentUser &&
+                    ['validator', 'field_officer', 'enumerator', 'viewer'].includes(member.role);
+
+                const canManage = ownerCanManage || managerCanManage;
+
+                let roleCell = `<span class="role-badge ${escapeHtml(member.role)}">${escapeHtml(member.role.replace('_', ' '))}</span>`;
+
+                if (ownerCanManage) {
+                    roleCell = `
+                        <select
+                            class="role-select"
+                            id="role-select-${member.user_id}"
+                            aria-label="Change role for ${escapeHtml(fullName)}"
+                            onchange="changeMemberRole('${member.user_id}', this.value)">
+                            ${manageableRoles.map(([value, label]) =>
+                                `<option value="${value}" ${member.role === value ? 'selected' : ''}>${label}</option>`
+                            ).join('')}
+                        </select>`;
+                }
+
+                const actions = `
+                    ${canManage && !isCurrentUser
+                        ? `<button onclick="revokeUser('${member.user_id}')" class="btn-danger">
+                               <i class="fas fa-user-minus"></i> Remove
+                           </button>`
+                        : ''}
+                `;
+
+                html += `
+                    <tr>
+                        <td>
+                            <div class="user-cell">
+                                <div class="user-avatar-small">${avatarInitial}</div>
+                                <div class="user-info-text">
+                                    <div class="user-name-text">${escapeHtml(fullName)}</div>
+                                    ${isCurrentUser ? '<span style="font-size:10px;color:#2c6e49;">(You)</span>' : ''}
+                                </div>
+                            </div>
+                        </td>
+                        <td class="user-email-text">${escapeHtml(email)}</td>
+                        <td>${roleCell}</td>
+                        <td>${member.granted_by === currentUser.id ? 'You' : 'System'}</td>
+                        <td>${addedDate}</td>
+                        <td>${actions}</td>
+                    </tr>`;
             }
-            
-            html += `</tbody> </div></div>`;
+
+            html += `
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+
             document.getElementById('pageContent').innerHTML = html;
         }
-        
+
+        window.changeMemberRole = async function(userId, newRole) {
+            if (currentUserRole !== 'owner') {
+                alert('Only the project Owner can assign or change the Super Manager role.');
+                await loadTeamPage();
+                return;
+            }
+
+            const allowedRoles = ['super_manager', 'manager', 'validator', 'field_officer', 'enumerator', 'viewer'];
+            if (!allowedRoles.includes(newRole)) {
+                alert('Invalid role.');
+                await loadTeamPage();
+                return;
+            }
+
+            if (!confirm(`Change this member's role to "${newRole.replace('_', ' ')}"?`)) {
+                await loadTeamPage();
+                return;
+            }
+
+            try {
+                const { error } = await supabaseClient
+                    .from('project_members')
+                    .update({ role: newRole })
+                    .eq('project_id', currentProject.id)
+                    .eq('user_id', userId)
+                    .eq('status', 'active');
+
+                if (error) throw error;
+
+                alert(`Role updated successfully to "${newRole.replace('_', ' ')}".`);
+                await loadTeamPage();
+
+            } catch (error) {
+                console.error('Error changing member role:', error);
+                alert('Role update failed: ' + (error.message || 'Unknown error'));
+                await loadTeamPage();
+            }
+        };
+
         // ============================================
         // INVITATION TOKENS MANAGEMENT
         // ============================================
