@@ -1684,7 +1684,6 @@ function setCurrentProjectMembership(membership) {
             });
         }
 
-        applyRoleSpecificKPILabels();
     }
 
 
@@ -1819,6 +1818,10 @@ function setCurrentProjectMembership(membership) {
             console.log('🚀 Initializing Dashboard...');
             supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
             await loadUserAndProjects();
+            if (typeof applyRoleSpecificKPILabels === 'function') {
+                applyRoleSpecificKPILabels();
+            }
+
             loadDismissedAlerts();
             console.log('✅ Dashboard initialized');
         } catch (error) {
