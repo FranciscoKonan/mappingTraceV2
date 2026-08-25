@@ -1676,12 +1676,16 @@ function setCurrentProjectMembership(membership) {
         canSyncKobo = activeProject && ['owner','manager','field_officer','enumerator'].includes(currentProjectRole);
 
         updateRoleAndProjectUI();
+
+        if (currentProjectRole === 'super_manager') {
             document.body.classList.add('summary-only-mode');
             document.querySelectorAll(
-                '#farmTableSection, #tableSection, #farmDataTable, .edit-farm, .delete-farm, .assign-farm, .validate-farm'
+                '#farmTableSection, #tableSection, #farmDataTable, ' +
+                '.edit-farm, .delete-farm, .assign-farm, .validate-farm'
             ).forEach(el => el.style.display = 'none');
         }
-                applyRoleSpecificKPILabels();
+
+        applyRoleSpecificKPILabels();
     }
 
     function updateRoleAndProjectUI() {
