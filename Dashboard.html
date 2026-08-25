@@ -11,6 +11,43 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css" />
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js">
+
+        // Global, null-safe Super Manager UI helper.
+        // Must remain at top-level script scope because setCurrentProjectMembership()
+        // calls it during initialization.
+        function applySuperManagerView() {
+            try {
+                const isSuperManager =
+                    typeof currentProjectRole !== 'undefined' &&
+                    currentProjectRole === 'super_manager';
+
+                const selectorsToHide = [
+                    '#farmTableSection',
+                    '#tableSection',
+                    '#farmDataTable'
+                ];
+
+                selectorsToHide.forEach(selector => {
+                    const el = document.querySelector(selector);
+                    if (el) {
+                        el.style.display = isSuperManager ? 'none' : '';
+                    }
+                });
+
+                if (isSuperManager) {
+                    document.querySelectorAll(
+                        '.edit-farm, .delete-farm, .assign-farm, .validate-farm,' +
+                        '[data-action="edit"], [data-action="delete"],' +
+                        '[data-action="assign"], [data-action="validate"]'
+                    ).forEach(el => {
+                        el.style.display = 'none';
+                    });
+                }
+            } catch (e) {
+                console.warn('⚠️ applySuperManagerView skipped:', e);
+            }
+        }
+
         
         
         
@@ -85,30 +122,6 @@ function applyRoleSpecificKPILabels() {
                 if (headings[i]) headings[i].textContent = label;
             });
         }
-
-function applySuperManagerView() {
-            const isSuperManager = currentProjectRole === 'super_manager';
-
-            // Hide operational farm-table/details sections when identifiable.
-            [
-                '#farmTableSection',
-                '#tableSection',
-                '#farmDataTable'
-            ].forEach(selector => {
-                const el = document.querySelector(selector);
-                if (el) el.style.display = isSuperManager ? 'none' : '';
-            });
-
-            // Never expose mutation controls to Super Manager.
-            if (isSuperManager) {
-                document.querySelectorAll(
-                    '.edit-farm, .delete-farm, .assign-farm, .validate-farm, [data-action="edit"], [data-action="delete"], [data-action="assign"], [data-action="validate"]'
-                ).forEach(el => {
-                    el.style.display = 'none';
-                });
-            }
-        }
-
 
         async function loadAssignedFarmsForOperationalRole(projectId) {
             const operationalRole =
@@ -1682,7 +1695,7 @@ async function loadSuperManagerApprovedFarms(projectId) {
         canSyncKobo = activeProject && ['owner','manager','field_officer','enumerator'].includes(currentProjectRole);
 
         updateRoleAndProjectUI();
-                if (typeof applySuperManagerView === 'function') applySuperManagerView();
+                if (typeof applySuperManagerView === 'function') if (typeof applySuperManagerView === 'function') applySuperManagerView();
                 applyRoleSpecificKPILabels();
     }
 
