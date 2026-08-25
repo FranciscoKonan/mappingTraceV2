@@ -12,7 +12,81 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css" />
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js">
         
-        function applySuperManagerView() {
+        
+        
+        function updateEnumeratorKPIs() {
+            if (currentProjectRole !== 'enumerator') return;
+
+            const farms = farmsData || [];
+            const total = farms.length;
+            const area = farms.reduce((sum, f) => sum + Number(f.area || 0), 0);
+            const drafts = farms.filter(f => String(f.submission_status || f.status || '').toLowerCase() === 'draft').length;
+            const corrections = farms.filter(f =>
+                String(f.submission_status || f.status || '').toLowerCase() === 'correction_required'
+            ).length;
+
+            // Expose authoritative role-scoped values for the existing UI.
+            window.roleKPIs = {
+                farms_collected: total,
+                area_collected_ha: area,
+                draft_farms: drafts,
+                corrections_required: corrections
+            };
+
+            console.log('📊 Enumerator KPIs:', window.roleKPIs);
+        }
+
+function applyRoleSpecificKPILabels() {
+            const role = currentProjectRole;
+
+            const configs = {
+                enumerator: {
+                    labels: ['Farms Collected', 'Area Collected (ha)', 'Draft Farms', 'Corrections Required']
+                },
+                field_officer: {
+                    labels: ['Farms Submitted', 'Area Under Review (ha)', 'Farms Under Review', 'Corrections Required']
+                },
+                validator: {
+                    labels: ['Awaiting Validation', 'Approved Farms', 'Correction Required', 'Validated Area (ha)']
+                },
+                manager: {
+                    labels: ['Total Farms', 'Pending Validation', 'Approved Farms', 'Total Area (ha)']
+                },
+                super_manager: {
+                    labels: ['Total Farms', 'Pending Farms', 'Approved Farms', 'Approved Area (ha)']
+                },
+                owner: {
+                    labels: ['Total Farms', 'Pending Validation', 'Approved Farms', 'Total Area (ha)']
+                }
+            };
+
+            const cfg = configs[role];
+            if (!cfg) return;
+
+            // Update common KPI card headings without assuming one exact HTML layout.
+            const selectors = [
+                '.kpi-card h3',
+                '.stat-card h3',
+                '.metric-card h3',
+                '.kpi-title',
+                '.stat-label'
+            ];
+
+            let headings = [];
+            for (const selector of selectors) {
+                const found = Array.from(document.querySelectorAll(selector));
+                if (found.length >= 4) {
+                    headings = found;
+                    break;
+                }
+            }
+
+            cfg.labels.forEach((label, i) => {
+                if (headings[i]) headings[i].textContent = label;
+            });
+        }
+
+function applySuperManagerView() {
             const isSuperManager = currentProjectRole === 'super_manager';
 
             // Hide operational farm-table/details sections when identifiable.
@@ -33,6 +107,46 @@
                     el.style.display = 'none';
                 });
             }
+        }
+
+
+        async function loadAssignedFarmsForOperationalRole(projectId) {
+            const operationalRole =
+                currentProjectRole === 'enumerator' ||
+                currentProjectRole === 'field_officer';
+
+            if (!operationalRole) return false;
+
+            console.log(`🔐 ${currentProjectRole}: loading assigned farms only...`);
+
+            const { data: assignments, error: assignmentError } =
+                await supabaseClient
+                    .from('farm_assignments')
+                    .select('farm_id')
+                    .eq('project_id', projectId)
+                    .eq('user_id', (await supabaseClient.auth.getUser()).data.user?.id);
+
+            if (assignmentError) {
+                console.error('❌ Assignment loading error:', assignmentError);
+                throw assignmentError;
+            }
+
+            const assignedIds = new Set(
+                (assignments || []).map(a => a.farm_id)
+            );
+
+            // farmsData has already passed Supabase RLS. This extra filter
+            // makes the operational map/table explicitly assignment-scoped.
+            farmsData = (farmsData || []).filter(f => assignedIds.has(f.id));
+            filteredFarms = [...farmsData];
+
+            console.log(`✅ ${currentProjectRole}: assigned farms:`, farmsData.length);
+
+            if (typeof updateMap === 'function') {
+                updateMap();
+            }
+
+            return true;
         }
 
 async function loadSuperManagerApprovedFarms(projectId) {
@@ -1569,6 +1683,7 @@ async function loadSuperManagerApprovedFarms(projectId) {
 
         updateRoleAndProjectUI();
                 applySuperManagerView();
+                applyRoleSpecificKPILabels();
     }
 
     function updateRoleAndProjectUI() {
@@ -1970,6 +2085,14 @@ async function loadSuperManagerApprovedFarms(projectId) {
             farmsData = farms || [];
             filteredFarms = [...farmsData];
             console.log('✅ Loaded farms:', farmsData.length);
+                if (
+                    currentProjectRole === 'enumerator' ||
+                    currentProjectRole === 'field_officer'
+                ) {
+                    await loadAssignedFarmsForOperationalRole(projectId);
+                    updateEnumeratorKPIs();
+                }
+
                 if (currentProjectRole === 'super_manager') {
                     await loadSuperManagerApprovedFarms(projectId);
                 }
