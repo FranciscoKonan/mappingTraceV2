@@ -1112,7 +1112,7 @@
                     <i class="fas fa-eye"></i>
                     <span id="projectOversightText">Read-only project oversight mode.</span>
                 </div>
-                <!-- KPIs -->
+                <!-- KPIs: selected-project values come from get_project_dashboard_summary() -->
                 <section class="kpis">
                     <div class="kpi"><div class="kpi-icon"><i class="fas fa-tractor"></i></div><div class="kpi-content"><h4>Total Farms</h4><p class="kpi-value" id="farmsCount">0</p></div></div>
                     <div class="kpi"><div class="kpi-icon"><i class="fas fa-hourglass-half"></i></div><div class="kpi-content"><h4>Pending Farms</h4><p class="kpi-value" id="pendingFarms">0</p></div></div>
@@ -1472,6 +1472,7 @@
             isAllProjectsView = !currentProjectMembership || !currentProject;
 
             const activeProject = !isProjectArchived && !isAllProjectsView;
+            // Super Manager is intentionally read-only: map/table visibility without farm mutation.
             canEditFarms = activeProject && ['owner','manager','validator','field_officer'].includes(currentProjectRole);
             canManageProtectedAreas = activeProject && currentProjectRole === 'owner';
             // Least-privilege export policy:
@@ -1776,7 +1777,7 @@
                 filteredFarms = [...farmsData];
                 console.log('✅ Loaded farms:', farmsData.length);
 
-                // Use the database RPC as the source of truth for project KPIs.
+                // Authoritative project-level KPIs from the SECURITY DEFINER RPC.
                 const { data: summary, error: summaryError } = await supabaseClient.rpc(
                     'get_project_dashboard_summary',
                     { p_project_id: projectId }
@@ -2179,200 +2180,67 @@
         }
 
         function updateAlertsUI() {
-            // Overlap alerts
-            const overlapList = document.getElementById('overlapList');
-            const overlapBadge = document.getElementById('overlapBadge');
-            overlapBadge.textContent = overlapAlerts.length;
-            
-            if (overlapAlerts.length === 0) {
-                overlapList.innerHTML = `
-                    <div style="text-align:center;padding:40px;color:#94a3b8;">
-                        <i class="fas fa-check-circle" style="font-size:32px;display:block;margin-bottom:12px;color:#22c55e;"></i>
-                        <h4>No Overlaps Detected</h4>
-                        <p style="font-size:12px;">All farms are outside protected areas</p>
-                    </div>
-                `;
-            } else {
-                overlapList.innerHTML = overlapAlerts.map(a => `
-                    <div class="alert-item ${a.severity}" onclick="zoomToFarm('${a.farmId}')">
-                        <div class="alert-title">⚠️ ${a.farmName} overlaps ${a.areaName}</div>
-                        <div class="alert-description">Overlap area: ${a.overlapHa.toFixed(2)} ha</div>
-                    </div>
-                `).join('');
-            }
-            
-            // Quality alerts
-            const qualityList = document.getElementById('qualityList');
-            const qualityBadge = document.getElementById('qualityBadge');
-            qualityBadge.textContent = qualityAlerts.length;
-            
-            if (qualityAlerts.length === 0) {
-                qualityList.innerHTML = `
-                    <div style="text-align:center;padding:40px;color:#94a3b8;">
-                        <i class="fas fa-check-circle" style="font-size:32px;display:block;margin-bottom:12px;color:#22c55e;"></i>
-                        <h4>No Quality Issues</h4>
-                        <p style="font-size:12px;">All farms pass quality checks</p>
-                    </div>
-                `;
-            } else {
-                qualityList.innerHTML = qualityAlerts.map(a => `
-                    <div class="alert-item ${a.severity}" onclick="zoomToFarm('${a.farmId}')">
-                        <div class="alert-title">${a.title}</div>
-                        <div class="alert-description">${a.description}</div>
-                    </div>
-                `).join('');
-            }
-            
             const totalAlerts = overlapAlerts.length + qualityAlerts.length;
-            
-            const alertsCount = document.getElementById('alertsCount');
-            if (alertsCount) {
-                alertsCount.textContent = totalAlerts;
-            }
-            
+
+            // The old alertsCount KPI was removed. Keep only the global alert badge.
             const alertBadge = document.getElementById('alertBadge');
             if (alertBadge) {
                 alertBadge.textContent = totalAlerts;
             }
-            
-            document.getElementById('alertBadge').textContent = overlapAlerts.length + qualityAlerts.length;
-        }
 
-        function dismissOverlapAlerts() {
-            overlapAlerts.forEach(a => dismissedAlertIds.push(a.id));
-            saveDismissedAlerts();
-            overlapAlerts = [];
-            updateAlertsUI();
-            if (currentMap) { updateMap(); }
-            showNotification('Overlap alerts dismissed', 'success');
-        }
+            // Overlap alerts
+            const overlapList = document.getElementById('overlapList');
+            const overlapBadge = document.getElementById('overlapBadge');
 
-        function dismissQualityAlerts() {
-            qualityAlerts.forEach(a => dismissedAlertIds.push(a.id));
-            saveDismissedAlerts();
-            qualityAlerts = [];
-            updateAlertsUI();
-            showNotification('Quality alerts dismissed', 'success');
-        }
-
-        function zoomToFarm(farmId) {
-            const farm = farmsData.find(f => f.id === farmId);
-            const geometry = normalizeGeometry(farm?.geometry);
-            if (!geometry || !currentMap) return;
-
-            try {
-                const layer = L.geoJSON({ type: 'Feature', properties: {}, geometry });
-                const bounds = layer.getBounds();
-                if (bounds.isValid()) {
-                    currentMap.fitBounds(bounds, { padding: [30, 30], maxZoom: 18 });
-                    showNotification(`Zooming to ${farm.farmer_name || 'farm'}`, 'info');
-                }
-            } catch (e) {
-                console.error('Error zooming to farm:', farmId, e);
+            if (overlapBadge) {
+                overlapBadge.textContent = overlapAlerts.length;
             }
-        }
 
-        // ============================================
-        // EXPORT FUNCTIONS
-        // ============================================
-        async function exportData(format) {
-            if (!ensureExportPermission()) return;
-
-            showLoading(true);
-            try {
-                const sourceFarms = exportValidatedOnly
-                    ? filteredFarms.filter(f => String(f.status || '').toLowerCase() === 'validated')
-                    : filteredFarms;
-                const data = sourceFarms.map(f => ({
-                    farmer_id: f.farmer_id || f.id.slice(0,8),
-                    farmer_name: f.farmer_name || 'Unknown',
-                    cooperative: f.cooperative || '',
-                    supplier: f.supplier || '',
-                    enumerator: f.enumerator || '',
-                    area_ha: f.area || 0,
-                    status: f.status || 'pending',
-                    created_at: f.created_at,
-                    geometry: f.geometry
-                }));
-
-                if (format === 'csv') {
-                    const headers = ['farmer_id','farmer_name','cooperative','supplier','enumerator','area_ha','status','created_at'];
-                    const rows = data.map(f => headers.map(h => f[h] || '').join(','));
-                    const csv = [headers.join(','), ...rows].join('\n');
-                    downloadFile(csv, `farms_${new Date().toISOString().slice(0,10)}.csv`, 'text/csv');
-                } else if (format === 'geojson') {
-                    const geojson = {
-                        type: 'FeatureCollection',
-                        features: data.map(f => ({
-                            type: 'Feature',
-                            geometry: f.geometry || null,
-                            properties: {
-                                farmer_id: f.farmer_id,
-                                farmer_name: f.farmer_name,
-                                cooperative: f.cooperative,
-                                supplier: f.supplier,
-                                enumerator: f.enumerator,
-                                area_ha: f.area_ha,
-                                status: f.status,
-                                created_at: f.created_at
-                            }
-                        }))
-                    };
-                    downloadFile(JSON.stringify(geojson, null, 2), `farms_${new Date().toISOString().slice(0,10)}.geojson`, 'application/json');
-                } else if (format === 'shapefile') {
-                    const geojson = {
-                        type: 'FeatureCollection',
-                        features: data.map(f => ({
-                            type: 'Feature',
-                            geometry: f.geometry || null,
-                            properties: {
-                                farmer_id: f.farmer_id,
-                                farmer_name: f.farmer_name,
-                                cooperative: f.cooperative,
-                                supplier: f.supplier,
-                                enumerator: f.enumerator,
-                                area_ha: f.area_ha,
-                                status: f.status
-                            }
-                        }))
-                    };
-                    downloadFile(JSON.stringify(geojson, null, 2), `farms_${new Date().toISOString().slice(0,10)}.geojson`, 'application/json');
-                    showNotification('GeoJSON downloaded. Use QGIS to convert to Shapefile.', 'info');
+            if (overlapList) {
+                if (overlapAlerts.length === 0) {
+                    overlapList.innerHTML = `
+                        <div style="text-align:center;padding:40px;color:#94a3b8;">
+                            <i class="fas fa-check-circle" style="font-size:32px;display:block;margin-bottom:12px;color:#22c55e;"></i>
+                            <h4>No Overlaps Detected</h4>
+                            <p style="font-size:12px;">All farms are outside protected areas</p>
+                        </div>
+                    `;
+                } else {
+                    overlapList.innerHTML = overlapAlerts.map(a => `
+                        <div class="alert-item ${a.severity}" onclick="zoomToFarm('${a.farmId}')">
+                            <div class="alert-title">⚠️ ${a.farmName} overlaps ${a.areaName}</div>
+                            <div class="alert-description">Overlap area: ${Number(a.overlapHa || 0).toFixed(2)} ha</div>
+                        </div>
+                    `).join('');
                 }
-                showNotification(`Export complete: ${data.length} farms`, 'success');
-            } catch (err) {
-                showNotification('Export error: ' + err.message, 'error');
             }
-            showLoading(false);
-        }
 
-        function downloadFile(content, filename, mimeType) {
-            const blob = new Blob([content], { type: mimeType });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = filename;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-        }
+            // Quality alerts
+            const qualityList = document.getElementById('qualityList');
+            const qualityBadge = document.getElementById('qualityBadge');
 
-        function exportTableData() {
-            if (!ensureExportPermission()) return;
+            if (qualityBadge) {
+                qualityBadge.textContent = qualityAlerts.length;
+            }
 
-            const exportRows = exportValidatedOnly
-                ? filteredFarms.filter(f => String(f.status || '').toLowerCase() === 'validated')
-                : filteredFarms;
-            const csv = [['Farmer ID','Farmer Name','Cooperative','Supplier','Enumerator','Area','Status']];
-            exportRows.forEach(f => csv.push([f.farmer_id||'', f.farmer_name||'', f.cooperative||'', f.supplier||'', f.enumerator||'', f.area||'', f.status||'']));
-            const csvContent = csv.map(row => row.join(',')).join('\n');
-            const blob = new Blob([csvContent], { type: 'text/csv' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url; a.download = `farms_export_${new Date().toISOString().slice(0,19)}.csv`;
-            a.click(); URL.revokeObjectURL(url);
-            showNotification('Export complete', 'success');
+            if (qualityList) {
+                if (qualityAlerts.length === 0) {
+                    qualityList.innerHTML = `
+                        <div style="text-align:center;padding:40px;color:#94a3b8;">
+                            <i class="fas fa-check-circle" style="font-size:32px;display:block;margin-bottom:12px;color:#22c55e;"></i>
+                            <h4>No Quality Issues</h4>
+                            <p style="font-size:12px;">All farms pass quality checks</p>
+                        </div>
+                    `;
+                } else {
+                    qualityList.innerHTML = qualityAlerts.map(a => `
+                        <div class="alert-item ${a.severity}" onclick="zoomToFarm('${a.farmId}')">
+                            <div class="alert-title">${a.title}</div>
+                            <div class="alert-description">${a.description}</div>
+                        </div>
+                    `).join('');
+                }
+            }
         }
 
         // ============================================
@@ -2477,7 +2345,7 @@
         // UI FUNCTIONS
         // ============================================
         function updateKPIs() {
-            // Selected project: use the authoritative dashboard RPC.
+            // Selected project: use the database summary as the source of truth.
             if (dashboardSummary) {
                 document.getElementById('farmsCount').textContent =
                     Number(dashboardSummary.total_farms || 0);
@@ -2491,7 +2359,7 @@
                 document.getElementById('totalArea').textContent =
                     Number(dashboardSummary.total_area_ha || 0).toFixed(1);
             } else {
-                // ALL PROJECTS fallback: calculate farm-level metrics locally.
+                // ALL PROJECTS fallback.
                 const pending = farmsData.filter(
                     f => String(f.status || '').toLowerCase() === 'pending'
                 ).length;
@@ -2503,9 +2371,17 @@
                     farmsData.reduce((s, f) => s + (Number(f.area) || 0), 0).toFixed(1);
             }
 
-            document.getElementById('mapFarmsCount').textContent = filteredFarms.length;
-            document.getElementById('mapTotalArea').textContent =
-                filteredFarms.reduce((s, f) => s + (Number(f.area) || 0), 0).toFixed(1) + ' ha';
+            const mapFarmsCount = document.getElementById('mapFarmsCount');
+            const mapTotalArea = document.getElementById('mapTotalArea');
+
+            if (mapFarmsCount) {
+                mapFarmsCount.textContent = filteredFarms.length;
+            }
+
+            if (mapTotalArea) {
+                mapTotalArea.textContent =
+                    filteredFarms.reduce((s, f) => s + (Number(f.area) || 0), 0).toFixed(1) + ' ha';
+            }
         }
 
         function updateCooperativeStats() {
@@ -2592,8 +2468,7 @@
                     supplier: document.getElementById('editSupplier').value.trim(),
                     enumerator: document.getElementById('editEnumerator').value.trim(),
                     area: parseFloat(document.getElementById('editArea').value) || 0,
-                    status: document.getElementById('editStatus').value,
-                    updated_at: new Date().toISOString()
+                    status: document.getElementById('editStatus').value
                 };
 
                 // Keep the UPDATE request simple. Do not request a returned row;
