@@ -10,7 +10,75 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css" />
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js">
+        
+        function applySuperManagerView() {
+            const isSuperManager = currentProjectRole === 'super_manager';
+
+            // Hide operational farm-table/details sections when identifiable.
+            [
+                '#farmTableSection',
+                '#tableSection',
+                '#farmDataTable'
+            ].forEach(selector => {
+                const el = document.querySelector(selector);
+                if (el) el.style.display = isSuperManager ? 'none' : '';
+            });
+
+            // Never expose mutation controls to Super Manager.
+            if (isSuperManager) {
+                document.querySelectorAll(
+                    '.edit-farm, .delete-farm, .assign-farm, .validate-farm, [data-action="edit"], [data-action="delete"], [data-action="assign"], [data-action="validate"]'
+                ).forEach(el => {
+                    el.style.display = 'none';
+                });
+            }
+        }
+
+async function loadSuperManagerApprovedFarms(projectId) {
+            if (currentProjectRole !== 'super_manager') {
+                approvedFarmsData = [];
+                return false;
+            }
+
+            console.log('🔐 Super Manager: loading approved farms only...');
+
+            const { data, error } = await supabaseClient.rpc(
+                'get_project_validated_farms',
+                { p_project_id: projectId }
+            );
+
+            if (error) {
+                console.error('❌ Approved farms error:', error);
+                throw error;
+            }
+
+            approvedFarmsData = data || [];
+
+            farmsData = approvedFarmsData.map(f => ({
+                id: f.farm_id,
+                project_id: f.project_id,
+                farmer_id: f.farmer_id,
+                farmer_name: f.farmer_name,
+                cooperative: f.cooperative,
+                supplier: f.supplier,
+                area: f.area,
+                geometry: f.geometry,
+                status: 'approved'
+            }));
+
+            filteredFarms = [...farmsData];
+
+            console.log('✅ Super Manager approved farms:', approvedFarmsData.length);
+
+            if (typeof updateMap === 'function') {
+                updateMap();
+            }
+
+            return true;
+        }
+
+</script>
 <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -1242,7 +1310,7 @@
                     </div>
                     <div class="alerts-footer">
                         <button onclick="checkOverlaps()" class="btn-primary">Check Now</button>
-                        <button onclick="window.dismissOverlapAlerts()" class="btn-secondary">Dismiss</button>
+                        <button onclick="dismissOverlapAlerts()" class="btn-secondary">Dismiss</button>
                     </div>
                 </div>
 
@@ -1260,7 +1328,7 @@
                     </div>
                     <div class="alerts-footer">
                         <button onclick="checkQualityAlerts()" class="btn-primary">Check Now</button>
-                        <button onclick="window.dismissQualityAlerts()" class="btn-secondary">Dismiss</button>
+                        <button onclick="dismissQualityAlerts()" class="btn-secondary">Dismiss</button>
                     </div>
                 </div>
             </div>
@@ -1411,6 +1479,7 @@
     let currentMap = null, farmLayers = [], protectedLayer = null, protectedAreas = [];
     let isProjectArchived = false, isAllProjectsView = false;
     let canEditFarms = false, canManageProtectedAreas = false, canExport = false, exportValidatedOnly = false, canSyncKobo = false;
+        let approvedFarmsData = [];
     let currentPage = 1, rowsPerPage = 10, coopChart = null;
     let overlapAlerts = [], qualityAlerts = [];
     let projectSummary = null;
@@ -1478,7 +1547,8 @@
         isAllProjectsView = !currentProjectMembership || !currentProject;
 
         const activeProject = !isProjectArchived && !isAllProjectsView;
-        canEditFarms = activeProject && ['owner','manager','validator','field_officer'].includes(currentProjectRole);
+        // Super Manager is read-only.
+            canEditFarms = activeProject && ['owner','manager','validator','field_officer'].includes(currentProjectRole);
         canManageProtectedAreas = activeProject && currentProjectRole === 'owner';
         // Least-privilege export policy:
         // Owner / Manager      -> full project export
@@ -1498,6 +1568,7 @@
         canSyncKobo = activeProject && ['owner','manager','field_officer','enumerator'].includes(currentProjectRole);
 
         updateRoleAndProjectUI();
+                applySuperManagerView();
     }
 
     function updateRoleAndProjectUI() {
@@ -1899,6 +1970,10 @@
             farmsData = farms || [];
             filteredFarms = [...farmsData];
             console.log('✅ Loaded farms:', farmsData.length);
+                if (currentProjectRole === 'super_manager') {
+                    await loadSuperManagerApprovedFarms(projectId);
+                }
+
 
             const submissionBadge = document.getElementById('submissionBadge');
             if (submissionBadge) submissionBadge.textContent = farmsData.length;
@@ -2359,22 +2434,22 @@
         }
     }
 
-    window.dismissOverlapAlerts = function () {
+    function dismissOverlapAlerts() {
         overlapAlerts.forEach(a => dismissedAlertIds.push(a.id));
         saveDismissedAlerts();
         overlapAlerts = [];
         updateAlertsUI();
-        if (currentMap) updateMap();
+        if (currentMap) { updateMap(); }
         showNotification('Overlap alerts dismissed', 'success');
-    };
+    }
 
-    window.dismissQualityAlerts = function () {
+    function dismissQualityAlerts() {
         qualityAlerts.forEach(a => dismissedAlertIds.push(a.id));
         saveDismissedAlerts();
         qualityAlerts = [];
         updateAlertsUI();
         showNotification('Quality alerts dismissed', 'success');
-    };
+    }
 
     function zoomToFarm(farmId) {
         const farm = farmsData.find(f => f.id === farmId);
@@ -2783,7 +2858,9 @@
     window.viewAllAlerts = () => { if (overlapAlerts.length === 0 && qualityAlerts.length === 0) alert('No alerts'); else alert('Overlaps: ' + overlapAlerts.length + '\nQuality: ' + qualityAlerts.length); };
     window.checkOverlaps = checkOverlaps;
     window.checkQualityAlerts = checkQualityAlerts;
-window.toggleCooperativeStats = toggleCooperativeStats;
+    window.dismissOverlapAlerts = dismissOverlapAlerts;
+    window.dismissQualityAlerts = dismissQualityAlerts;
+    window.toggleCooperativeStats = toggleCooperativeStats;
     window.openEditModal = openEditModal;
     window.closeEditModal = closeEditModal;
     window.redirectToMap = redirectToMap;
@@ -2879,22 +2956,6 @@ window.toggleCooperativeStats = toggleCooperativeStats;
         document.addEventListener('DOMContentLoaded', init);
     } else {
         init();
-    }
-
-    // Global alert handlers: required by the alert-panel buttons.
-    if (typeof window.dismissOverlapAlerts !== 'function') {
-        window.dismissOverlapAlerts = function () {
-            overlapAlerts = [];
-            updateAlertsUI();
-            if (currentMap) updateMap();
-        };
-    }
-
-    if (typeof window.dismissQualityAlerts !== 'function') {
-        window.dismissQualityAlerts = function () {
-            qualityAlerts = [];
-            updateAlertsUI();
-        };
     }
 </script>
 </body>
