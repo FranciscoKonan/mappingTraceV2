@@ -1457,48 +1457,6 @@
         // ============================================
         // INITIALIZATION
         // ============================================
-
-        function verifyRoleDataScope() {
-            try {
-                const role = currentProjectRole || 'unknown';
-                const farms = Array.isArray(farmsData) ? farmsData : [];
-
-                const totalArea = farms.reduce(
-                    (sum, farm) => sum + Number(farm.area || 0), 0
-                );
-
-                const approved = farms.filter(f =>
-                    String(f.submission_status || '').toLowerCase() === 'approved'
-                ).length;
-
-                const pending = farms.filter(f =>
-                    ['submitted', 'under_review', 'correction_required']
-                        .includes(String(f.submission_status || '').toLowerCase())
-                ).length;
-
-                console.group(`🔎 ROLE DATA VERIFICATION: ${role}`);
-                console.log('Role:', role);
-                console.log('Project:', currentProject?.id || currentProjectId || null);
-                console.log('Visible farms:', farms.length);
-                console.log('Visible area (ha):', Number(totalArea.toFixed(6)));
-                console.log('Approved farms:', approved);
-                console.log('Pending validation/correction:', pending);
-                console.log('Visible farm IDs:', farms.map(f => f.id));
-                console.groupEnd();
-
-                window.roleVerification = {
-                    role,
-                    project_id: currentProject?.id || currentProjectId || null,
-                    visible_farms: farms.length,
-                    visible_area_ha: Number(totalArea.toFixed(6)),
-                    approved_farms: approved,
-                    pending_validation_or_correction: pending
-                };
-            } catch (error) {
-                console.warn('⚠️ Role verification failed:', error);
-            }
-        }
-
         async function init() {
             try {
                 console.log('🚀 Initializing Dashboard...');
@@ -1664,6 +1622,117 @@
         // ============================================
         // DATA LOADING
         // ============================================
+
+        // Current farm state = one latest submission per farm.
+        // This prevents multiple revisions from inflating farm KPIs.
+        async function buildCurrentFarmStates(projectId) {
+            const { data: submissions, error } = await supabaseClient
+                .from('submissions')
+                .select('id,farm_id,status,validated_at,created_at,updated_at')
+                .eq('project_id', projectId);
+
+            if (error) {
+                console.error('❌ Error loading submissions for KPI state:', error);
+                throw error;
+            }
+
+            const latestByFarm = new Map();
+
+            (submissions || []).forEach(s => {
+                const existing = latestByFarm.get(s.farm_id);
+
+                const sTime = new Date(
+                    s.validated_at || s.updated_at || s.created_at || 0
+                ).getTime();
+
+                const eTime = existing
+                    ? new Date(
+                        existing.validated_at ||
+                        existing.updated_at ||
+                        existing.created_at ||
+                        0
+                    ).getTime()
+                    : -1;
+
+                if (!existing || sTime >= eTime) {
+                    latestByFarm.set(s.farm_id, s);
+                }
+            });
+
+            return (farmsData || []).map(farm => ({
+                ...farm,
+                current_submission: latestByFarm.get(farm.id) || null,
+                current_submission_status: latestByFarm.get(farm.id)?.status || null
+            }));
+        }
+
+        async function calculateRoleKPIs(projectId) {
+            const states = await buildCurrentFarmStates(projectId);
+
+            const totalFarms = states.length;
+            const totalArea = states.reduce(
+                (sum, f) => sum + Number(f.area || 0), 0
+            );
+
+            const approvedFarms = states.filter(
+                f => f.current_submission_status === 'approved'
+            );
+
+            const pendingValidation = states.filter(
+                f => ['submitted', 'under_review'].includes(f.current_submission_status)
+            );
+
+            const correctionRequired = states.filter(
+                f => f.current_submission_status === 'correction_required'
+            );
+
+            const draftFarms = states.filter(
+                f => f.current_submission_status === 'draft'
+            );
+
+            const submittedFarms = states.filter(
+                f => f.current_submission_status === 'submitted'
+            );
+
+            const approvedArea = approvedFarms.reduce(
+                (sum, f) => sum + Number(f.area || 0), 0
+            );
+
+            const pendingValidationArea = pendingValidation.reduce(
+                (sum, f) => sum + Number(f.area || 0), 0
+            );
+
+            const submittedArea = submittedFarms.reduce(
+                (sum, f) => sum + Number(f.area || 0), 0
+            );
+
+            return {
+                total_farms: totalFarms,
+                total_area_ha: totalArea,
+                approved_farms: approvedFarms.length,
+                approved_area_ha: approvedArea,
+                pending_farms: Math.max(0, totalFarms - approvedFarms.length),
+                pending_validation: pendingValidation.length,
+                pending_validation_area_ha: pendingValidationArea,
+                submitted_farms: submittedFarms.length,
+                submitted_area_ha: submittedArea,
+                correction_required: correctionRequired.length,
+                draft_farms: draftFarms.length
+            };
+        }
+
+        async function verifyCurrentFarmKPIs() {
+            if (!currentProject?.id) {
+                console.warn('⚠️ No current project available.');
+                return null;
+            }
+
+            const kpis = await calculateRoleKPIs(currentProject.id);
+            console.log('📊 Current farm-state KPIs:', kpis);
+            console.table(kpis);
+            return kpis;
+        }
+
         async function loadProjectData(projectId) {
             showLoading(true);
             try {
@@ -1678,6 +1747,10 @@
                 farmsData = farms || [];
                 filteredFarms = roleVisibleFarms(farmsData);
                 console.log('✅ Loaded farms:', farmsData.length);
+
+            window.currentRoleKPIs = await calculateRoleKPIs(projectId);
+            console.log('📊 Current farm-state KPIs:', window.currentRoleKPIs);
+
                 
                 document.getElementById('submissionBadge').textContent = farmsData.length;
                 
@@ -2345,7 +2418,6 @@
                 }).eq('id', id);
                 closeEditModal();
                 await loadProjectData(currentProject.id);
-        verifyRoleDataScope();
             } catch (error) {
                 showNotification('Error saving: ' + error.message, 'error');
             }
