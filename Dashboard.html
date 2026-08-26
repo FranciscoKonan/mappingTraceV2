@@ -1099,7 +1099,24 @@
                     <div class="kpi"><div class="kpi-icon"><i class="fas fa-th-large"></i></div><div class="kpi-content"><h4>Active Plots</h4><p class="kpi-value" id="activePlots">0</p></div></div>
                     <div class="kpi"><div class="kpi-icon"><i class="fas fa-exclamation-triangle"></i></div><div class="kpi-content"><h4>Quality Alerts</h4><p class="kpi-value" id="alertsCount">0</p></div></div>
                 </section>
-
+                <section class="farm-queue">
+                  <h2>Pending Review</h2>
+                
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Farmer ID</th>
+                        <th>Farmer</th>
+                        <th>Cooperative</th>
+                        <th>Area (ha)</th>
+                        <th>Submission</th>
+                        <th>Action</th>
+                      </tr>
+                    </thead>
+                
+                    <tbody id="pendingFarmTableBody"></tbody>
+                  </table>
+                </section>
                 <!-- Cooperative Stats -->
                 <div class="cooperative-stats-toggle">
                     <div class="cooperative-header" onclick="toggleCooperativeStats()">
