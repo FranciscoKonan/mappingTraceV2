@@ -1014,3 +1014,24 @@ body {
     .format-heading { flex-direction:column; align-items:flex-start; }
     .permission-row { grid-template-columns:1fr 1fr 80px; }
 }
+
+/* =========================================================
+   EXPORT CENTER V3 — PROFESSIONAL ANALYTICS / AUDIT LAYER
+   ========================================================= */
+.advanced-filters-section,.audit-tools-section{border-top:1px solid #edf2f7;padding:18px 24px;background:#fbfcfe}
+.advanced-toggle-row,.history-title{display:flex;align-items:center;justify-content:space-between;gap:16px}
+.advanced-toggle-row h3,.audit-tools-section h3{margin:0 0 3px;font-size:14px;color:#172033}
+.advanced-filters{margin-top:16px;padding-top:16px;border-top:1px solid #edf2f7}
+.advanced-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.advanced-field label{display:block;font-size:11px;font-weight:700;color:#475569;margin-bottom:6px}
+.advanced-field select,.advanced-field input{width:100%;height:38px;border:1px solid #dbe3ec;border-radius:8px;padding:0 10px;background:#fff;color:#1e293b;font-size:12px}
+.performance-highlights{display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid #edf2f7;border-bottom:1px solid #edf2f7;background:#fbfcfe}
+.performance-highlights>div{padding:13px 16px;border-right:1px solid #edf2f7}
+.performance-highlights>div:last-child{border-right:0}
+.performance-highlights span{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:#94a3b8}
+.performance-highlights strong{display:block;margin-top:4px;font-size:13px;color:#334155}
+.audit-tools-section{margin-top:0}
+.hidden{display:none!important}
+.history-title h3{margin:0}
+@media(max-width:1000px){.advanced-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:650px){.advanced-grid,.performance-highlights{grid-template-columns:1fr}.performance-highlights>div{border-right:0;border-bottom:1px solid #edf2f7}.advanced-toggle-row,.history-title{align-items:flex-start;flex-direction:column}}
