@@ -2509,6 +2509,220 @@
         }
 
         // ============================================
+// FARM REVIEW
+// ============================================
+
+async function openFarmReview(farmId) {
+    const modal = document.getElementById('farmReviewModal');
+    const content = document.getElementById('farmReviewContent');
+
+    if (!modal || !content) {
+        console.error('❌ Farm Review modal not found');
+        return;
+    }
+
+    modal.classList.add('show');
+
+    content.innerHTML = `
+        <div style="text-align:center;padding:40px;">
+            <i class="fas fa-spinner fa-spin"></i>
+            Loading farm review...
+        </div>
+    `;
+
+    try {
+        const farm = farmsData.find(f => f.id === farmId);
+
+        if (!farm) {
+            throw new Error('Farm not found: ' + farmId);
+        }
+
+        console.log('🔎 Reviewing farm:', farm);
+
+        const { data: submission, error } = await supabaseClient
+            .from('submissions')
+            .select(`
+                id,
+                farm_id,
+                farmer_id,
+                farmer_name,
+                status,
+                media_filename,
+                media_url,
+                created_at,
+                submitted_at
+            `)
+            .eq('farm_id', farmId)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+        if (error) throw error;
+
+        console.log('📦 Review submission:', submission);
+
+        const imageUrl = submission?.media_url || null;
+
+        const mediaFilename =
+            submission?.media_filename ||
+            farm.media ||
+            null;
+
+        content.innerHTML = `
+            <div style="padding:25px;">
+
+                <div style="
+                    display:grid;
+                    grid-template-columns:1fr 1fr;
+                    gap:25px;
+                ">
+
+                    <!-- FARM INFORMATION -->
+                    <div>
+                        <h4 style="margin-bottom:15px;">
+                            <i class="fas fa-tractor"></i>
+                            Farm Information
+                        </h4>
+
+                        <div style="
+                            background:#f8fafc;
+                            padding:20px;
+                            border-radius:10px;
+                        ">
+
+                            <p>
+                                <strong>Farmer ID:</strong>
+                                ${escapeHtml(farm.farmer_id || 'N/A')}
+                            </p>
+
+                            <p>
+                                <strong>Farmer Name:</strong>
+                                ${escapeHtml(farm.farmer_name || 'N/A')}
+                            </p>
+
+                            <p>
+                                <strong>Cooperative:</strong>
+                                ${escapeHtml(farm.cooperative || 'N/A')}
+                            </p>
+
+                            <p>
+                                <strong>Supplier:</strong>
+                                ${escapeHtml(farm.supplier || 'N/A')}
+                            </p>
+
+                            <p>
+                                <strong>Enumerator:</strong>
+                                ${escapeHtml(farm.enumerator || 'N/A')}
+                            </p>
+
+                            <p>
+                                <strong>Area:</strong>
+                                ${Number(farm.area || 0).toFixed(2)} ha
+                            </p>
+
+                            <p>
+                                <strong>Status:</strong>
+                                ${escapeHtml(
+                                    submission?.status ||
+                                    farm.status ||
+                                    'N/A'
+                                )}
+                            </p>
+
+                            <p>
+                                <strong>Media:</strong>
+                                ${escapeHtml(mediaFilename || 'No photo')}
+                            </p>
+
+                        </div>
+                    </div>
+
+                    <!-- PHOTO -->
+                    <div>
+                        <h4 style="margin-bottom:15px;">
+                            <i class="fas fa-camera"></i>
+                            Farm Photo
+                        </h4>
+
+                        <div style="
+                            background:#f8fafc;
+                            border-radius:10px;
+                            min-height:350px;
+                            display:flex;
+                            align-items:center;
+                            justify-content:center;
+                            padding:15px;
+                        ">
+
+                            ${
+                                imageUrl
+                                ? `
+                                    <img
+                                        src="${escapeHtml(imageUrl)}"
+                                        alt="Farm photo"
+                                        style="
+                                            max-width:100%;
+                                            max-height:500px;
+                                            border-radius:8px;
+                                            object-fit:contain;
+                                        "
+                                        onerror="
+                                            this.style.display='none';
+                                            document.getElementById('farmPhotoError').style.display='block';
+                                        "
+                                    >
+
+                                    <div
+                                        id="farmPhotoError"
+                                        style="display:none;text-align:center;"
+                                    >
+                                        <i class="fas fa-image fa-3x"></i>
+                                        <p>Unable to load the Kobo image.</p>
+                                    </div>
+                                `
+                                : `
+                                    <div style="text-align:center;">
+                                        <i class="fas fa-image fa-3x"></i>
+                                        <p>No photo available.</p>
+                                    </div>
+                                `
+                            }
+
+                        </div>
+                    </div>
+
+                </div>
+
+                <div style="
+                    margin-top:20px;
+                    padding:15px;
+                    background:#f1f5f9;
+                    border-radius:8px;
+                ">
+                    <strong>Submission ID:</strong>
+                    ${escapeHtml(submission?.id || 'No submission')}
+                </div>
+
+            </div>
+        `;
+
+    } catch (error) {
+
+        console.error('❌ Farm review error:', error);
+
+        content.innerHTML = `
+            <div style="padding:40px;text-align:center;">
+                <i class="fas fa-exclamation-triangle"></i>
+                <p>Unable to load farm review.</p>
+                <small>${escapeHtml(error.message)}</small>
+            </div>
+        `;
+    }
+}
+
+window.openFarmReview = openFarmReview;
+
+        // ============================================
         // UI FUNCTIONS
         // ============================================
         function updateKPIs() {
