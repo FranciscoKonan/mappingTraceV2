@@ -2509,7 +2509,8 @@
             document.getElementById('pageNumbers').innerHTML = html;
         }
 
-            // ============================================
+
+                    // ============================================
             // FARM REVIEW
             // ============================================
             
@@ -2588,17 +2589,18 @@
                                 '📷 Loading image through Kobo proxy...'
                             );
             
-                             const response = await fetch(
+                            const response = await fetch(
                                 `${SUPABASE_URL}/functions/v1/kobo-media-proxy`,
                                 {
                                     method: 'POST',
-                            
+            
                                     headers: {
                                         'Content-Type': 'application/json',
                                         'apikey': SUPABASE_ANON_KEY,
-                                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+                                        'Authorization':
+                                            `Bearer ${SUPABASE_ANON_KEY}`
                                     },
-                            
+            
                                     body: JSON.stringify({
                                         url: submission.media_url
                                     })
@@ -2606,7 +2608,6 @@
                             );
             
                             if (!response.ok) {
-            
                                 throw new Error(
                                     `Media proxy returned ${response.status}`
                                 );
@@ -2660,7 +2661,9 @@
                                         max-height:500px;
                                         border-radius:10px;
                                         object-fit:contain;
-                                        box-shadow:0 2px 10px rgba(0,0,0,0.15);
+                                        box-shadow:
+                                            0 2px 10px
+                                            rgba(0,0,0,0.15);
                                     "
                                 >
             
@@ -2691,6 +2694,7 @@
                                 color:#64748b;
                             ">
                                 <i class="fas fa-image fa-2x"></i>
+            
                                 <p style="margin-top:10px;">
                                     No farm photo available
                                 </p>
@@ -2716,24 +2720,29 @@
             
                                 <div>
                                     <strong>Farmer</strong>
+            
                                     <div>
                                         ${escapeHtml(
-                                            farm.farmer_name || 'Unknown'
+                                            farm.farmer_name ||
+                                            'Unknown'
                                         )}
                                     </div>
                                 </div>
             
                                 <div>
                                     <strong>Farmer ID</strong>
+            
                                     <div>
                                         ${escapeHtml(
-                                            farm.farmer_id || '-'
+                                            farm.farmer_id ||
+                                            '-'
                                         )}
                                     </div>
                                 </div>
             
                                 <div>
                                     <strong>Status</strong>
+            
                                     <div>
                                         <span class="status-badge ${
                                             submission?.status ||
@@ -2751,6 +2760,7 @@
             
                                 <div>
                                     <strong>Area</strong>
+            
                                     <div>
                                         ${(farm.area || 0).toFixed(2)} ha
                                     </div>
@@ -2776,7 +2786,11 @@
                             text-align:center;
                             color:#dc2626;
                         ">
-                            <i class="fas fa-exclamation-triangle fa-2x"></i>
+            
+                            <i class="
+                                fas fa-exclamation-triangle
+                                fa-2x
+                            "></i>
             
                             <p style="margin-top:15px;">
                                 Failed to load farm review.
@@ -2788,17 +2802,41 @@
                                     'Unknown error'
                                 )}
                             </small>
+            
                         </div>
                     `;
                 }
             }
             
+            
             // ============================================
-            // MAKE FUNCTION AVAILABLE TO HTML ONCLICK
+            // CLOSE FARM REVIEW
             // ============================================
             
-            window.openFarmReview = openFarmReview;
-                    
+            function closeFarmReview() {
+            
+                const modal =
+                    document.getElementById('farmReviewModal');
+            
+                if (modal) {
+                    modal.classList.remove('show');
+                }
+            
+                console.log('✅ Farm Review closed');
+            }
+            
+            
+            // ============================================
+            // MAKE FUNCTIONS AVAILABLE GLOBALLY
+            // ============================================
+            
+            window.openFarmReview =
+                openFarmReview;
+            
+            window.closeFarmReview =
+                closeFarmReview;
+
+        
         // ============================================
         // UI FUNCTIONS
         // ============================================
