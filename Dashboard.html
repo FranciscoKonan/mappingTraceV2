@@ -905,21 +905,52 @@
         .pagination-btn.active { background: #2c6e49; color: white; border-color: #2c6e49; }
         .overlap-badge { background: #dc2626; color: white; padding: 2px 8px; border-radius: 20px; font-size: 10px; font-weight: 600; margin-left: 6px; }
         
-        .edit-modal { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 10001; align-items: center; justify-content: center; }
-        .edit-modal.active { display: flex; }
-        .edit-modal-content { background: white; border-radius: 16px; max-width: 500px; width: 90%; max-height: 80vh; overflow-y: auto; padding: 24px; }
-        .edit-modal-header { display: flex; justify-content: space-between; margin-bottom: 20px; padding-bottom: 12px; border-bottom: 1px solid #e2e8f0; }
-        .edit-modal-header h3 { font-size: 18px; }
-        .close-modal { background: none; border: none; font-size: 24px; cursor: pointer; color: #64748b; }
-        .form-group { margin-bottom: 16px; }
-        .form-group label { display: block; margin-bottom: 6px; font-weight: 500; font-size: 13px; color: #475569; }
-        .form-group input, .form-group select { width: 100%; padding: 10px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 14px; }
-        .form-group input:focus, .form-group select:focus { outline: none; border-color: #2c6e49; box-shadow: 0 0 0 3px rgba(44,110,73,0.1); }
-        .modal-buttons { display: flex; gap: 12px; margin-top: 24px; }
-        .btn-cancel { background: #e2e8f0; color: #475569; border: none; padding: 10px 16px; border-radius: 8px; cursor: pointer; flex: 1; }
-        .btn-save { background: #2c6e49; color: white; border: none; padding: 10px 16px; border-radius: 8px; cursor: pointer; flex: 1; }
-        .btn-save:hover { background: #1e4f33; }
-        
+        .edit-modal { display:none; position:fixed; inset:0; background:rgba(15,23,42,.60); z-index:20000; align-items:center; justify-content:center; padding:20px; }
+        .edit-modal.active, .edit-modal.show { display:flex !important; }
+        .edit-modal-content { background:white; border-radius:16px; width:95%; max-width:1100px; max-height:90vh; overflow-y:auto; padding:24px; box-shadow:0 20px 60px rgba(0,0,0,.25); position:relative; }
+        .edit-modal-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; padding-bottom:12px; border-bottom:1px solid #e2e8f0; }
+        .edit-modal-header h3 { font-size:18px; margin:0; font-weight:600; display:flex; align-items:center; gap:8px; }
+        .edit-modal-header h3 i { color:#2563eb; }
+        .close-modal { background:transparent; border:none; font-size:28px; line-height:1; cursor:pointer; color:#64748b; width:36px; height:36px; border-radius:8px; }
+        .close-modal:hover { background:#f1f5f9; color:#dc2626; }
+        .form-group { margin-bottom:16px; }
+        .form-group label { display:block; margin-bottom:6px; font-weight:500; font-size:13px; color:#475569; }
+        .form-group input, .form-group select { width:100%; padding:10px; border:1px solid #e2e8f0; border-radius:8px; font-size:14px; }
+        .form-group input:focus, .form-group select:focus { outline:none; border-color:#2c6e49; box-shadow:0 0 0 3px rgba(44,110,73,.1); }
+        .modal-buttons { display:flex; gap:12px; margin-top:24px; }
+        .btn-cancel { background:#e2e8f0; color:#475569; border:none; padding:10px 16px; border-radius:8px; cursor:pointer; flex:1; }
+        .btn-save { background:#2c6e49; color:white; border:none; padding:10px 16px; border-radius:8px; cursor:pointer; flex:1; }
+        .btn-save:hover { background:#1e4f33; }
+
+        /* Pending Review */
+        .farm-queue { background:white; border-radius:12px; box-shadow:0 1px 3px rgba(0,0,0,.10); margin-bottom:20px; overflow:hidden; }
+        .farm-queue-header { padding:16px 20px; border-bottom:1px solid #e2e8f0; background:#f8fafc; display:flex; justify-content:space-between; align-items:center; }
+        .farm-queue-header h2 { margin:0; font-size:15px; font-weight:600; color:#1e293b; display:flex; align-items:center; gap:8px; }
+        .farm-queue-header h2 i { color:#2563eb; }
+        .farm-queue-count { background:#fef3c7; color:#92400e; padding:4px 10px; border-radius:20px; font-size:11px; font-weight:600; }
+        .farm-queue .table-container { overflow-x:auto; }
+        .farm-queue table { width:100%; min-width:700px; border-collapse:collapse; }
+        .farm-queue th { text-align:left; padding:11px 16px; background:#f8fafc; color:#475569; font-size:11px; font-weight:600; border-bottom:1px solid #e2e8f0; }
+        .farm-queue td { padding:11px 16px; font-size:12px; border-bottom:1px solid #e2e8f0; vertical-align:middle; }
+        .farm-queue tbody tr:hover { background:#f8fafc; }
+        .pending-action-group { display:flex; gap:6px; align-items:center; }
+        .pending-review-btn,.pending-map-btn { width:32px; height:32px; border:none; border-radius:7px; color:white; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; }
+        .pending-review-btn { background:#2563eb; } .pending-review-btn:hover { background:#1d4ed8; }
+        .pending-map-btn { background:#10b981; } .pending-map-btn:hover { background:#059669; }
+        .pending-empty { text-align:center; padding:35px 20px; color:#94a3b8; }
+        .pending-empty i { font-size:28px; margin-bottom:10px; }
+
+        /* Farm Review */
+        .farm-review-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:20px; }
+        .farm-review-card { background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:14px; }
+        .farm-review-card-label { font-size:10px; text-transform:uppercase; letter-spacing:.4px; color:#64748b; margin-bottom:5px; font-weight:600; }
+        .farm-review-card-value { font-size:14px; color:#1e293b; font-weight:600; word-break:break-word; }
+        .farm-review-photo { background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:18px; text-align:center; }
+        .farm-review-photo h4 { margin:0 0 14px; font-size:14px; color:#334155; }
+        .farm-review-photo img { display:block; max-width:100%; max-height:500px; margin:0 auto; border-radius:10px; object-fit:contain; box-shadow:0 2px 10px rgba(0,0,0,.15); }
+        @media (max-width:768px) { .farm-review-grid { grid-template-columns:repeat(2,1fr); } .edit-modal { padding:10px; } .edit-modal-content { width:100%; max-height:95vh; padding:16px; } }
+        @media (max-width:480px) { .farm-review-grid { grid-template-columns:1fr; } }
+
         .loading-spinner {
             position: fixed;
             top: 50%;
@@ -1099,23 +1130,31 @@
                     <div class="kpi"><div class="kpi-icon"><i class="fas fa-th-large"></i></div><div class="kpi-content"><h4>Active Plots</h4><p class="kpi-value" id="activePlots">0</p></div></div>
                     <div class="kpi"><div class="kpi-icon"><i class="fas fa-exclamation-triangle"></i></div><div class="kpi-content"><h4>Quality Alerts</h4><p class="kpi-value" id="alertsCount">0</p></div></div>
                 </section>
+                <!-- ============================================
+                     PENDING REVIEW
+                     ============================================ -->
                 <section class="farm-queue">
-                  <h2>Pending Review</h2>
-                
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>Farmer ID</th>
-                        <th>Farmer</th>
-                        <th>Cooperative</th>
-                        <th>Area (ha)</th>
-                        <th>Submission</th>
-                        <th>Action</th>
-                      </tr>
-                    </thead>
-                
-                    <tbody id="pendingFarmTableBody"></tbody>
-                  </table>
+                    <div class="farm-queue-header">
+                        <h2><i class="fas fa-clipboard-check"></i> Pending Review</h2>
+                        <span class="farm-queue-count" id="pendingReviewCount">0</span>
+                    </div>
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Farmer ID</th>
+                                    <th>Farmer</th>
+                                    <th>Cooperative</th>
+                                    <th>Area (ha)</th>
+                                    <th>Submission</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="pendingFarmTableBody">
+                                <tr><td colspan="6"><div class="pending-empty"><i class="fas fa-spinner fa-spin"></i><div>Loading pending farms...</div></div></td></tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </section>
                 <!-- Cooperative Stats -->
                 <div class="cooperative-stats-toggle">
@@ -1895,6 +1934,7 @@
 
         updateKPIs();
         updateCooperativeStats();
+        updatePendingReview();
         updateTable();
 
         if (!mapInitialized) {
@@ -1945,6 +1985,7 @@
                 await loadProtectedAreas();
                 updateKPIs();
                 updateCooperativeStats();
+                updatePendingReview();
                 updateTable();
                 if (!mapInitialized) { initMap(); }
                 updateMap();
@@ -2390,37 +2431,38 @@
             const suppliers = [...new Set(farmsData.map(f => f.supplier).filter(Boolean))];
             const coops = [...new Set(farmsData.map(f => f.cooperative).filter(Boolean))];
             const statuses = ['pending', 'validated', 'rejected'];
-            
-            document.getElementById('supplierFilter').innerHTML = '<option value="all">All Suppliers</option>' + suppliers.map(s => `<option value="${s}">${s}</option>`).join('');
-            document.getElementById('cooperativeFilter').innerHTML = '<option value="all">All Cooperatives</option>' + coops.map(c => `<option value="${c}">${c}</option>`).join('');
-            document.getElementById('statusFilter').innerHTML = '<option value="all">All Status</option>' + statuses.map(s => `<option value="${s}">${s.charAt(0).toUpperCase() + s.slice(1)}</option>`).join('');
+            const supplierFilter = document.getElementById('supplierFilter');
+            const cooperativeFilter = document.getElementById('cooperativeFilter');
+            const statusFilter = document.getElementById('statusFilter');
+            if (supplierFilter) supplierFilter.innerHTML = '<option value="all">All Suppliers</option>' + suppliers.map(s => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join('');
+            if (cooperativeFilter) cooperativeFilter.innerHTML = '<option value="all">All Cooperatives</option>' + coops.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+            if (statusFilter) statusFilter.innerHTML = '<option value="all">All Status</option>' + statuses.map(s => `<option value="${s}">${s.charAt(0).toUpperCase() + s.slice(1)}</option>`).join('');
         }
 
         function filterTable() {
-            const search = document.getElementById('tableSearch').value.toLowerCase();
-            const coop = document.getElementById('cooperativeFilter').value;
-            const supplier = document.getElementById('supplierFilter').value;
-            const status = document.getElementById('statusFilter').value;
-            
+            const search = document.getElementById('tableSearch')?.value.toLowerCase() || '';
+            const coop = document.getElementById('cooperativeFilter')?.value || 'all';
+            const supplier = document.getElementById('supplierFilter')?.value || 'all';
+            const status = document.getElementById('statusFilter')?.value || 'all';
             filteredFarms = farmsData.filter(f => {
                 if (coop !== 'all' && (f.cooperative || 'Unassigned') !== coop) return false;
                 if (supplier !== 'all' && f.supplier !== supplier) return false;
                 if (status !== 'all' && f.status !== status) return false;
-                if (search && !`${f.farmer_name || ''} ${f.farmer_id || ''} ${f.cooperative || ''} ${f.enumerator || ''}`.toLowerCase().includes(search)) return false;
+                if (search) {
+                    const searchable = `${f.farmer_name || ''} ${f.farmer_id || ''} ${f.cooperative || ''} ${f.enumerator || ''}`.toLowerCase();
+                    if (!searchable.includes(search)) return false;
+                }
                 return true;
             });
             currentPage = 1;
             updateTable();
+            updateCooperativeStats();
         }
 
         function sortTable(field) {
-            if (sortField === field) {
-                sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
-            } else {
-                sortField = field;
-                sortDirection = 'asc';
-            }
-            filteredFarms.sort((a, b) => {
+            if (sortField === field) sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+            else { sortField = field; sortDirection = 'asc'; }
+            filteredFarms.sort((a,b) => {
                 let valA = a[field] || '', valB = b[field] || '';
                 if (typeof valA === 'string') valA = valA.toLowerCase();
                 if (typeof valB === 'string') valB = valB.toLowerCase();
@@ -2432,411 +2474,134 @@
         }
 
         function updateTable() {
-            const start = (currentPage-1)*rowsPerPage, end = start+rowsPerPage;
-            const pageFarms = filteredFarms.slice(start, end);
+            const start = (currentPage - 1) * rowsPerPage;
+            const pageFarms = filteredFarms.slice(start, start + rowsPerPage);
             const tbody = document.getElementById('tableBody');
-            if (pageFarms.length === 0) { 
-                tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:40px;">No farms found</td></tr>'; 
-                updatePagination(); 
-                return; 
+            if (!tbody) return;
+            if (pageFarms.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:40px;">No farms found</td></tr>';
+                updatePagination();
+                return;
             }
-            
             const overlapFarmIds = new Set(overlapAlerts.map(a => a.farmId));
-            
             tbody.innerHTML = pageFarms.map(f => {
                 const hasOverlap = overlapFarmIds.has(f.id);
-                return `
-                    <tr style="${hasOverlap ? 'background:#fef2f2;' : ''}">
-                        <td><strong>${escapeHtml(f.farmer_name || 'Unknown')}</strong></td>
-                        <td><code>${escapeHtml(f.farmer_id || f.id.slice(0,8))}</code></td>
-                        <td>${escapeHtml(f.cooperative || '-')}</td>
-                        <td>${escapeHtml(f.supplier || '-')}</td>
-                        <td>${escapeHtml(f.enumerator || '-')}</td>
-                        <td>${(f.area || 0).toFixed(1)} ha</td>
-                        <td>${new Date(f.created_at).toLocaleDateString()}</td>
-                        <td><span class="status-badge ${f.status || 'pending'}">${f.status || 'pending'}</span>${hasOverlap ? ' <span class="overlap-badge">⚠️</span>' : ''}</td>
-                        <td>
-                        <div class="action-buttons-group">
-                        
-                            <button
-                                class="action-btn view"
-                                onclick="viewFarm('${f.id}')"
-                                title="View Details">
-                                <i class="fas fa-eye"></i>
-                            </button>
-                        
-                            <button
-                                type="button"
-                                class="action-btn"
-                                onclick="window.openFarmReview('${f.id}')"
-                                title="Farm Review"
-                                style="background:#2563eb;color:white;">
-                                <i class="fas fa-clipboard-check"></i>
-                            </button>
-                        
-                            <button
-                                class="action-btn edit-btn"
-                                onclick="openEditModal('${f.id}')"
-                                title="Edit Farm">
-                                <i class="fas fa-edit"></i>
-                            </button>
-                        
-                            <button
-                                class="action-btn map-btn-action"
-                                onclick="redirectToMap('${f.id}')"
-                                title="View on Map">
-                                <i class="fas fa-map-marker-alt"></i>
-                            </button>
-                        
-                        </div>
-                        </td>
-                    </tr>
-                `;
+                return `<tr style="${hasOverlap ? 'background:#fef2f2;' : ''}">
+                    <td><strong>${escapeHtml(f.farmer_name || 'Unknown')}</strong></td>
+                    <td><code>${escapeHtml(f.farmer_id || String(f.id).slice(0,8))}</code></td>
+                    <td>${escapeHtml(f.cooperative || '-')}</td>
+                    <td>${escapeHtml(f.supplier || '-')}</td>
+                    <td>${escapeHtml(f.enumerator || '-')}</td>
+                    <td>${(Number(f.area) || 0).toFixed(1)} ha</td>
+                    <td>${f.created_at ? new Date(f.created_at).toLocaleDateString() : '-'}</td>
+                    <td><span class="status-badge ${escapeHtml(f.status || 'pending')}">${escapeHtml(f.status || 'pending')}</span>${hasOverlap ? ' <span class="overlap-badge">⚠️</span>' : ''}</td>
+                    <td><div class="action-buttons-group">
+                        <button type="button" class="action-btn view" data-action="view" data-farm-id="${f.id}" title="View Details"><i class="fas fa-eye"></i></button>
+                        <button type="button" class="action-btn farm-review-btn" data-action="review" data-farm-id="${f.id}" title="Farm Review" style="background:#2563eb;color:white;"><i class="fas fa-clipboard-check"></i></button>
+                        <button type="button" class="action-btn edit-btn" data-action="edit" data-farm-id="${f.id}" title="Edit Farm"><i class="fas fa-edit"></i></button>
+                        <button type="button" class="action-btn map-btn-action" data-action="map" data-farm-id="${f.id}" title="View on Map"><i class="fas fa-map-marker-alt"></i></button>
+                    </div></td>
+                </tr>`;
             }).join('');
+            document.querySelectorAll('#tableBody [data-action="review"]').forEach(b => b.addEventListener('click', e => { e.preventDefault(); window.openFarmReview(b.dataset.farmId); }));
+            document.querySelectorAll('#tableBody [data-action="view"]').forEach(b => b.addEventListener('click', e => { e.preventDefault(); viewFarm(b.dataset.farmId); }));
+            document.querySelectorAll('#tableBody [data-action="edit"]').forEach(b => b.addEventListener('click', e => { e.preventDefault(); openEditModal(b.dataset.farmId); }));
+            document.querySelectorAll('#tableBody [data-action="map"]').forEach(b => b.addEventListener('click', e => { e.preventDefault(); redirectToMap(b.dataset.farmId); }));
             updatePagination();
+        }
+
+        function updatePendingReview() {
+            const tbody = document.getElementById('pendingFarmTableBody');
+            const countElement = document.getElementById('pendingReviewCount');
+            if (!tbody) return;
+            const pendingFarms = farmsData.filter(f => pendingStatus(f.status));
+            if (countElement) countElement.textContent = pendingFarms.length;
+            if (!pendingFarms.length) {
+                tbody.innerHTML = '<tr><td colspan="6"><div class="pending-empty"><i class="fas fa-check-circle"></i><div>No farms pending review</div></div></td></tr>';
+                return;
+            }
+            const sorted = [...pendingFarms].sort((a,b) => new Date(b.created_at || b.submission_date || 0) - new Date(a.created_at || a.submission_date || 0));
+            tbody.innerHTML = sorted.map(f => {
+                const d = f.created_at || f.submission_date;
+                return `<tr>
+                    <td><code>${escapeHtml(f.farmer_id || String(f.id).slice(0,8))}</code></td>
+                    <td><strong>${escapeHtml(f.farmer_name || 'Unknown')}</strong></td>
+                    <td>${escapeHtml(f.cooperative || 'Unassigned')}</td>
+                    <td>${(Number(f.area) || 0).toFixed(2)} ha</td>
+                    <td>${d ? new Date(d).toLocaleDateString() : '-'}</td>
+                    <td><div class="pending-action-group">
+                        <button type="button" class="pending-review-btn pending-review-action" data-farm-id="${f.id}" title="Review Farm"><i class="fas fa-clipboard-check"></i></button>
+                        <button type="button" class="pending-map-btn pending-map-action" data-farm-id="${f.id}" title="View on Map"><i class="fas fa-map-marker-alt"></i></button>
+                    </div></td>
+                </tr>`;
+            }).join('');
+            document.querySelectorAll('.pending-review-action').forEach(b => b.addEventListener('click', e => { e.preventDefault(); window.openFarmReview(b.dataset.farmId); }));
+            document.querySelectorAll('.pending-map-action').forEach(b => b.addEventListener('click', e => { e.preventDefault(); redirectToMap(b.dataset.farmId); }));
         }
 
         function updatePagination() {
             const totalPages = Math.ceil(filteredFarms.length / rowsPerPage);
-            document.getElementById('showingCount').textContent = `${Math.min((currentPage-1)*rowsPerPage+1, filteredFarms.length)}-${Math.min(currentPage*rowsPerPage, filteredFarms.length)}`;
-            document.getElementById('totalCount').textContent = filteredFarms.length;
-            document.getElementById('prevBtn').disabled = currentPage === 1;
-            document.getElementById('nextBtn').disabled = currentPage === totalPages || totalPages === 0;
-            let html = '';
-            for (let i = 1; i <= Math.min(totalPages, 5); i++) {
-                html += `<button class="pagination-btn ${i===currentPage?'active':''}" onclick="goToPage(${i})">${i}</button>`;
-            }
-            document.getElementById('pageNumbers').innerHTML = html;
+            const showing = document.getElementById('showingCount');
+            const total = document.getElementById('totalCount');
+            const prev = document.getElementById('prevBtn');
+            const next = document.getElementById('nextBtn');
+            const pages = document.getElementById('pageNumbers');
+            if (showing) showing.textContent = filteredFarms.length === 0 ? '0-0' : `${Math.min((currentPage-1)*rowsPerPage+1, filteredFarms.length)}-${Math.min(currentPage*rowsPerPage, filteredFarms.length)}`;
+            if (total) total.textContent = filteredFarms.length;
+            if (prev) prev.disabled = currentPage === 1;
+            if (next) next.disabled = currentPage === totalPages || totalPages === 0;
+            if (pages) { let html=''; for(let i=1;i<=Math.min(totalPages,5);i++) html += `<button class="pagination-btn ${i===currentPage?'active':''}" onclick="goToPage(${i})">${i}</button>`; pages.innerHTML=html; }
         }
 
-
-                    // ============================================
-            // FARM REVIEW
-            // ============================================
-            
-            async function openFarmReview(farmId) {
-            
-                const modal = document.getElementById('farmReviewModal');
-                const content = document.getElementById('farmReviewContent');
-            
-                if (!modal || !content) {
-                    console.error('❌ Farm Review modal not found');
-                    return;
+        // ============================================
+        // FARM REVIEW
+        // ============================================
+        async function openFarmReview(farmId) {
+            const modal = document.getElementById('farmReviewModal');
+            const content = document.getElementById('farmReviewContent');
+            if (!modal || !content) { console.error('❌ Farm Review modal not found'); return; }
+            modal.classList.add('show');
+            content.innerHTML = '<div style="text-align:center;padding:50px;color:#64748b;"><i class="fas fa-spinner fa-spin fa-2x"></i><p style="margin-top:15px;">Loading farm review...</p></div>';
+            let imageBlobUrl = null;
+            try {
+                const farm = farmsData.find(f => f.id === farmId);
+                if (!farm) throw new Error('Farm not found: ' + farmId);
+                const { data: submission, error } = await supabaseClient.from('submissions').select(`id,farm_id,farmer_id,farmer_name,status,media_filename,media_url,created_at,submitted_at`).eq('farm_id', farmId).order('created_at', { ascending:false }).limit(1).maybeSingle();
+                if (error) throw error;
+                if (submission?.media_url) {
+                    try {
+                        const response = await fetch(`${SUPABASE_URL}/functions/v1/kobo-media-proxy`, { method:'POST', headers:{'Content-Type':'application/json','apikey':SUPABASE_ANON_KEY,'Authorization':`Bearer ${SUPABASE_ANON_KEY}`}, body:JSON.stringify({url:submission.media_url}) });
+                        if (!response.ok) throw new Error(`Media proxy returned ${response.status}`);
+                        imageBlobUrl = URL.createObjectURL(await response.blob());
+                    } catch (imageError) { console.error('❌ Failed to load farm image:', imageError); }
                 }
-            
-                modal.classList.add('show');
-            
-                content.innerHTML = `
-                    <div style="text-align:center;padding:40px;">
-                        <i class="fas fa-spinner fa-spin"></i>
-                        Loading farm review...
-                    </div>
-                `;
-            
-                let imageBlobUrl = null;
-            
-                try {
-            
-                    // ============================================
-                    // FIND FARM
-                    // ============================================
-            
-                    const farm = farmsData.find(f => f.id === farmId);
-            
-                    if (!farm) {
-                        throw new Error('Farm not found: ' + farmId);
-                    }
-            
-                    console.log('🔎 Reviewing farm:', farm);
-            
-                    // ============================================
-                    // GET LATEST SUBMISSION
-                    // ============================================
-            
-                    const { data: submission, error } = await supabaseClient
-                        .from('submissions')
-                        .select(`
-                            id,
-                            farm_id,
-                            farmer_id,
-                            farmer_name,
-                            status,
-                            media_filename,
-                            media_url,
-                            created_at,
-                            submitted_at
-                        `)
-                        .eq('farm_id', farmId)
-                        .order('created_at', { ascending: false })
-                        .limit(1)
-                        .maybeSingle();
-            
-                    if (error) {
-                        throw error;
-                    }
-            
-                    console.log('📦 Review submission:', submission);
-            
-                    // ============================================
-                    // LOAD KOBO IMAGE THROUGH PROXY
-                    // ============================================
-            
-                    if (submission?.media_url) {
-            
-                        try {
-            
-                            console.log(
-                                '📷 Loading image through Kobo proxy...'
-                            );
-            
-                            const response = await fetch(
-                                `${SUPABASE_URL}/functions/v1/kobo-media-proxy`,
-                                {
-                                    method: 'POST',
-            
-                                    headers: {
-                                        'Content-Type': 'application/json',
-                                        'apikey': SUPABASE_ANON_KEY,
-                                        'Authorization':
-                                            `Bearer ${SUPABASE_ANON_KEY}`
-                                    },
-            
-                                    body: JSON.stringify({
-                                        url: submission.media_url
-                                    })
-                                }
-                            );
-            
-                            if (!response.ok) {
-                                throw new Error(
-                                    `Media proxy returned ${response.status}`
-                                );
-                            }
-            
-                            const blob = await response.blob();
-            
-                            imageBlobUrl =
-                                URL.createObjectURL(blob);
-            
-                            console.log(
-                                '✅ Farm image loaded:',
-                                blob.type,
-                                blob.size,
-                                'bytes'
-                            );
-            
-                        } catch (imageError) {
-            
-                            console.error(
-                                '❌ Failed to load farm image:',
-                                imageError
-                            );
-                        }
-                    }
-            
-                    // ============================================
-                    // IMAGE HTML
-                    // ============================================
-            
-                    let imageHtml = '';
-            
-                    if (imageBlobUrl) {
-            
-                        imageHtml = `
-                            <div style="
-                                margin-top:20px;
-                                text-align:center;
-                            ">
-            
-                                <h4 style="margin-bottom:12px;">
-                                    <i class="fas fa-camera"></i>
-                                    Farm Photo
-                                </h4>
-            
-                                <img
-                                    src="${imageBlobUrl}"
-                                    alt="Farm photo"
-                                    style="
-                                        max-width:100%;
-                                        max-height:500px;
-                                        border-radius:10px;
-                                        object-fit:contain;
-                                        box-shadow:
-                                            0 2px 10px
-                                            rgba(0,0,0,0.15);
-                                    "
-                                >
-            
-                                <div style="
-                                    margin-top:8px;
-                                    color:#666;
-                                    font-size:13px;
-                                ">
-                                    ${escapeHtml(
-                                        submission.media_filename ||
-                                        farm.media ||
-                                        'Farm photo'
-                                    )}
-                                </div>
-            
-                            </div>
-                        `;
-            
-                    } else {
-            
-                        imageHtml = `
-                            <div style="
-                                margin-top:20px;
-                                padding:30px;
-                                text-align:center;
-                                background:#f8fafc;
-                                border-radius:10px;
-                                color:#64748b;
-                            ">
-                                <i class="fas fa-image fa-2x"></i>
-            
-                                <p style="margin-top:10px;">
-                                    No farm photo available
-                                </p>
-                            </div>
-                        `;
-                    }
-            
-                    // ============================================
-                    // FARM REVIEW CONTENT
-                    // ============================================
-            
-                    content.innerHTML = `
-            
-                        <div style="padding:20px;">
-            
-                            <div style="
-                                display:grid;
-                                grid-template-columns:
-                                    repeat(auto-fit,minmax(200px,1fr));
-                                gap:15px;
-                                margin-bottom:20px;
-                            ">
-            
-                                <div>
-                                    <strong>Farmer</strong>
-            
-                                    <div>
-                                        ${escapeHtml(
-                                            farm.farmer_name ||
-                                            'Unknown'
-                                        )}
-                                    </div>
-                                </div>
-            
-                                <div>
-                                    <strong>Farmer ID</strong>
-            
-                                    <div>
-                                        ${escapeHtml(
-                                            farm.farmer_id ||
-                                            '-'
-                                        )}
-                                    </div>
-                                </div>
-            
-                                <div>
-                                    <strong>Status</strong>
-            
-                                    <div>
-                                        <span class="status-badge ${
-                                            submission?.status ||
-                                            farm.status ||
-                                            'pending'
-                                        }">
-                                            ${
-                                                submission?.status ||
-                                                farm.status ||
-                                                'pending'
-                                            }
-                                        </span>
-                                    </div>
-                                </div>
-            
-                                <div>
-                                    <strong>Area</strong>
-            
-                                    <div>
-                                        ${(farm.area || 0).toFixed(2)} ha
-                                    </div>
-                                </div>
-            
-                            </div>
-            
-                            ${imageHtml}
-            
-                        </div>
-                    `;
-            
-                } catch (error) {
-            
-                    console.error(
-                        '❌ Farm Review error:',
-                        error
-                    );
-            
-                    content.innerHTML = `
-                        <div style="
-                            padding:40px;
-                            text-align:center;
-                            color:#dc2626;
-                        ">
-            
-                            <i class="
-                                fas fa-exclamation-triangle
-                                fa-2x
-                            "></i>
-            
-                            <p style="margin-top:15px;">
-                                Failed to load farm review.
-                            </p>
-            
-                            <small>
-                                ${escapeHtml(
-                                    error.message ||
-                                    'Unknown error'
-                                )}
-                            </small>
-            
-                        </div>
-                    `;
-                }
+                const imageHtml = imageBlobUrl ? `<div class="farm-review-photo"><h4><i class="fas fa-camera"></i> Farm Photo</h4><img src="${imageBlobUrl}" alt="Farm photo"><div style="margin-top:10px;color:#64748b;font-size:11px;">${escapeHtml(submission.media_filename || farm.media || 'Farm photo')}</div></div>` : `<div class="farm-review-photo"><i class="fas fa-image fa-2x" style="color:#94a3b8;"></i><p style="margin-top:10px;color:#64748b;">No farm photo available</p></div>`;
+                const status = submission?.status || farm.status || 'pending';
+                const submissionDate = submission?.submitted_at || submission?.created_at || farm.created_at;
+                content.innerHTML = `<div class="farm-review-grid">
+                    <div class="farm-review-card"><div class="farm-review-card-label">Farmer</div><div class="farm-review-card-value">${escapeHtml(farm.farmer_name || 'Unknown')}</div></div>
+                    <div class="farm-review-card"><div class="farm-review-card-label">Farmer ID</div><div class="farm-review-card-value">${escapeHtml(farm.farmer_id || '-')}</div></div>
+                    <div class="farm-review-card"><div class="farm-review-card-label">Cooperative</div><div class="farm-review-card-value">${escapeHtml(farm.cooperative || 'Unassigned')}</div></div>
+                    <div class="farm-review-card"><div class="farm-review-card-label">Area</div><div class="farm-review-card-value">${(Number(farm.area)||0).toFixed(2)} ha</div></div>
+                    <div class="farm-review-card"><div class="farm-review-card-label">Status</div><div><span class="status-badge ${escapeHtml(status)}">${escapeHtml(status)}</span></div></div>
+                    <div class="farm-review-card"><div class="farm-review-card-label">Enumerator</div><div class="farm-review-card-value">${escapeHtml(farm.enumerator || '-')}</div></div>
+                    <div class="farm-review-card"><div class="farm-review-card-label">Submission</div><div class="farm-review-card-value">${submissionDate ? new Date(submissionDate).toLocaleDateString() : '-'}</div></div>
+                    <div class="farm-review-card"><div class="farm-review-card-label">Farm ID</div><div class="farm-review-card-value">${escapeHtml(farm.id)}</div></div>
+                </div>${imageHtml}`;
+            } catch (error) {
+                console.error('❌ Farm Review error:', error);
+                content.innerHTML = `<div style="padding:40px;text-align:center;color:#dc2626;"><i class="fas fa-exclamation-triangle fa-2x"></i><p style="margin-top:15px;font-weight:600;">Failed to load farm review.</p><small>${escapeHtml(error.message || 'Unknown error')}</small></div>`;
             }
-            
-            
-            // ============================================
-            // CLOSE FARM REVIEW
-            // ============================================
-            
-            function closeFarmReview() {
-            
-                const modal =
-                    document.getElementById('farmReviewModal');
-            
-                if (modal) {
-                    modal.classList.remove('show');
-                }
-            
-                console.log('✅ Farm Review closed');
-            }
-            
-            
-            // ============================================
-            // MAKE FUNCTIONS AVAILABLE GLOBALLY
-            // ============================================
-            
-            window.openFarmReview =
-                openFarmReview;
-            
-            window.closeFarmReview =
-                closeFarmReview;
+        }
 
-        
+        function closeFarmReview() {
+            const modal = document.getElementById('farmReviewModal');
+            if (modal) { modal.classList.remove('show'); modal.classList.remove('active'); }
+        }
+
+        window.openFarmReview = openFarmReview;
+        window.closeFarmReview = closeFarmReview;
+
         // ============================================
         // UI FUNCTIONS
         // ============================================
@@ -2970,6 +2735,7 @@
         window.dismissOverlapAlerts = dismissOverlapAlerts;
         window.dismissQualityAlerts = dismissQualityAlerts;
         window.toggleCooperativeStats = toggleCooperativeStats;
+        window.updatePendingReview = updatePendingReview;
         window.openEditModal = openEditModal;
         window.closeEditModal = closeEditModal;
         window.redirectToMap = redirectToMap;
