@@ -919,3 +919,9 @@ tr:hover { background: #f8fafc; }
     .user-details .user-name { font-size: 11px; }
     .sync-btn { font-size: 9px; padding: 3px 8px; }
 }
+.workflow-section{background:#fff;border-radius:12px;padding:18px 20px;margin-bottom:24px;box-shadow:0 1px 3px rgba(0,0,0,.1)}
+.workflow-heading{margin-bottom:14px}.workflow-heading h3{font-size:16px;margin:0 0 4px;display:flex;align-items:center;gap:8px}.workflow-heading h3 i{color:#2c6e49}.workflow-heading p{margin:0;color:#64748b;font-size:12px}
+.workflow-grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px}.workflow-card{background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px}.workflow-card span{display:block;color:#64748b;font-size:11px;font-weight:600;margin-bottom:6px}.workflow-card strong{display:block;font-size:24px;color:#0f172a}.workflow-card small{display:block;color:#94a3b8;font-size:10px;margin-top:6px}
+.workflow-badge{display:inline-flex;align-items:center;padding:4px 9px;border-radius:20px;font-size:10px;font-weight:600;white-space:nowrap}.workflow-badge.submitted,.workflow-badge.enumerator_review{background:#fef9c3;color:#854d0e}.workflow-badge.field_officer_review{background:#e0e7ff;color:#3730a3}.workflow-badge.gis_compliance_review{background:#dbeafe;color:#1e40af}.workflow-badge.final_validation{background:#f3e8ff;color:#6b21a8}.workflow-badge.correction_required{background:#ffedd5;color:#9a3412}.workflow-badge.validated{background:#dcfce7;color:#166534}.workflow-badge.rejected{background:#fee2e2;color:#991b1b}
+.action-btn.workflow-next{background:#2c6e49;color:#fff}.action-btn.takeover{background:#4f46e5;color:#fff}.action-btn.correction{background:#f59e0b;color:#fff}.action-btn.final-validate{background:#22c55e;color:#fff}
+@media(max-width:1200px){.workflow-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}@media(max-width:650px){.workflow-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
