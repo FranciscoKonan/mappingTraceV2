@@ -1324,7 +1324,32 @@
     </div>
 
     <div id="loadingOverlay" class="loading-spinner"><i class="fas fa-spinner fa-spin"></i><span>Loading...</span></div>
+<div class="edit-modal" id="farmReviewModal">
+    <div class="edit-modal-content" style="max-width:1100px;">
 
+        <div class="edit-modal-header">
+            <h3>
+                <i class="fas fa-clipboard-check"></i>
+                Farm Review
+            </h3>
+
+            <button
+                class="close-modal"
+                onclick="closeFarmReview()">
+                ×
+            </button>
+        </div>
+
+        <div id="farmReviewContent">
+
+            <div style="text-align:center;padding:40px;">
+                Loading farm...
+            </div>
+
+        </div>
+
+    </div>
+</div>
     <script>
         // ============================================
         // SIDEBAR TOGGLE LOGIC - BURGER + COLLAPSE
