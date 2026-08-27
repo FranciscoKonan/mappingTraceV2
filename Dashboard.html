@@ -1381,6 +1381,35 @@
 
         <div id="farmReviewContent">
 
+            <div id="farmReviewDecision" style="display:none; margin-top:20px; border-top:1px solid #e2e8f0; padding-top:20px;">
+                <h4 style="margin:0 0 12px;color:#1e293b;">
+                    <i class="fas fa-gavel"></i> Reviewer Decision
+                </h4>
+
+                <textarea id="farmReviewComment"
+                    placeholder="Add a review comment..."
+                    style="width:100%;min-height:90px;padding:12px;border:1px solid #cbd5e1;border-radius:8px;resize:vertical;box-sizing:border-box;"></textarea>
+
+                <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;">
+                    <button type="button" id="approveFarmBtn"
+                        style="background:#16a34a;color:white;border:0;border-radius:8px;padding:10px 16px;cursor:pointer;">
+                        <i class="fas fa-check"></i> Approve
+                    </button>
+
+                    <button type="button" id="rejectFarmBtn"
+                        style="background:#dc2626;color:white;border:0;border-radius:8px;padding:10px 16px;cursor:pointer;">
+                        <i class="fas fa-times"></i> Reject
+                    </button>
+
+                    <button type="button" id="correctionFarmBtn"
+                        style="background:#d97706;color:white;border:0;border-radius:8px;padding:10px 16px;cursor:pointer;">
+                        <i class="fas fa-undo"></i> Request Correction
+                    </button>
+                </div>
+
+                <div id="farmReviewDecisionMessage" style="margin-top:12px;font-size:13px;"></div>
+            </div>
+
             <div style="text-align:center;padding:40px;">
                 Loading farm...
             </div>
