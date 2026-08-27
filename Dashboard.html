@@ -1876,7 +1876,7 @@
             );
         }
 
-        farmsData = farms;
+        farmsData = await buildCurrentFarmStates(projectId);
 
         filteredFarms = roleVisibleFarms(farmsData);
 
