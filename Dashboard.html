@@ -885,7 +885,16 @@
         .status-badge { padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; display: inline-block; }
         .status-badge.validated { background: #dcfce7; color: #166534; }
         .status-badge.pending { background: #fef9c3; color: #854d0e; }
-        .status-badge.rejected { background: #fee2e2; color: #991b1b; }
+        
+.status-badge.rejected { background: #fee2e2; color: #991b1b; }
+.status-badge.submitted { background:#dbeafe; color:#1e40af; }
+.status-badge.enumerator_check { background:#e0e7ff; color:#3730a3; }
+.status-badge.field_officer_review { background:#fef3c7; color:#92400e; }
+.status-badge.gis_compliance { background:#f3e8ff; color:#6b21a8; }
+.status-badge.final_validation { background:#cffafe; color:#155e75; }
+.status-badge.correction_required { background:#ffedd5; color:#9a3412; }
+.status-badge.under_review { background:#fef3c7; color:#92400e; }
+
         
         .action-buttons-group { display: flex; gap: 6px; }
         .action-btn { width: 30px; height: 30px; border: none; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
@@ -1543,13 +1552,81 @@
         }
 
 
-        // ROLE-SCOPED DASHBOARD
-        function approvedStatus(s) { return ['approved','validated'].includes(String(s||'').toLowerCase()); }
-        function pendingStatus(s) { return ['pending','submitted','under_review'].includes(String(s||'').toLowerCase()); }
-        function correctionStatus(s) { return ['rejected','correction_required','correction'].includes(String(s||'').toLowerCase()); }
+        // ROLE-SCOPED DASHBOARD / WORKFLOW
+        function normalizeWorkflowStatus(s) {
+            const v = String(s || '').toLowerCase().trim();
+            if (v === 'pending' || v === 'under_review') return 'submitted';
+            if (v === 'approved') return 'validated';
+            return v || 'draft';
+        }
+
+        function approvedStatus(s) {
+            return normalizeWorkflowStatus(s) === 'validated';
+        }
+
+        function pendingStatus(s) {
+            return [
+                'submitted',
+                'enumerator_check',
+                'field_officer_review',
+                'gis_compliance',
+                'final_validation'
+            ].includes(normalizeWorkflowStatus(s));
+        }
+
+        function correctionStatus(s) {
+            return ['rejected', 'correction_required', 'correction'].includes(
+                normalizeWorkflowStatus(s)
+            );
+        }
+
+        function workflowLabel(status) {
+            const labels = {
+                draft: 'Draft',
+                submitted: 'Submitted',
+                enumerator_check: 'Enumerator Self-Check',
+                field_officer_review: 'Field Officer Review',
+                gis_compliance: 'GIS / Compliance Review',
+                final_validation: 'Final Validation',
+                correction_required: 'Correction Required',
+                validated: 'Validated',
+                rejected: 'Rejected'
+            };
+            return labels[normalizeWorkflowStatus(status)] || normalizeWorkflowStatus(status);
+        }
+
+        function nextWorkflowState(status) {
+            const s = normalizeWorkflowStatus(status);
+            const next = {
+                submitted: 'enumerator_check',
+                enumerator_check: 'field_officer_review',
+                field_officer_review: 'gis_compliance',
+                gis_compliance: 'final_validation',
+                final_validation: 'validated',
+                correction_required: 'submitted'
+            };
+            return next[s] || null;
+        }
+
+        function roleCanAdvance(status, role) {
+            const s = normalizeWorkflowStatus(status);
+            if (['manager', 'owner', 'super_manager'].includes(role)) return !!nextWorkflowState(s);
+            if (role === 'enumerator') {
+                return ['submitted', 'correction_required'].includes(s);
+            }
+            if (role === 'field_officer') {
+                return ['submitted', 'enumerator_check', 'field_officer_review'].includes(s);
+            }
+            if (role === 'validator') {
+                return ['gis_compliance', 'final_validation'].includes(s);
+            }
+            return false;
+        }
 
         function roleVisibleFarms(allFarms) {
-            if (currentProjectRole === 'super_manager') return allFarms.filter(f => approvedStatus(f.status));
+            if (currentProjectRole === 'super_manager') {
+                return allFarms.filter(f => approvedStatus(f.status));
+            }
             return [...allFarms];
         }
 
@@ -1805,54 +1882,40 @@
             const states = await buildCurrentFarmStates(projectId);
 
             const totalFarms = states.length;
-            const totalArea = states.reduce(
-                (sum, f) => sum + Number(f.area || 0), 0
+            const totalArea = states.reduce((sum, f) => sum + Number(f.area || 0), 0);
+
+            const count = status => states.filter(
+                f => normalizeWorkflowStatus(f.current_submission_status) === status
             );
 
-            const approvedFarms = states.filter(
-                f => f.current_submission_status === 'approved'
-            );
+            const validated = count('validated');
+            const submitted = count('submitted');
+            const enumeratorCheck = count('enumerator_check');
+            const fieldOfficer = count('field_officer_review');
+            const gisCompliance = count('gis_compliance');
+            const finalValidation = count('final_validation');
+            const correction = count('correction_required');
+            const draft = count('draft');
 
-            const pendingValidation = states.filter(
-                f => ['submitted', 'under_review'].includes(f.current_submission_status)
-            );
-
-            const correctionRequired = states.filter(
-                f => f.current_submission_status === 'correction_required'
-            );
-
-            const draftFarms = states.filter(
-                f => f.current_submission_status === 'draft'
-            );
-
-            const submittedFarms = states.filter(
-                f => f.current_submission_status === 'submitted'
-            );
-
-            const approvedArea = approvedFarms.reduce(
-                (sum, f) => sum + Number(f.area || 0), 0
-            );
-
-            const pendingValidationArea = pendingValidation.reduce(
-                (sum, f) => sum + Number(f.area || 0), 0
-            );
-
-            const submittedArea = submittedFarms.reduce(
+            const area = list => list.reduce(
                 (sum, f) => sum + Number(f.area || 0), 0
             );
 
             return {
                 total_farms: totalFarms,
                 total_area_ha: totalArea,
-                approved_farms: approvedFarms.length,
-                approved_area_ha: approvedArea,
-                pending_farms: Math.max(0, totalFarms - approvedFarms.length),
-                pending_validation: pendingValidation.length,
-                pending_validation_area_ha: pendingValidationArea,
-                submitted_farms: submittedFarms.length,
-                submitted_area_ha: submittedArea,
-                correction_required: correctionRequired.length,
-                draft_farms: draftFarms.length
+                submitted_farms: submitted.length,
+                submitted_area_ha: area(submitted),
+                enumerator_check: enumeratorCheck.length,
+                field_officer_review: fieldOfficer.length,
+                gis_compliance: gisCompliance.length,
+                final_validation: finalValidation.length,
+                validated_farms: validated.length,
+                validated_area_ha: area(validated),
+                pending_farms: totalFarms - validated.length,
+                correction_required: correction.length,
+                correction_area_ha: area(correction),
+                draft_farms: draft.length
             };
         }
 
@@ -1945,6 +2008,24 @@
         }
 
         farmsData = farms;
+
+        // Always drive the dashboard from the latest submission per farm.
+        // This keeps farm totals stable while workflow counters move between states.
+        const currentStates = await buildCurrentFarmStates(projectId);
+        const stateByFarm = new Map(currentStates.map(f => [f.id, f]));
+
+        farmsData = farmsData.map(f => {
+            const state = stateByFarm.get(f.id);
+            return state ? {
+                ...f,
+                status: normalizeWorkflowStatus(state.current_submission_status || f.status),
+                submission_status: state.current_submission_status || f.submission_status || null,
+                submission_id: state.submission_id || f.submission_id || null,
+                media_url: state.media_url || null,
+                media_filename: state.media_filename || null,
+                current_submission: state.current_submission || null
+            } : f;
+        });
 
         filteredFarms = roleVisibleFarms(farmsData);
 
@@ -2459,7 +2540,7 @@
         function populateFilters() {
             const suppliers = [...new Set(farmsData.map(f => f.supplier).filter(Boolean))];
             const coops = [...new Set(farmsData.map(f => f.cooperative).filter(Boolean))];
-            const statuses = ['pending', 'validated', 'rejected'];
+            const statuses = ['submitted','enumerator_check','field_officer_review','gis_compliance','final_validation','correction_required','validated','rejected'];
             const supplierFilter = document.getElementById('supplierFilter');
             const cooperativeFilter = document.getElementById('cooperativeFilter');
             const statusFilter = document.getElementById('statusFilter');
@@ -2527,14 +2608,12 @@
                     <td><div class="action-buttons-group">
                         <button type="button" class="action-btn view" data-action="view" data-farm-id="${f.id}" title="View Details"><i class="fas fa-eye"></i></button>
                         <button type="button" class="action-btn farm-review-btn" data-action="review" data-farm-id="${f.id}" title="Farm Review" style="background:#2563eb;color:white;"><i class="fas fa-clipboard-check"></i></button>
-                        <button type="button" class="action-btn edit-btn" data-action="edit" data-farm-id="${f.id}" title="Edit Farm"><i class="fas fa-edit"></i></button>
                         <button type="button" class="action-btn map-btn-action" data-action="map" data-farm-id="${f.id}" title="View on Map"><i class="fas fa-map-marker-alt"></i></button>
                     </div></td>
                 </tr>`;
             }).join('');
             document.querySelectorAll('#tableBody [data-action="review"]').forEach(b => b.addEventListener('click', e => { e.preventDefault(); window.openFarmReview(b.dataset.farmId); }));
-            document.querySelectorAll('#tableBody [data-action="view"]').forEach(b => b.addEventListener('click', e => { e.preventDefault(); viewFarm(b.dataset.farmId); }));
-            document.querySelectorAll('#tableBody [data-action="edit"]').forEach(b => b.addEventListener('click', e => { e.preventDefault(); openEditModal(b.dataset.farmId); }));
+            document.querySelectorAll('#tableBody [data-action="view"]').forEach(b => b.addEventListener('click', e => { e.preventDefault(); viewFarm(b.dataset.farmId); })); openEditModal(b.dataset.farmId); }));
             document.querySelectorAll('#tableBody [data-action="map"]').forEach(b => b.addEventListener('click', e => { e.preventDefault(); redirectToMap(b.dataset.farmId); }));
             updatePagination();
         }
@@ -2543,13 +2622,20 @@
             const tbody = document.getElementById('pendingFarmTableBody');
             const countElement = document.getElementById('pendingReviewCount');
             if (!tbody) return;
+
             const pendingFarms = farmsData.filter(f => pendingStatus(f.status));
             if (countElement) countElement.textContent = pendingFarms.length;
+
             if (!pendingFarms.length) {
                 tbody.innerHTML = '<tr><td colspan="6"><div class="pending-empty"><i class="fas fa-check-circle"></i><div>No farms pending review</div></div></td></tr>';
                 return;
             }
-            const sorted = [...pendingFarms].sort((a,b) => new Date(b.created_at || b.submission_date || 0) - new Date(a.created_at || a.submission_date || 0));
+
+            const sorted = [...pendingFarms].sort((a,b) =>
+                new Date(b.created_at || b.submission_date || 0) -
+                new Date(a.created_at || a.submission_date || 0)
+            );
+
             tbody.innerHTML = sorted.map(f => {
                 const d = f.created_at || f.submission_date;
                 return `<tr>
@@ -2557,15 +2643,31 @@
                     <td><strong>${escapeHtml(f.farmer_name || 'Unknown')}</strong></td>
                     <td>${escapeHtml(f.cooperative || 'Unassigned')}</td>
                     <td>${(Number(f.area) || 0).toFixed(2)} ha</td>
-                    <td>${d ? new Date(d).toLocaleDateString() : '-'}</td>
+                    <td>
+                        <span class="status-badge ${escapeHtml(normalizeWorkflowStatus(f.status))}">
+                            ${escapeHtml(workflowLabel(f.status))}
+                        </span>
+                    </td>
                     <td><div class="pending-action-group">
                         <button type="button" class="pending-review-btn pending-review-action" data-farm-id="${f.id}" title="Review Farm"><i class="fas fa-clipboard-check"></i></button>
                         <button type="button" class="pending-map-btn pending-map-action" data-farm-id="${f.id}" title="View on Map"><i class="fas fa-map-marker-alt"></i></button>
                     </div></td>
                 </tr>`;
             }).join('');
-            document.querySelectorAll('.pending-review-action').forEach(b => b.addEventListener('click', e => { e.preventDefault(); window.openFarmReview(b.dataset.farmId); }));
-            document.querySelectorAll('.pending-map-action').forEach(b => b.addEventListener('click', e => { e.preventDefault(); redirectToMap(b.dataset.farmId); }));
+
+            document.querySelectorAll('.pending-review-action').forEach(b =>
+                b.addEventListener('click', e => {
+                    e.preventDefault();
+                    window.openFarmReview(b.dataset.farmId);
+                })
+            );
+
+            document.querySelectorAll('.pending-map-action').forEach(b =>
+                b.addEventListener('click', e => {
+                    e.preventDefault();
+                    redirectToMap(b.dataset.farmId);
+                })
+            );
         }
 
         function updatePagination() {
@@ -2583,49 +2685,172 @@
         }
 
         // ============================================
-        // FARM REVIEW
+        // FARM REVIEW / WORKFLOW
         // ============================================
+
+        let currentReviewFarmId = null;
+        let currentReviewSubmissionId = null;
+
         async function openFarmReview(farmId) {
             const modal = document.getElementById('farmReviewModal');
             const content = document.getElementById('farmReviewContent');
-            if (!modal || !content) { console.error('❌ Farm Review modal not found'); return; }
+            if (!modal || !content) {
+                console.error('❌ Farm Review modal not found');
+                return;
+            }
+
+            currentReviewFarmId = farmId;
+            currentReviewSubmissionId = null;
             modal.classList.add('show');
             content.innerHTML = '<div style="text-align:center;padding:50px;color:#64748b;"><i class="fas fa-spinner fa-spin fa-2x"></i><p style="margin-top:15px;">Loading farm review...</p></div>';
-            let imageBlobUrl = null;
+
             try {
                 const farm = farmsData.find(f => f.id === farmId);
                 if (!farm) throw new Error('Farm not found: ' + farmId);
-                const { data: submission, error } = await supabaseClient.from('submissions').select(`id,farm_id,farmer_id,farmer_name,status,media_filename,media_url,created_at,submitted_at`).eq('farm_id', farmId).order('created_at', { ascending:false }).limit(1).maybeSingle();
+
+                const { data: submission, error } = await supabaseClient
+                    .from('submissions')
+                    .select(`id,farm_id,farmer_id,farmer_name,status,media_filename,media_url,created_at,submitted_at`)
+                    .eq('farm_id', farmId)
+                    .order('created_at', { ascending:false })
+                    .limit(1)
+                    .maybeSingle();
+
                 if (error) throw error;
+
+                currentReviewSubmissionId = submission?.id || null;
+                const status = normalizeWorkflowStatus(submission?.status || farm.status);
+                const submissionDate = submission?.submitted_at || submission?.created_at || farm.created_at;
+
+                // Image is OPTIONAL. It is evidence only and never blocks workflow progression.
+                let imageHtml = `<div class="farm-review-photo"><i class="fas fa-image fa-2x" style="color:#94a3b8;"></i><p style="margin-top:10px;color:#64748b;">No farm photo provided — this does not prevent review.</p></div>`;
+
                 if (submission?.media_url) {
                     try {
-                        const response = await fetch(`${SUPABASE_URL}/functions/v1/kobo-media-proxy`, { method:'POST', headers:{'Content-Type':'application/json','apikey':SUPABASE_ANON_KEY,'Authorization':`Bearer ${SUPABASE_ANON_KEY}`}, body:JSON.stringify({url:submission.media_url}) });
+                        console.log('📷 Loading optional image through Kobo proxy...');
+                        const response = await fetch(`${SUPABASE_URL}/functions/v1/kobo-media-proxy`, {
+                            method:'POST',
+                            headers:{
+                                'Content-Type':'application/json',
+                                'apikey':SUPABASE_ANON_KEY,
+                                'Authorization':`Bearer ${SUPABASE_ANON_KEY}`
+                            },
+                            body:JSON.stringify({url:submission.media_url})
+                        });
                         if (!response.ok) throw new Error(`Media proxy returned ${response.status}`);
-                        imageBlobUrl = URL.createObjectURL(await response.blob());
-                    } catch (imageError) { console.error('❌ Failed to load farm image:', imageError); }
+                        const blob = await response.blob();
+                        const imageBlobUrl = URL.createObjectURL(blob);
+                        imageHtml = `<div class="farm-review-photo"><h4><i class="fas fa-camera"></i> Farm Photo <span style="font-size:11px;color:#64748b;font-weight:400;">(optional evidence)</span></h4><img src="${imageBlobUrl}" alt="Farm photo"><div style="margin-top:10px;color:#64748b;font-size:11px;">${escapeHtml(submission.media_filename || farm.media || 'Farm photo')}</div></div>`;
+                        console.log('✅ Optional farm image loaded:', blob.type, blob.size, 'bytes');
+                    } catch (imageError) {
+                        console.error('❌ Optional farm image could not be loaded:', imageError);
+                    }
                 }
-                const imageHtml = imageBlobUrl ? `<div class="farm-review-photo"><h4><i class="fas fa-camera"></i> Farm Photo</h4><img src="${imageBlobUrl}" alt="Farm photo"><div style="margin-top:10px;color:#64748b;font-size:11px;">${escapeHtml(submission.media_filename || farm.media || 'Farm photo')}</div></div>` : `<div class="farm-review-photo"><i class="fas fa-image fa-2x" style="color:#94a3b8;"></i><p style="margin-top:10px;color:#64748b;">No farm photo available</p></div>`;
-                const status = submission?.status || farm.status || 'pending';
-                const submissionDate = submission?.submitted_at || submission?.created_at || farm.created_at;
-                content.innerHTML = `<div class="farm-review-grid">
-                    <div class="farm-review-card"><div class="farm-review-card-label">Farmer</div><div class="farm-review-card-value">${escapeHtml(farm.farmer_name || 'Unknown')}</div></div>
-                    <div class="farm-review-card"><div class="farm-review-card-label">Farmer ID</div><div class="farm-review-card-value">${escapeHtml(farm.farmer_id || '-')}</div></div>
-                    <div class="farm-review-card"><div class="farm-review-card-label">Cooperative</div><div class="farm-review-card-value">${escapeHtml(farm.cooperative || 'Unassigned')}</div></div>
-                    <div class="farm-review-card"><div class="farm-review-card-label">Area</div><div class="farm-review-card-value">${(Number(farm.area)||0).toFixed(2)} ha</div></div>
-                    <div class="farm-review-card"><div class="farm-review-card-label">Status</div><div><span class="status-badge ${escapeHtml(status)}">${escapeHtml(status)}</span></div></div>
-                    <div class="farm-review-card"><div class="farm-review-card-label">Enumerator</div><div class="farm-review-card-value">${escapeHtml(farm.enumerator || '-')}</div></div>
-                    <div class="farm-review-card"><div class="farm-review-card-label">Submission</div><div class="farm-review-card-value">${submissionDate ? new Date(submissionDate).toLocaleDateString() : '-'}</div></div>
-                    <div class="farm-review-card"><div class="farm-review-card-label">Farm ID</div><div class="farm-review-card-value">${escapeHtml(farm.id)}</div></div>
-                </div>${imageHtml}`;
+
+                const canAdvance = roleCanAdvance(status, currentProjectRole) && !!currentReviewSubmissionId;
+                const nextState = nextWorkflowState(status);
+                const nextLabel = nextState ? workflowLabel(nextState) : 'Next State';
+
+                content.innerHTML = `
+                    <div class="farm-review-grid">
+                        <div class="farm-review-card"><div class="farm-review-card-label">Farmer</div><div class="farm-review-card-value">${escapeHtml(farm.farmer_name || 'Unknown')}</div></div>
+                        <div class="farm-review-card"><div class="farm-review-card-label">Farmer ID</div><div class="farm-review-card-value">${escapeHtml(farm.farmer_id || '-')}</div></div>
+                        <div class="farm-review-card"><div class="farm-review-card-label">Cooperative</div><div class="farm-review-card-value">${escapeHtml(farm.cooperative || 'Unassigned')}</div></div>
+                        <div class="farm-review-card"><div class="farm-review-card-label">Area</div><div class="farm-review-card-value">${(Number(farm.area)||0).toFixed(2)} ha</div></div>
+                        <div class="farm-review-card"><div class="farm-review-card-label">Current Workflow State</div><div><span class="status-badge ${escapeHtml(status)}">${escapeHtml(workflowLabel(status))}</span></div></div>
+                        <div class="farm-review-card"><div class="farm-review-card-label">Enumerator</div><div class="farm-review-card-value">${escapeHtml(farm.enumerator || '-')}</div></div>
+                        <div class="farm-review-card"><div class="farm-review-card-label">Submission Date</div><div class="farm-review-card-value">${submissionDate ? new Date(submissionDate).toLocaleDateString() : '-'}</div></div>
+                        <div class="farm-review-card"><div class="farm-review-card-label">Farm ID</div><div class="farm-review-card-value">${escapeHtml(farm.id)}</div></div>
+                    </div>
+
+                    ${imageHtml}
+
+                    <div id="farmReviewDecision" style="margin-top:20px;border-top:1px solid #e2e8f0;padding-top:20px;">
+                        <h4 style="margin:0 0 12px;color:#1e293b;"><i class="fas fa-route"></i> Workflow Decision</h4>
+                        <p style="font-size:13px;color:#64748b;margin:0 0 12px;">${canAdvance ? `Passing this review will move the farm to <strong>${escapeHtml(nextLabel)}</strong>.` : 'This role cannot advance this farm from the current state.'}</p>
+                        <textarea id="farmReviewComment" placeholder="Review comment (optional for pass; required for correction/rejection)" style="width:100%;min-height:80px;padding:12px;border:1px solid #cbd5e1;border-radius:8px;resize:vertical;box-sizing:border-box;"></textarea>
+                        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;">
+                            ${canAdvance ? `<button type="button" id="advanceFarmBtn" style="background:#16a34a;color:white;border:0;border-radius:8px;padding:10px 16px;cursor:pointer;"><i class="fas fa-arrow-right"></i> Pass → ${escapeHtml(nextLabel)}</button>` : ''}
+                            ${currentReviewSubmissionId && !['validated','rejected'].includes(status) ? `<button type="button" id="correctionFarmBtn" style="background:#d97706;color:white;border:0;border-radius:8px;padding:10px 16px;cursor:pointer;"><i class="fas fa-undo"></i> Request Correction</button><button type="button" id="rejectFarmBtn" style="background:#dc2626;color:white;border:0;border-radius:8px;padding:10px 16px;cursor:pointer;"><i class="fas fa-times"></i> Reject</button>` : ''}
+                        </div>
+                        <div id="farmReviewDecisionMessage" style="margin-top:12px;font-size:13px;"></div>
+                    </div>`;
+
+                const advanceBtn = document.getElementById('advanceFarmBtn');
+                const correctionBtn = document.getElementById('correctionFarmBtn');
+                const rejectBtn = document.getElementById('rejectFarmBtn');
+
+                if (advanceBtn) advanceBtn.onclick = () => saveFarmReviewDecision(nextState);
+                if (correctionBtn) correctionBtn.onclick = () => saveFarmReviewDecision('correction_required');
+                if (rejectBtn) rejectBtn.onclick = () => saveFarmReviewDecision('rejected');
+
             } catch (error) {
                 console.error('❌ Farm Review error:', error);
                 content.innerHTML = `<div style="padding:40px;text-align:center;color:#dc2626;"><i class="fas fa-exclamation-triangle fa-2x"></i><p style="margin-top:15px;font-weight:600;">Failed to load farm review.</p><small>${escapeHtml(error.message || 'Unknown error')}</small></div>`;
             }
         }
 
+        async function saveFarmReviewDecision(decision) {
+            if (!currentReviewSubmissionId) {
+                showNotification('No submission selected for review.', 'error');
+                return;
+            }
+
+            const comment = document.getElementById('farmReviewComment')?.value.trim() || '';
+
+            if ((decision === 'rejected' || decision === 'correction_required') && !comment) {
+                setReviewMessage('Please add a comment for correction or rejection.', 'error');
+                return;
+            }
+
+            const buttons = ['advanceFarmBtn','correctionFarmBtn','rejectFarmBtn']
+                .map(id => document.getElementById(id)).filter(Boolean);
+            buttons.forEach(b => b.disabled = true);
+
+            try {
+                const payload = { status: decision };
+                if (decision === 'validated') payload.validated_at = new Date().toISOString();
+
+                const { error } = await supabaseClient
+                    .from('submissions')
+                    .update(payload)
+                    .eq('id', currentReviewSubmissionId);
+
+                if (error) throw error;
+
+                console.log('✅ Workflow state updated:', {
+                    farm_id: currentReviewFarmId,
+                    submission_id: currentReviewSubmissionId,
+                    decision,
+                    comment
+                });
+
+                showNotification(`Farm moved to ${workflowLabel(decision)}`, 'success');
+                await loadProjectData(currentProject.id);
+                closeFarmReview();
+
+            } catch (error) {
+                console.error('❌ Failed to update workflow state:', error);
+                setReviewMessage(error.message || 'Unable to update workflow state.', 'error');
+                buttons.forEach(b => b.disabled = false);
+            }
+        }
+
+        function setReviewMessage(message, type='info') {
+            const el = document.getElementById('farmReviewDecisionMessage');
+            if (!el) return;
+            el.textContent = message;
+            el.style.cssText = `margin-top:12px;padding:10px;border-radius:8px;font-size:13px;color:${type==='error'?'#991b1b':'#166534'};background:${type==='error'?'#fee2e2':'#dcfce7'};`;
+        }
+
         function closeFarmReview() {
             const modal = document.getElementById('farmReviewModal');
-            if (modal) { modal.classList.remove('show'); modal.classList.remove('active'); }
+            if (modal) {
+                modal.classList.remove('show');
+                modal.classList.remove('active');
+            }
+            currentReviewFarmId = null;
+            currentReviewSubmissionId = null;
         }
 
         window.openFarmReview = openFarmReview;
@@ -2635,33 +2860,64 @@
         // UI FUNCTIONS
         // ============================================
         function updateKPIs() {
-            const area = fs => fs.reduce((s,f)=>s+(Number(f.area)||0),0);
+            const area = list => list.reduce((sum, f) => sum + (Number(f.area) || 0), 0);
+            const states = farmsData;
+            const submitted = states.filter(f => normalizeWorkflowStatus(f.status) === 'submitted');
+            const enumeratorCheck = states.filter(f => normalizeWorkflowStatus(f.status) === 'enumerator_check');
+            const fieldOfficer = states.filter(f => normalizeWorkflowStatus(f.status) === 'field_officer_review');
+            const gis = states.filter(f => normalizeWorkflowStatus(f.status) === 'gis_compliance');
+            const finalValidation = states.filter(f => normalizeWorkflowStatus(f.status) === 'final_validation');
+            const validated = states.filter(f => approvedStatus(f.status));
+            const corrections = states.filter(f => correctionStatus(f.status));
+            const drafts = states.filter(f => normalizeWorkflowStatus(f.status) === 'draft');
+
             let labels, values;
+
             switch (currentProjectRole) {
                 case 'enumerator':
-                    labels=['Farms Mapped','Mapped Area (ha)','Draft Farms','Quality Alerts'];
-                    values=[farmsData.length,area(farmsData),farmsData.filter(f=>String(f.status||'').toLowerCase()==='draft').length,overlapAlerts.length+qualityAlerts.length]; break;
+                    labels = ['Farms Mapped', 'Mapped Area (ha)', 'Self-Check Queue', 'Quality Alerts'];
+                    values = [states.length, area(states), submitted.length + enumeratorCheck.length, overlapAlerts.length + qualityAlerts.length];
+                    break;
+
                 case 'field_officer':
-                    labels=['Farms Submitted','Submitted Area (ha)','Pending Corrections','Quality Alerts'];
-                    values=[farmsData.length,area(farmsData),farmsData.filter(f=>correctionStatus(f.status)).length,overlapAlerts.length+qualityAlerts.length]; break;
+                    labels = ['Farms Submitted', 'Submitted Area (ha)', 'Pending Corrections', 'Quality Alerts'];
+                    values = [states.length, area(states), corrections.length, overlapAlerts.length + qualityAlerts.length];
+                    break;
+
                 case 'validator':
-                    labels=['Pending Validation','Area Under Validation (ha)','Approved Farms','Correction Required'];
-                    values=[farmsData.filter(f=>pendingStatus(f.status)).length,area(farmsData.filter(f=>pendingStatus(f.status))),farmsData.filter(f=>approvedStatus(f.status)).length,farmsData.filter(f=>correctionStatus(f.status)).length]; break;
+                    labels = ['Pending Validation', 'Area Under Validation (ha)', 'Validated Farms', 'Correction Required'];
+                    values = [gis.length + finalValidation.length, area([...gis, ...finalValidation]), validated.length, corrections.length];
+                    break;
+
                 case 'super_manager':
-                    labels=['Approved Farms','Approved Area (ha)','Pending Farms','Quality Alerts'];
-                    values=[farmsData.filter(f=>approvedStatus(f.status)).length,area(farmsData.filter(f=>approvedStatus(f.status))),farmsData.filter(f=>!approvedStatus(f.status)).length,overlapAlerts.length+qualityAlerts.length]; break;
+                    labels = ['Validated Farms', 'Validated Area (ha)', 'Pending Farms', 'Quality Alerts'];
+                    values = [validated.length, area(validated), states.length - validated.length, overlapAlerts.length + qualityAlerts.length];
+                    break;
+
                 case 'manager':
                 case 'owner':
-                    labels=['Total Farms','Total Area (ha)','Pending Validation','Quality Alerts'];
-                    values=[farmsData.length,area(farmsData),farmsData.filter(f=>pendingStatus(f.status)).length,overlapAlerts.length+qualityAlerts.length]; break;
+                    labels = ['Farms Submitted', 'Total Area (ha)', 'Pending Review', 'Validated Farms'];
+                    values = [states.length, area(states), states.filter(f => pendingStatus(f.status)).length, validated.length];
+                    break;
+
                 default:
-                    labels=['Farms Visible','Visible Area (ha)','Approved Farms','Quality Alerts'];
-                    values=[farmsData.length,area(farmsData),farmsData.filter(f=>approvedStatus(f.status)).length,overlapAlerts.length+qualityAlerts.length];
+                    labels = ['Farms Visible', 'Visible Area (ha)', 'Validated Farms', 'Quality Alerts'];
+                    values = [states.length, area(states), validated.length, overlapAlerts.length + qualityAlerts.length];
             }
-            const cards=document.querySelectorAll('.kpi');
-            labels.forEach((label,i)=>{ cards[i]?.querySelector('h4') && (cards[i].querySelector('h4').textContent=label); if(cards[i]?.querySelector('.kpi-value')) cards[i].querySelector('.kpi-value').textContent=i===1?Number(values[i]||0).toFixed(1):values[i]||0; });
-            document.getElementById('mapFarmsCount').textContent=filteredFarms.length;
-            document.getElementById('mapTotalArea').textContent=area(filteredFarms).toFixed(1)+' ha';
+
+            const cards = document.querySelectorAll('.kpi');
+            labels.forEach((label, i) => {
+                if (cards[i]?.querySelector('h4')) cards[i].querySelector('h4').textContent = label;
+                if (cards[i]?.querySelector('.kpi-value')) {
+                    cards[i].querySelector('.kpi-value').textContent =
+                        i === 1 ? Number(values[i] || 0).toFixed(1) : (values[i] || 0);
+                }
+            });
+
+            const mapCount = document.getElementById('mapFarmsCount');
+            const mapArea = document.getElementById('mapTotalArea');
+            if (mapCount) mapCount.textContent = filteredFarms.length;
+            if (mapArea) mapArea.textContent = area(filteredFarms).toFixed(1) + ' ha';
         }
 
 
@@ -2765,8 +3021,6 @@
         window.dismissQualityAlerts = dismissQualityAlerts;
         window.toggleCooperativeStats = toggleCooperativeStats;
         window.updatePendingReview = updatePendingReview;
-        window.openEditModal = openEditModal;
-        window.closeEditModal = closeEditModal;
         window.redirectToMap = redirectToMap;
         window.viewFarm = viewFarm;
         window.clearAllProtectedAreas = clearAllProtectedAreas;
