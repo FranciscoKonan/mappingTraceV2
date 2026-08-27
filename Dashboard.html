@@ -1670,7 +1670,7 @@
         async function buildCurrentFarmStates(projectId) {
             const { data: submissions, error } = await supabaseClient
                 .from('submissions')
-                .select('id,farm_id,status,validated_at,created_at,updated_at')
+                .select('id,farm_id,status,validated_at,created_at,updated_at,media_filename,media_url')
                 .eq('project_id', projectId);
 
             if (error) {
