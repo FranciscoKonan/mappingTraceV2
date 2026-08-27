@@ -113,35 +113,21 @@
 
             <!-- SUBMISSIONS CONTENT -->
             <div class="submissions-container">
-                <!-- Stats Cards -->
-                <div class="stats-grid">
-                    <div class="stat-card total">
-                        <div class="stat-icon"><i class="fas fa-clipboard-list"></i></div>
-                        <div class="stat-info">
-                            <h4>Total Submissions</h4>
-                            <div class="stat-value" id="totalSubmissions">0</div>
+                <!-- Operational Workflow Dashboard -->
+                <div class="workflow-section">
+                    <div class="workflow-heading">
+                        <div>
+                            <h3><i class="fas fa-route"></i> Review Queue</h3>
+                            <p>Operational work queue. Overall KPIs remain on the main Dashboard.</p>
                         </div>
                     </div>
-                    <div class="stat-card validated">
-                        <div class="stat-icon"><i class="fas fa-check-circle"></i></div>
-                        <div class="stat-info">
-                            <h4>Validated</h4>
-                            <div class="stat-value" id="validatedCount">0</div>
-                        </div>
-                    </div>
-                    <div class="stat-card pending">
-                        <div class="stat-icon"><i class="fas fa-clock"></i></div>
-                        <div class="stat-info">
-                            <h4>Pending</h4>
-                            <div class="stat-value" id="pendingCount">0</div>
-                        </div>
-                    </div>
-                    <div class="stat-card rejected">
-                        <div class="stat-icon"><i class="fas fa-times-circle"></i></div>
-                        <div class="stat-info">
-                            <h4>Rejected</h4>
-                            <div class="stat-value" id="rejectedCount">0</div>
-                        </div>
+                    <div class="workflow-grid">
+                        <div class="workflow-card"><span>To Self-Check</span><strong id="selfCheckCount">0</strong><small>Enumerator / FO takeover</small></div>
+                        <div class="workflow-card"><span>Field Officer Review</span><strong id="fieldOfficerCount">0</strong><small>Waiting for FO review</small></div>
+                        <div class="workflow-card"><span>GIS / Compliance</span><strong id="gisCount">0</strong><small>Waiting for GIS check</small></div>
+                        <div class="workflow-card"><span>Final Validation</span><strong id="finalCount">0</strong><small>Ready for final decision</small></div>
+                        <div class="workflow-card"><span>Corrections</span><strong id="correctionCount">0</strong><small>Returned for correction</small></div>
+                        <div class="workflow-card"><span>Duplicate Alerts</span><strong id="duplicateCount">0</strong><small>Code / exact geometry</small></div>
                     </div>
                 </div>
 
@@ -158,11 +144,15 @@
                         </select>
                     </div>
                     <div class="filter-group">
-                        <label>Status</label>
+                        <label>Workflow</label>
                         <select id="statusFilter" class="filter-select">
-                            <option value="all">All Status</option>
+                            <option value="all">All Workflow States</option>
+                            <option value="enumerator_review">To Self-Check</option>
+                            <option value="field_officer_review">Field Officer Review</option>
+                            <option value="gis_compliance_review">GIS / Compliance</option>
+                            <option value="final_validation">Final Validation</option>
+                            <option value="correction_required">Correction Required</option>
                             <option value="validated">Validated</option>
-                            <option value="pending">Pending</option>
                             <option value="rejected">Rejected</option>
                         </select>
                     </div>
@@ -189,7 +179,7 @@
                                     <th onclick="window.sortTable('supplier')">Supplier <i class="fas fa-sort"></i></th>
                                     <th onclick="window.sortTable('area')">Area (ha) <i class="fas fa-sort"></i></th>
                                     <th onclick="window.sortTable('created_at')">Date <i class="fas fa-sort"></i></th>
-                                    <th onclick="window.sortTable('status')">Status <i class="fas fa-sort"></i></th>
+                                    <th onclick="window.sortTable('workflow_state')">Workflow <i class="fas fa-sort"></i></th>
                                     <th>Actions</th>
                                 </tr>
                             </thead>
