@@ -1776,43 +1776,134 @@
         }
 
         async function loadProjectData(projectId) {
-            showLoading(true);
-            try {
-                console.log('📊 Loading project data for:', projectId);
-                const { data: farms, error } = await supabaseClient
-                    .from('farms')
-                    .select('*')
-                    .eq('project_id', projectId);
-                
-                if (error) throw error;
-                
-                farmsData = farms || [];
-                filteredFarms = roleVisibleFarms(farmsData);
-                console.log('✅ Loaded farms:', farmsData.length);
+    showLoading(true);
 
-            window.currentRoleKPIs = await calculateRoleKPIs(projectId);
-            console.log('📊 Current farm-state KPIs:', window.currentRoleKPIs);
+    try {
+        console.log('📊 Loading project data for:', projectId);
 
-                
-                document.getElementById('submissionBadge').textContent = farmsData.length;
-                
-                await loadProtectedAreas();
-                updateKPIs();
-                updateCooperativeStats();
-                updateTable();
-                if (!mapInitialized) { initMap(); }
-                updateMap();
-                await checkOverlaps();
-                checkQualityAlerts();
-                updateAlertsUI();
-                populateFilters();
-            } catch (error) {
-                console.error('❌ Error loading project data:', error);
-                showNotification('Error loading data: ' + error.message, 'error');
-            }
-            showLoading(false);
-            document.querySelector('.header-title h1').innerHTML = `Dashboard <span style="font-size:14px; background:#e2e8f0; padding:2px 10px; border-radius:20px;">${currentProject?.name || 'Loading...'}</span>`;
+        let farms;
+
+        // FIELD OFFICER → load only assigned farms
+        if (currentProjectRole === 'field_officer') {
+
+            console.log('👷 Loading assigned farms for Field Officer...');
+
+            const { data, error } = await supabaseClient.rpc(
+                'get_my_assigned_farms',
+                {
+                    p_project_id: projectId,
+                    p_status: null
+                }
+            );
+
+            if (error) throw error;
+
+            farms = (data || []).map(f => ({
+                id: f.farm_id,
+                farm_id: f.farm_id,
+                project_id: f.project_id,
+
+                farmer_id: f.farmer_id,
+                farmer_name: f.farmer_name,
+                cooperative: f.cooperative,
+                supplier: f.supplier,
+                enumerator: f.enumerator,
+
+                area: f.area,
+                geometry: f.geometry,
+
+                // Normalized workflow status
+                status: f.submission_status || f.farm_status,
+
+                submission_status: f.submission_status,
+                submission_id: f.submission_id,
+                media: f.media,
+
+                created_at: f.submission_date,
+
+                correction_reason: f.correction_reason,
+                correction_requested_at: f.correction_requested_at,
+
+                validated_by: f.validated_by,
+                validated_at: f.validated_at
+            }));
+
+            console.log(
+                '👷 Assigned farms loaded:',
+                farms.length
+            );
+
+        } else {
+
+            // EXISTING BEHAVIOR FOR OTHER ROLES
+            const { data, error } = await supabaseClient
+                .from('farms')
+                .select('*')
+                .eq('project_id', projectId);
+
+            if (error) throw error;
+
+            farms = data || [];
+
+            console.log(
+                '✅ Loaded farms:',
+                farms.length
+            );
         }
+
+        farmsData = farms;
+
+        filteredFarms = roleVisibleFarms(farmsData);
+
+        window.currentRoleKPIs =
+            await calculateRoleKPIs(projectId);
+
+        console.log(
+            '📊 Current farm-state KPIs:',
+            window.currentRoleKPIs
+        );
+
+        document.getElementById('submissionBadge').textContent =
+            farmsData.length;
+
+        await loadProtectedAreas();
+
+        updateKPIs();
+        updateCooperativeStats();
+        updateTable();
+
+        if (!mapInitialized) {
+            initMap();
+        }
+
+        updateMap();
+
+        await checkOverlaps();
+
+        checkQualityAlerts();
+        updateAlertsUI();
+        populateFilters();
+
+    } catch (error) {
+
+        console.error(
+            '❌ Error loading project data:',
+            error
+        );
+
+        showNotification(
+            'Error loading data: ' + error.message,
+            'error'
+        );
+    }
+
+    showLoading(false);
+
+    document.querySelector(
+        '.header-title h1'
+    ).innerHTML =
+        `Dashboard <span style="font-size:14px; background:#e2e8f0; padding:2px 10px; border-radius:20px;">${currentProject?.name || 'Loading...'}</span>`;
+}
 
         async function loadAllProjectsData() {
             showLoading(true);
