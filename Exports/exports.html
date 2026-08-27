@@ -229,6 +229,22 @@
                         </div>
                     </div>
 
+                    <!-- Advanced Filters -->
+                    <div class="advanced-filters-section">
+                        <div class="advanced-toggle-row">
+                            <div><h3><i class="fas fa-sliders-h"></i> Advanced Filters</h3><p class="panel-subtitle">Use these controls for audit, quality and workload analysis.</p></div>
+                            <button class="btn-secondary" id="advancedToggleBtn"><i class="fas fa-chevron-down"></i> Show advanced filters</button>
+                        </div>
+                        <div class="advanced-filters hidden" id="advancedFilters">
+                            <div class="advanced-grid">
+                                <div class="advanced-field"><label>Workflow date basis</label><select id="dateBasis"><option value="created_at">Mapping / submission date</option><option value="updated_at">Last update</option><option value="validated_at">Validation date</option><option value="rejected_at">Rejection date</option></select></div>
+                                <div class="advanced-field"><label>Minimum area (ha)</label><input id="areaMin" type="number" min="0" step="0.01" placeholder="No minimum"></div>
+                                <div class="advanced-field"><label>Maximum area (ha)</label><input id="areaMax" type="number" min="0" step="0.01" placeholder="No maximum"></div>
+                                <div class="advanced-field"><label>Quality condition</label><select id="qualityFilter"><option value="all">All records</option><option value="missing_geometry">Missing geometry</option><option value="rejection_reason">Has rejection reason</option><option value="correction_required">Correction required</option></select></div>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Format -->
                     <div class="format-section">
                         <div class="format-heading">
@@ -253,6 +269,7 @@
                             <div class="performance-tabs">
                                 <button class="performance-tab active" data-tab="enumerators">Enumerators</button>
                                 <button class="performance-tab" data-tab="cooperatives">Cooperatives</button>
+                                <button class="performance-tab" data-tab="workflow">Workflow</button>
                             </div>
                         </div>
 
@@ -275,6 +292,16 @@
                                 <tbody id="cooperativePerformanceBody"></tbody>
                             </table>
                         </div>
+                    </div>
+
+                    <!-- Performance Highlights -->
+                    <div class="performance-highlights">
+                        <div><span>Top validation rate</span><strong id="topPerformer">—</strong></div>
+                        <div><span>Highest workload</span><strong id="highestWorkload">—</strong></div>
+                        <div><span>Highest correction rate</span><strong id="highestCorrection">—</strong></div>
+                    </div>
+                    <div class="performance-table-wrap hidden" id="workflowPerformance">
+                        <table class="performance-table"><thead><tr><th>Workflow Stage</th><th>Farms</th><th>Area (ha)</th></tr></thead><tbody id="workflowPerformanceBody"></tbody></table>
                     </div>
 
                     <!-- Summary -->
@@ -321,9 +348,17 @@
                     </div>
                 </div>
 
+                <!-- Audit Tools -->
+                <div class="audit-tools-section">
+                    <div class="section-title-row">
+                        <div><h3><i class="fas fa-shield-alt"></i> Audit Tools</h3><p class="panel-subtitle">Rejected records remain exportable for audit and corrective-action review.</p></div>
+                        <button class="btn-secondary" id="rejectedAuditBtn"><i class="fas fa-file-signature"></i> Export Rejected Audit</button>
+                    </div>
+                </div>
+
                 <!-- Export History -->
                 <div class="history-section">
-                    <h3><i class="fas fa-history"></i> Recent Exports</h3>
+                    <div class="history-title"><h3><i class="fas fa-history"></i> Recent Exports</h3><button class="btn-link" id="refreshHistoryBtn">Refresh</button></div>
                     <div class="history-list" id="historyList">
                         <div class="empty-history">
                             <i class="fas fa-box-open"></i>
