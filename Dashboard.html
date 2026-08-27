@@ -2722,6 +2722,17 @@ async function openFarmReview(farmId) {
 
 window.openFarmReview = openFarmReview;
 
+function closeFarmReview() {
+    const modal = document.getElementById('farmReviewModal');
+
+    if (modal) {
+        modal.classList.remove('show');
+        modal.classList.remove('active');
+    }
+}
+
+window.closeFarmReview = closeFarmReview;
+        
         // ============================================
         // UI FUNCTIONS
         // ============================================
