@@ -2456,11 +2456,38 @@
                         <td>${new Date(f.created_at).toLocaleDateString()}</td>
                         <td><span class="status-badge ${f.status || 'pending'}">${f.status || 'pending'}</span>${hasOverlap ? ' <span class="overlap-badge">⚠️</span>' : ''}</td>
                         <td>
-                            <div class="action-buttons-group">
-                                <button class="action-btn view" onclick="viewFarm('${f.id}')" title="View Details"><i class="fas fa-eye"></i></button>
-                                <button class="action-btn edit-btn" onclick="openEditModal('${f.id}')" title="Edit Farm"><i class="fas fa-edit"></i></button>
-                                <button class="action-btn map-btn-action" onclick="redirectToMap('${f.id}')" title="View on Map"><i class="fas fa-map-marker-alt"></i></button>
-                            </div>
+                        <div class="action-buttons-group">
+                        
+                            <button
+                                class="action-btn view"
+                                onclick="viewFarm('${f.id}')"
+                                title="View Details">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        
+                            <button
+                                class="action-btn"
+                                onclick="openFarmReview('${f.id}')"
+                                title="Farm Review"
+                                style="background:#2563eb;color:white;">
+                                <i class="fas fa-clipboard-check"></i>
+                            </button>
+                        
+                            <button
+                                class="action-btn edit-btn"
+                                onclick="openEditModal('${f.id}')"
+                                title="Edit Farm">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                        
+                            <button
+                                class="action-btn map-btn-action"
+                                onclick="redirectToMap('${f.id}')"
+                                title="View on Map">
+                                <i class="fas fa-map-marker-alt"></i>
+                            </button>
+                        
+                        </div>
                         </td>
                     </tr>
                 `;
