@@ -1670,23 +1670,32 @@
         async function buildCurrentFarmStates(projectId) {
             const { data: submissions, error } = await supabaseClient
                 .from('submissions')
-                .select('id,farm_id,status,validated_at,created_at,updated_at,media_filename,media_url')
+                .select(`
+                    id,
+                    farm_id,
+                    status,
+                    validated_at,
+                    created_at,
+                    updated_at,
+                    media_filename,
+                    media_url
+                `)
                 .eq('project_id', projectId);
-
+        
             if (error) {
                 console.error('❌ Error loading submissions for KPI state:', error);
                 throw error;
             }
-
+        
             const latestByFarm = new Map();
-
+        
             (submissions || []).forEach(s => {
                 const existing = latestByFarm.get(s.farm_id);
-
+        
                 const sTime = new Date(
                     s.validated_at || s.updated_at || s.created_at || 0
                 ).getTime();
-
+        
                 const eTime = existing
                     ? new Date(
                         existing.validated_at ||
@@ -1695,17 +1704,33 @@
                         0
                     ).getTime()
                     : -1;
-
+        
                 if (!existing || sTime >= eTime) {
                     latestByFarm.set(s.farm_id, s);
                 }
             });
-
-            return (farmsData || []).map(farm => ({
-                ...farm,
-                current_submission: latestByFarm.get(farm.id) || null,
-                current_submission_status: latestByFarm.get(farm.id)?.status || null
-            }));
+        
+            return (farmsData || []).map(farm => {
+                const submission = latestByFarm.get(farm.id) || null;
+        
+                return {
+                    ...farm,
+        
+                    current_submission: submission,
+                    current_submission_status: submission?.status || null,
+        
+                    submission_id: submission?.id || null,
+        
+                    media_filename:
+                        submission?.media_filename ||
+                        farm.media ||
+                        null,
+        
+                    media_url:
+                        submission?.media_url ||
+                        null
+                };
+            });
         }
 
         async function calculateRoleKPIs(projectId) {
