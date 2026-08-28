@@ -10,16 +10,23 @@ function toggleSidebar() {
     if (window.innerWidth <= 768) {
         sidebar.classList.toggle('mobile-open');
         sidebarOverlay.classList.toggle('active');
-        document.body.style.overflow = sidebar.classList.contains('mobile-open') ? 'hidden' : '';
+        document.body.style.overflow =
+            sidebar.classList.contains('mobile-open') ? 'hidden' : '';
     } else {
         sidebar.classList.toggle('collapsed');
+
         const icon = sidebarToggle.querySelector('i');
+
         if (sidebar.classList.contains('collapsed')) {
             icon.className = 'fas fa-chevron-right';
         } else {
             icon.className = 'fas fa-chevron-left';
         }
-        localStorage.setItem('sidebarCollapsed', sidebar.classList.contains('collapsed'));
+
+        localStorage.setItem(
+            'sidebarCollapsed',
+            sidebar.classList.contains('collapsed')
+        );
     }
 }
 
@@ -32,709 +39,2361 @@ function closeMobileSidebar() {
 window.toggleMobileSidebar = toggleSidebar;
 window.closeMobileSidebar = closeMobileSidebar;
 
-burgerBtn.addEventListener('click', function(e) {
+burgerBtn.addEventListener('click', function (e) {
     e.stopPropagation();
     toggleSidebar();
 });
 
-sidebarToggle.addEventListener('click', function(e) {
+sidebarToggle.addEventListener('click', function (e) {
     e.stopPropagation();
+
     if (window.innerWidth > 768) {
         toggleSidebar();
     }
 });
 
-sidebarOverlay.addEventListener('click', closeMobileSidebar);
+sidebarOverlay.addEventListener(
+    'click',
+    closeMobileSidebar
+);
 
 if (window.innerWidth > 768) {
-    const saved = localStorage.getItem('sidebarCollapsed');
+    const saved =
+        localStorage.getItem('sidebarCollapsed');
+
     if (saved === 'true') {
         sidebar.classList.add('collapsed');
-        sidebarToggle.querySelector('i').className = 'fas fa-chevron-right';
+
+        sidebarToggle.querySelector('i').className =
+            'fas fa-chevron-right';
     }
 }
 
-window.addEventListener('resize', function() {
+window.addEventListener('resize', function () {
     if (window.innerWidth > 768) {
         closeMobileSidebar();
     }
 });
 
+
 // ===========================================
-// QUALITY ALERTS - COMPLETE JAVASCRIPT
+// QUALITY ALERTS
 // ===========================================
-console.log('🚀 Quality Alerts page initializing...');
+console.log(
+    '🚀 Quality Alerts page initializing...'
+);
+
 
 // ===========================================
 // SUPABASE CONFIGURATION
 // ===========================================
-const SUPABASE_URL = 'https://crvnohvudurqfukjpisv.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNydm5vaHZ1ZHVycWZ1a2pwaXN2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg0NTUxNzMsImV4cCI6MjA5NDAzMTE3M30.Qp8E57yAN4LnO4A-yirf-Z3QufGZw9OKjBfcQxG7fo8';
+const SUPABASE_URL =
+    'https://crvnohvudurqfukjpisv.supabase.co';
+
+const SUPABASE_ANON_KEY =
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSI6IkNydm5vaHZ1ZHVycWZ1a2pwaXN2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc4NDUxNzMsImV4cCI6MjA5NDAzMTE3M30.Qp8E57yAN4LnO4A-yirf-Z3QufGZw9OKjBfcQxG7fo8';
+
 
 // ===========================================
 // GLOBAL VARIABLES
 // ===========================================
 let supabaseClient = null;
+
 let currentUser = null;
 let currentProject = null;
+let currentProjectRole = null;
+
 let allUserProjects = [];
+
 let allFarms = [];
 let protectedAreas = [];
 
-// Protected alerts
 let protectedAlerts = [];
 let filteredProtectedAlerts = [];
 let protectedPage = 1;
 
-// Polygon alerts
 let polygonAlerts = [];
 let filteredPolygonAlerts = [];
 let polygonPage = 1;
 
 const rowsPerPage = 10;
+
 let currentMap = null;
+
 
 // ===========================================
 // INITIALIZATION
 // ===========================================
-document.addEventListener('DOMContentLoaded', async function() {
-    console.log('📌 DOM Content Loaded');
-    supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-    await loadUserAndProjects();
-    setupDropdown();
-    setupEventListeners();
-});
+document.addEventListener(
+    'DOMContentLoaded',
+    async function () {
 
+        console.log(
+            '📌 DOM Content Loaded'
+        );
+
+        supabaseClient =
+            window.supabase.createClient(
+                SUPABASE_URL,
+                SUPABASE_ANON_KEY
+            );
+
+        await loadUserAndProjects();
+
+        setupDropdown();
+
+        setupEventListeners();
+    }
+);
+
+
+// ===========================================
+// LOAD USER + PROJECTS
+// ===========================================
 async function loadUserAndProjects() {
+
     showLoading(true);
-    
-    const { data: { session } } = await supabaseClient.auth.getSession();
-    if (!session) { 
-        window.location.href = '../login.html'; 
-        return; 
+
+    const {
+        data: { session }
+    } =
+        await supabaseClient.auth.getSession();
+
+    if (!session) {
+
+        window.location.href =
+            '../login.html';
+
+        return;
     }
-    currentUser = session.user;
-    
-    const { data: profile } = await supabaseClient
-        .from('user_profiles')
-        .select('first_name, email')
-        .eq('id', currentUser.id)
-        .maybeSingle();
-    
-    const firstName = profile?.first_name || '';
-    const displayName = firstName || currentUser.email.split('@')[0];
-    document.getElementById('userName').textContent = displayName;
-    document.getElementById('userAvatar').textContent = (firstName.charAt(0) || currentUser.email.charAt(0)).toUpperCase();
-    
-    const { data: memberships } = await supabaseClient
-        .from('project_members')
-        .select('project_id, role, projects(*)')
-        .eq('user_id', currentUser.id)
-        .eq('status', 'active');
-    
-    if (memberships && memberships.length > 0) {
-        allUserProjects = memberships;
-        document.getElementById('userRole').textContent = memberships[0].role.replace('_', ' ').toUpperCase();
-        
-        const roleBadge = document.createElement('span');
-        roleBadge.className = `role-badge ${memberships[0].role}`;
-        roleBadge.textContent = memberships[0].role.toUpperCase();
-        document.querySelector('.user-info').insertBefore(roleBadge, document.querySelector('.sync-btn'));
-        
-        const urlParams = new URLSearchParams(window.location.search);
-        let projectIdFromUrl = urlParams.get('project');
+
+    currentUser =
+        session.user;
+
+
+    // -----------------------------------------
+    // USER PROFILE
+    // -----------------------------------------
+    const { data: profile } =
+        await supabaseClient
+            .from('user_profiles')
+            .select(
+                'first_name, email'
+            )
+            .eq(
+                'id',
+                currentUser.id
+            )
+            .maybeSingle();
+
+    const firstName =
+        profile?.first_name || '';
+
+    const displayName =
+        firstName ||
+        currentUser.email.split('@')[0];
+
+    const userName =
+        document.getElementById(
+            'userName'
+        );
+
+    const userAvatar =
+        document.getElementById(
+            'userAvatar'
+        );
+
+    if (userName) {
+        userName.textContent =
+            displayName;
+    }
+
+    if (userAvatar) {
+        userAvatar.textContent =
+            (
+                firstName.charAt(0) ||
+                currentUser.email.charAt(0)
+            ).toUpperCase();
+    }
+
+
+    // -----------------------------------------
+    // PROJECT MEMBERSHIPS
+    // -----------------------------------------
+    const {
+        data: memberships
+    } =
+        await supabaseClient
+            .from('project_members')
+            .select(
+                'project_id, role, projects(*)'
+            )
+            .eq(
+                'user_id',
+                currentUser.id
+            )
+            .eq(
+                'status',
+                'active'
+            );
+
+
+    if (
+        memberships &&
+        memberships.length > 0
+    ) {
+
+        allUserProjects =
+            memberships;
+
+
+        currentProjectRole =
+            memberships[0].role;
+
+        window.currentProjectRole =
+            currentProjectRole;
+
+
+        const userRole =
+            document.getElementById(
+                'userRole'
+            );
+
+        if (userRole) {
+            userRole.textContent =
+                memberships[0]
+                    .role
+                    .replace('_', ' ')
+                    .toUpperCase();
+        }
+
+
+        // -------------------------------------
+        // ROLE BADGE
+        // -------------------------------------
+        const roleBadge =
+            document.createElement('span');
+
+        roleBadge.className =
+            `role-badge ${memberships[0].role}`;
+
+        roleBadge.textContent =
+            memberships[0]
+                .role
+                .toUpperCase();
+
+        const userInfo =
+            document.querySelector(
+                '.user-info'
+            );
+
+        const syncBtn =
+            document.querySelector(
+                '.sync-btn'
+            );
+
+        if (
+            userInfo &&
+            syncBtn
+        ) {
+            userInfo.insertBefore(
+                roleBadge,
+                syncBtn
+            );
+        }
+
+
+        // -------------------------------------
+        // PROJECT FROM URL
+        // -------------------------------------
+        const urlParams =
+            new URLSearchParams(
+                window.location.search
+            );
+
+        const projectIdFromUrl =
+            urlParams.get(
+                'project'
+            );
+
         let targetProject = null;
-        
-        if (projectIdFromUrl && projectIdFromUrl !== 'all') {
-            targetProject = memberships.find(m => m.projects.id === projectIdFromUrl);
+
+
+        if (
+            projectIdFromUrl &&
+            projectIdFromUrl !== 'all'
+        ) {
+
+            targetProject =
+                memberships.find(
+                    m =>
+                        m.projects?.id ===
+                        projectIdFromUrl
+                );
         }
+
+
+        // -------------------------------------
+        // LAST PROJECT
+        // -------------------------------------
         if (!targetProject) {
-            const lastViewed = localStorage.getItem(`lastProject_${currentUser.id}`);
-            if (lastViewed) targetProject = memberships.find(m => m.projects.id === lastViewed);
-            if (!targetProject) targetProject = memberships[0];
+
+            const lastViewed =
+                localStorage.getItem(
+                    `lastProject_${currentUser.id}`
+                );
+
+            if (lastViewed) {
+
+                targetProject =
+                    memberships.find(
+                        m =>
+                            m.projects?.id ===
+                            lastViewed
+                    );
+            }
         }
-        
-        const isOwner = memberships.some(m => m.role === 'owner');
-        if (isOwner && memberships.length > 1) {
-            document.getElementById('projectSelectorContainer').classList.remove('hidden');
-            await populateDropdown(memberships);
+
+
+        // -------------------------------------
+        // DEFAULT PROJECT
+        // -------------------------------------
+        if (!targetProject) {
+            targetProject =
+                memberships[0];
         }
-        
-        currentProject = targetProject.projects;
-        document.getElementById('selectedProjectName').innerHTML = `📁 ${currentProject.name}`;
-        document.getElementById('projectBadge').textContent = currentProject.name;
-        
-        console.log('📁 Loading project:', currentProject.id, currentProject.name);
-        
-        // Load farms and protected areas in parallel
+
+
+        // -------------------------------------
+        // PROJECT SELECTOR
+        // -------------------------------------
+        const isOwner =
+            memberships.some(
+                m =>
+                    m.role === 'owner'
+            );
+
+        if (
+            isOwner &&
+            memberships.length > 1
+        ) {
+
+            const selector =
+                document.getElementById(
+                    'projectSelectorContainer'
+                );
+
+            if (selector) {
+                selector.classList.remove(
+                    'hidden'
+                );
+            }
+
+            await populateDropdown(
+                memberships
+            );
+        }
+
+
+        // -------------------------------------
+        // SET CURRENT PROJECT
+        // -------------------------------------
+        currentProject =
+            targetProject.projects;
+
+
+        window.currentProject =
+            currentProject;
+
+
+        const projectName =
+            document.getElementById(
+                'selectedProjectName'
+            );
+
+        if (projectName) {
+            projectName.innerHTML =
+                `📁 ${escapeHtml(
+                    currentProject.name
+                )}`;
+        }
+
+
+        const projectBadge =
+            document.getElementById(
+                'projectBadge'
+            );
+
+        if (projectBadge) {
+            projectBadge.textContent =
+                currentProject.name;
+        }
+
+
+        console.log(
+            '📁 Loading project:',
+            currentProject.id,
+            currentProject.name
+        );
+
+
+        // -------------------------------------
+        // LOAD DATA
+        // -------------------------------------
         await Promise.all([
-            loadFarms(currentProject.id),
-            loadProtectedAreas(currentProject.id)
+            loadFarms(
+                currentProject.id
+            ),
+            loadProtectedAreas(
+                currentProject.id
+            )
         ]);
-        
-        // Generate alerts after both are loaded
+
+
         generateAlerts();
-        localStorage.setItem(`lastProject_${currentUser.id}`, currentProject.id);
-        
-        const url = new URL(window.location);
-        url.searchParams.set('project', currentProject.id);
-        window.history.replaceState({}, '', url);
+
+        renderQualityQueue();
+
+
+        localStorage.setItem(
+            `lastProject_${currentUser.id}`,
+            currentProject.id
+        );
+
+
+        const url =
+            new URL(window.location);
+
+        url.searchParams.set(
+            'project',
+            currentProject.id
+        );
+
+        window.history.replaceState(
+            {},
+            '',
+            url
+        );
     }
-    
+
+
     showLoading(false);
 }
 
-async function populateDropdown(memberships) {
-    const container = document.getElementById('dropdownItems');
-    let html = `<div class="dropdown-item" data-value="all">📊 ALL PROJECTS</div>`;
-    for (const m of memberships) {
-        html += `<div class="dropdown-item" data-value="${m.projects.id}">📁 ${m.projects.name}</div>`;
+
+// ===========================================
+// PROJECT DROPDOWN
+// ===========================================
+async function populateDropdown(
+    memberships
+) {
+
+    const container =
+        document.getElementById(
+            'dropdownItems'
+        );
+
+    if (!container) {
+        return;
     }
-    container.innerHTML = html;
-    
-    document.querySelectorAll('.dropdown-item').forEach(item => {
-        item.addEventListener('click', async () => {
-            const value = item.dataset.value;
-            document.getElementById('selectedProjectName').innerHTML = value === 'all' ? '📊 ALL PROJECTS' : `📁 ${item.textContent.slice(2)}`;
-            document.getElementById('dropdownMenu').classList.remove('show');
-            
-            if (value === 'all') {
-                await loadAllProjectsData();
-            } else {
-                const selected = allUserProjects.find(p => p.projects.id === value);
-                if (selected) {
-                    currentProject = selected.projects;
-                    document.getElementById('projectBadge').textContent = currentProject.name;
-                    await Promise.all([
-                        loadFarms(value),
-                        loadProtectedAreas(value)
-                    ]);
-                    generateAlerts();
-                    localStorage.setItem(`lastProject_${currentUser.id}`, value);
+
+
+    let html =
+        `<div class="dropdown-item"
+              data-value="all">
+              📊 ALL PROJECTS
+          </div>`;
+
+
+    for (
+        const m of memberships
+    ) {
+
+        html += `
+            <div
+                class="dropdown-item"
+                data-value="${escapeHtml(
+                    m.projects.id
+                )}"
+            >
+                📁 ${escapeHtml(
+                    m.projects.name
+                )}
+            </div>
+        `;
+    }
+
+
+    container.innerHTML =
+        html;
+
+
+    document
+        .querySelectorAll(
+            '.dropdown-item'
+        )
+        .forEach(item => {
+
+            item.addEventListener(
+                'click',
+                async () => {
+
+                    const value =
+                        item.dataset.value;
+
+
+                    document
+                        .getElementById(
+                            'selectedProjectName'
+                        )
+                        .innerHTML =
+                        value === 'all'
+                            ? '📊 ALL PROJECTS'
+                            : `📁 ${escapeHtml(
+                                item.textContent
+                                    .slice(2)
+                                    .trim()
+                            )}`;
+
+
+                    document
+                        .getElementById(
+                            'dropdownMenu'
+                        )
+                        .classList
+                        .remove(
+                            'show'
+                        );
+
+
+                    if (
+                        value ===
+                        'all'
+                    ) {
+
+                        await loadAllProjectsData();
+
+                    } else {
+
+                        const selected =
+                            allUserProjects.find(
+                                p =>
+                                    p.projects.id ===
+                                    value
+                            );
+
+
+                        if (selected) {
+
+                            currentProject =
+                                selected.projects;
+
+                            window.currentProject =
+                                currentProject;
+
+
+                            document
+                                .getElementById(
+                                    'projectBadge'
+                                )
+                                .textContent =
+                                currentProject.name;
+
+
+                            currentProjectRole =
+                                selected.role;
+
+                            window.currentProjectRole =
+                                currentProjectRole;
+
+
+                            await Promise.all([
+                                loadFarms(
+                                    value
+                                ),
+                                loadProtectedAreas(
+                                    value
+                                )
+                            ]);
+
+
+                            generateAlerts();
+
+                            renderQualityQueue();
+
+
+                            localStorage.setItem(
+                                `lastProject_${currentUser.id}`,
+                                value
+                            );
+                        }
+                    }
+
+
+                    const url =
+                        new URL(
+                            window.location
+                        );
+
+                    url.searchParams.set(
+                        'project',
+                        value
+                    );
+
+                    window.history.pushState(
+                        {},
+                        '',
+                        url
+                    );
+
+
+                    document
+                        .querySelectorAll(
+                            '.dropdown-item'
+                        )
+                        .forEach(
+                            i =>
+                                i.classList.remove(
+                                    'selected'
+                                )
+                        );
+
+                    item.classList.add(
+                        'selected'
+                    );
                 }
-            }
-            
-            const url = new URL(window.location);
-            url.searchParams.set('project', value);
-            window.history.pushState({}, '', url);
-            
-            document.querySelectorAll('.dropdown-item').forEach(i => i.classList.remove('selected'));
-            item.classList.add('selected');
+            );
         });
-    });
 }
 
+
+// ===========================================
+// DROPDOWN SETUP
+// ===========================================
 function setupDropdown() {
-    const selected = document.getElementById('dropdownSelected');
-    const menu = document.getElementById('dropdownMenu');
-    const search = document.getElementById('projectSearch');
-    
-    selected.addEventListener('click', (e) => { 
-        e.stopPropagation(); 
-        menu.classList.toggle('show'); 
-        if (menu.classList.contains('show')) { 
-            search.value = ''; 
-            filterDropdown(''); 
-            search.focus(); 
-        } 
-    });
-    
-    search.addEventListener('input', (e) => filterDropdown(e.target.value.toLowerCase()));
-    document.addEventListener('click', () => menu.classList.remove('show'));
+
+    const selected =
+        document.getElementById(
+            'dropdownSelected'
+        );
+
+    const menu =
+        document.getElementById(
+            'dropdownMenu'
+        );
+
+    const search =
+        document.getElementById(
+            'projectSearch'
+        );
+
+
+    if (
+        !selected ||
+        !menu ||
+        !search
+    ) {
+        return;
+    }
+
+
+    selected.addEventListener(
+        'click',
+        e => {
+
+            e.stopPropagation();
+
+            menu.classList.toggle(
+                'show'
+            );
+
+
+            if (
+                menu.classList.contains(
+                    'show'
+                )
+            ) {
+
+                search.value =
+                    '';
+
+                filterDropdown('');
+
+                search.focus();
+            }
+        }
+    );
+
+
+    search.addEventListener(
+        'input',
+        e =>
+            filterDropdown(
+                e.target.value
+                    .toLowerCase()
+            )
+    );
+
+
+    document.addEventListener(
+        'click',
+        () =>
+            menu.classList.remove(
+                'show'
+            )
+    );
 }
+
 
 function filterDropdown(term) {
-    document.querySelectorAll('.dropdown-item').forEach(item => {
-        item.style.display = item.textContent.toLowerCase().includes(term) ? 'block' : 'none';
-    });
+
+    document
+        .querySelectorAll(
+            '.dropdown-item'
+        )
+        .forEach(
+            item => {
+
+                item.style.display =
+                    item.textContent
+                        .toLowerCase()
+                        .includes(term)
+                        ? 'block'
+                        : 'none';
+            }
+        );
 }
 
+
+// ===========================================
+// LOAD ALL PROJECTS
+// ===========================================
 async function loadAllProjectsData() {
+
     showLoading(true);
-    
+
     let allFarmsData = [];
     let allProtectedData = [];
-    for (const m of allUserProjects) {
-        const { data: farms } = await supabaseClient
-            .from('farms')
-            .select('*')
-            .eq('project_id', m.projects.id);
-        if (farms) allFarmsData = [...allFarmsData, ...farms];
-        
-        const { data: protected } = await supabaseClient
-            .from('protected_areas')
-            .select('*')
-            .eq('project_id', m.projects.id);
-        if (protected) allProtectedData = [...allProtectedData, ...protected];
+
+
+    for (
+        const m of allUserProjects
+    ) {
+
+        const {
+            data: farms
+        } =
+            await supabaseClient
+                .from('farms')
+                .select('*')
+                .eq(
+                    'project_id',
+                    m.projects.id
+                );
+
+
+        if (farms) {
+
+            allFarmsData =
+                allFarmsData.concat(
+                    farms
+                );
+        }
+
+
+        const {
+            data: protectedData
+        } =
+            await supabaseClient
+                .from('protected_areas')
+                .select('*')
+                .eq(
+                    'project_id',
+                    m.projects.id
+                );
+
+
+        if (protectedData) {
+
+            allProtectedData =
+                allProtectedData.concat(
+                    protectedData
+                );
+        }
     }
-    
-    allFarms = allFarmsData;
-    protectedAreas = allProtectedData;
-    console.log('📊 All Projects - Farms:', allFarms.length, 'Protected Areas:', protectedAreas.length);
+
+
+    allFarms =
+        allFarmsData;
+
+    protectedAreas =
+        allProtectedData;
+
+
     generateAlerts();
-    document.getElementById('projectBadge').textContent = 'ALL PROJECTS';
+
+    renderQualityQueue();
+
     showLoading(false);
 }
 
-async function loadFarms(projectId) {
-    console.log('🔍 Loading farms for project:', projectId);
-    const { data: farms, error } = await supabaseClient
-        .from('farms')
-        .select('*')
-        .eq('project_id', projectId);
-    
+
+// ===========================================
+// LOAD FARMS
+// ===========================================
+async function loadFarms(
+    projectId
+) {
+
+    const {
+        data,
+        error
+    } =
+        await supabaseClient
+            .from('farms')
+            .select('*')
+            .eq(
+                'project_id',
+                projectId
+            );
+
+
     if (error) {
-        console.error('❌ Error loading farms:', error);
+
+        console.error(
+            'Error loading farms:',
+            error
+        );
+
         allFarms = [];
-    } else {
-        allFarms = farms || [];
-        console.log('✅ Loaded farms:', allFarms.length);
+
+        return;
     }
-    return allFarms;
+
+
+    allFarms =
+        data || [];
+
+
+    window.farmsData =
+        allFarms;
+
+
+    console.log(
+        `✅ Loaded ${allFarms.length} farms`
+    );
 }
 
-async function loadProtectedAreas(projectId) {
-    console.log('🔍 Loading protected areas for project:', projectId);
-    try {
-        const { data, error } = await supabaseClient
+
+// ===========================================
+// LOAD PROTECTED AREAS
+// ===========================================
+async function loadProtectedAreas(
+    projectId
+) {
+
+    const {
+        data,
+        error
+    } =
+        await supabaseClient
             .from('protected_areas')
             .select('*')
-            .eq('project_id', projectId);
-        
-        if (error) {
-            console.error('❌ Error loading protected areas:', error);
-            protectedAreas = [];
-        } else {
-            protectedAreas = data || [];
-            console.log('✅ Loaded protected areas:', protectedAreas.length);
-            if (protectedAreas.length > 0) {
-                console.log('📋 Protected areas:', protectedAreas.map(a => a.name || 'Unnamed'));
-            }
-        }
-    } catch (error) {
-        console.error('❌ Error loading protected areas:', error);
+            .eq(
+                'project_id',
+                projectId
+            );
+
+
+    if (error) {
+
+        console.error(
+            'Error loading protected areas:',
+            error
+        );
+
         protectedAreas = [];
+
+        return;
     }
-    return protectedAreas;
+
+
+    protectedAreas =
+        data || [];
+
+
+    console.log(
+        `✅ Loaded ${protectedAreas.length} protected areas`
+    );
 }
 
+
 // ===========================================
-// ALERT GENERATION - FIXED FOR PROTECTED AREAS
+// GENERATE ALERTS
 // ===========================================
 function generateAlerts() {
-    console.log('🔍 Generating quality alerts...');
-    console.log('📊 Total farms:', allFarms.length);
-    console.log('📊 Protected areas:', protectedAreas.length);
-    
+
     protectedAlerts = [];
+
     polygonAlerts = [];
-    
-    // Filter farms with valid geometry
-    const farmsWithGeo = allFarms.filter(f => f.geometry && f.geometry.coordinates);
-    console.log('📊 Farms with geometry:', farmsWithGeo.length);
-    
-    // ===========================================
-    // PROTECTED AREA ALERTS - MAIN FOCUS
-    // ===========================================
-    if (protectedAreas.length > 0 && farmsWithGeo.length > 0) {
-        console.log('🔍 Checking protected area overlaps...');
-        
-        // Log sample of protected areas for debugging
-        protectedAreas.forEach((area, idx) => {
-            if (idx < 3) {
-                console.log(`  Protected area ${idx+1}:`, area.name || 'Unnamed', 
-                           'Type:', area.geometry?.type, 
-                           'Has coords:', !!area.geometry?.coordinates);
-            }
-        });
-        
-        let overlapCount = 0;
-        
-        farmsWithGeo.forEach(farm => {
-            protectedAreas.forEach(area => {
-                try {
-                    // Skip if area has no geometry
-                    if (!area.geometry || !area.geometry.coordinates) {
-                        return;
-                    }
-                    
-                    // Handle different geometry types
-                    let areaCoords = area.geometry.coordinates;
-                    let farmCoords = farm.geometry.coordinates;
-                    
-                    // If it's a Polygon, wrap in array for turf
-                    if (area.geometry.type === 'Polygon') {
-                        areaCoords = [areaCoords];
-                    }
-                    if (farm.geometry.type === 'Polygon') {
-                        farmCoords = [farmCoords];
-                    }
-                    
-                    // Create turf polygons
-                    try {
-                        const farmPoly = turf.polygon(farm.geometry.coordinates);
-                        const areaPoly = turf.polygon(area.geometry.coordinates);
-                        
-                        // Check if they intersect
-                        if (turf.booleanIntersects(farmPoly, areaPoly)) {
-                            const intersection = turf.intersect(farmPoly, areaPoly);
-                            if (intersection) {
-                                const overlapAreaHa = turf.area(intersection) / 10000;
-                                // Only count significant overlaps (> 0.01 ha)
-                                if (overlapAreaHa > 0.01) {
-                                    overlapCount++;
-                                    
-                                    let severity = 'medium';
-                                    if (overlapAreaHa > 10) severity = 'critical';
-                                    else if (overlapAreaHa > 5) severity = 'high';
-                                    else if (overlapAreaHa > 1) severity = 'medium';
-                                    else severity = 'low';
-                                    
-                                    console.log(`⚠️ Overlap: ${farm.farmer_name} overlaps ${area.name || 'Unnamed'} by ${overlapAreaHa.toFixed(2)} ha (${severity})`);
-                                    
-                                    protectedAlerts.push({
-                                        id: `protected_overlap_${farm.id}_${area.id}`,
-                                        type: 'protected_overlap',
-                                        severity: severity,
-                                        title: 'Protected Area Overlap',
-                                        description: `Farm "${farm.farmer_name || 'Unknown'}" overlaps protected area "${area.name || 'Unnamed'}" by ${overlapAreaHa.toFixed(2)} ha`,
-                                        farm: farm,
-                                        protectedArea: area,
-                                        overlapArea: overlapAreaHa,
-                                        intersectionGeo: intersection.geometry.coordinates,
-                                        supplier: farm.supplier || 'Unknown',
-                                        cooperative: farm.cooperative || 'Unassigned',
-                                        status: 'new',
-                                        date: new Date().toISOString()
-                                    });
-                                }
-                            }
-                        }
-                    } catch (turfError) {
-                        // Skip individual turf errors
-                    }
-                } catch(e) {
-                    // Skip errors
-                }
-            });
-        });
-        
-        console.log(`✅ Found ${overlapCount} protected area overlaps`);
-        console.log(`✅ Generated ${protectedAlerts.length} protected area alerts`);
-        
-    } else {
-        if (protectedAreas.length === 0) {
-            console.log('ℹ️ No protected areas loaded for this project');
-        }
-        if (farmsWithGeo.length === 0) {
-            console.log('ℹ️ No farms with geometry data');
-        }
-    }
-    
-    // ===========================================
-    // POLYGON QUALITY ALERTS
-    // ===========================================
-    console.log('🔍 Checking polygon quality...');
-    
-    // 1. Self-intersection
-    farmsWithGeo.forEach(farm => {
-        try {
-            const poly = turf.polygon(farm.geometry.coordinates);
-            if (!turf.booleanValid(poly)) {
+
+
+    const farmsWithGeo =
+        allFarms.filter(
+            farm =>
+                farm.geometry &&
+                farm.geometry.coordinates
+        );
+
+
+    // -----------------------------------------
+    // 1. INVALID GEOMETRY
+    // -----------------------------------------
+    allFarms.forEach(
+        farm => {
+
+            if (
+                !farm.geometry ||
+                !farm.geometry.coordinates
+            ) {
+
                 polygonAlerts.push({
-                    id: `self_intersection_${farm.id}`,
-                    type: 'self_intersection',
-                    severity: 'high',
-                    title: 'Self-Intersection Detected',
-                    description: `Farm "${farm.farmer_name || 'Unknown'}" has self-intersecting polygon boundaries.`,
-                    farm: farm,
-                    supplier: farm.supplier || 'Unknown',
-                    cooperative: farm.cooperative || 'Unassigned',
-                    status: 'new',
-                    date: new Date().toISOString()
+                    id:
+                        `invalid_geom_${farm.id}`,
+
+                    type:
+                        'self_intersection',
+
+                    severity:
+                        'critical',
+
+                    title:
+                        'Invalid Geometry',
+
+                    description:
+                        `Farm "${
+                            farm.farmer_name ||
+                            'Unknown'
+                        }" has invalid geometry.`,
+
+                    farm:
+                        farm,
+
+                    supplier:
+                        farm.supplier ||
+                        'Unknown',
+
+                    cooperative:
+                        farm.cooperative ||
+                        'Unassigned',
+
+                    status:
+                        'new',
+
+                    date:
+                        new Date().toISOString()
+                });
+
+                return;
+            }
+
+
+            try {
+
+                if (
+                    typeof turf !==
+                    'undefined'
+                ) {
+
+                    const feature =
+                        turf.feature(
+                            farm.geometry
+                        );
+
+                    if (
+                        !turf.booleanValid(
+                            feature
+                        )
+                    ) {
+
+                        polygonAlerts.push({
+                            id:
+                                `self_intersection_${farm.id}`,
+
+                            type:
+                                'self_intersection',
+
+                            severity:
+                                'critical',
+
+                            title:
+                                'Invalid Geometry',
+
+                            description:
+                                `Farm "${
+                                    farm.farmer_name ||
+                                    'Unknown'
+                                }" has invalid geometry.`,
+
+                            farm:
+                                farm,
+
+                            supplier:
+                                farm.supplier ||
+                                'Unknown',
+
+                            cooperative:
+                                farm.cooperative ||
+                                'Unassigned',
+
+                            status:
+                                'new',
+
+                            date:
+                                new Date().toISOString()
+                        });
+                    }
+
+                }
+
+            } catch (e) {
+
+                polygonAlerts.push({
+                    id:
+                        `invalid_geom_${farm.id}`,
+
+                    type:
+                        'self_intersection',
+
+                    severity:
+                        'critical',
+
+                    title:
+                        'Invalid Geometry',
+
+                    description:
+                        `Farm "${
+                            farm.farmer_name ||
+                            'Unknown'
+                        }" has invalid geometry.`,
+
+                    farm:
+                        farm,
+
+                    supplier:
+                        farm.supplier ||
+                        'Unknown',
+
+                    cooperative:
+                        farm.cooperative ||
+                        'Unassigned',
+
+                    status:
+                        'new',
+
+                    date:
+                        new Date().toISOString()
                 });
             }
-        } catch(e) {
-            polygonAlerts.push({
-                id: `invalid_geom_${farm.id}`,
-                type: 'self_intersection',
-                severity: 'critical',
-                title: 'Invalid Geometry',
-                description: `Farm "${farm.farmer_name || 'Unknown'}" has invalid geometry.`,
-                farm: farm,
-                supplier: farm.supplier || 'Unknown',
-                cooperative: farm.cooperative || 'Unassigned',
-                status: 'new',
-                date: new Date().toISOString()
-            });
         }
-    });
-    
-    // 2. Duplicate farmer IDs
+    );
+
+
+    // -----------------------------------------
+    // 2. DUPLICATE FARMER IDS
+    // -----------------------------------------
     const seenIds = {};
-    allFarms.forEach(farm => {
-        if (farm.farmer_id) {
-            if (seenIds[farm.farmer_id]) {
-                if (!polygonAlerts.some(a => a.farm?.id === farm.id && a.type === 'duplicate')) {
+
+
+    allFarms.forEach(
+        farm => {
+
+            if (!farm.farmer_id) {
+                return;
+            }
+
+
+            if (
+                seenIds[
+                    farm.farmer_id
+                ]
+            ) {
+
+                if (
+                    !polygonAlerts.some(
+                        a =>
+                            a.farm?.id ===
+                            farm.id &&
+                            a.type ===
+                            'duplicate'
+                    )
+                ) {
+
                     polygonAlerts.push({
-                        id: `duplicate_${farm.id}`,
-                        type: 'duplicate',
-                        severity: 'high',
-                        title: 'Duplicate Farmer ID',
-                        description: `Farmer ID "${farm.farmer_id}" appears in multiple farms.`,
-                        farm: farm,
-                        supplier: farm.supplier || 'Unknown',
-                        cooperative: farm.cooperative || 'Unassigned',
-                        duplicateId: farm.farmer_id,
-                        status: 'new',
-                        date: new Date().toISOString()
+
+                        id:
+                            `duplicate_${farm.id}`,
+
+                        type:
+                            'duplicate',
+
+                        severity:
+                            'high',
+
+                        title:
+                            'Duplicate Farmer ID',
+
+                        description:
+                            `Farmer ID "${
+                                farm.farmer_id
+                            }" appears in multiple farms.`,
+
+                        farm:
+                            farm,
+
+                        supplier:
+                            farm.supplier ||
+                            'Unknown',
+
+                        cooperative:
+                            farm.cooperative ||
+                            'Unassigned',
+
+                        duplicateId:
+                            farm.farmer_id,
+
+                        status:
+                            'new',
+
+                        date:
+                            new Date().toISOString()
                     });
                 }
             }
-            seenIds[farm.farmer_id] = true;
+
+
+            seenIds[
+                farm.farmer_id
+            ] = true;
         }
-    });
-    
-    // 3. Overlap between farms
-    for (let i = 0; i < farmsWithGeo.length; i++) {
-        for (let j = i + 1; j < farmsWithGeo.length; j++) {
-            const farm1 = farmsWithGeo[i];
-            const farm2 = farmsWithGeo[j];
-            
+    );
+
+
+    // -----------------------------------------
+    // 3. FARM OVERLAPS
+    // -----------------------------------------
+    for (
+        let i = 0;
+        i < farmsWithGeo.length;
+        i++
+    ) {
+
+        for (
+            let j = i + 1;
+            j < farmsWithGeo.length;
+            j++
+        ) {
+
+            const farm1 =
+                farmsWithGeo[i];
+
+            const farm2 =
+                farmsWithGeo[j];
+
+
             try {
-                const poly1 = turf.polygon(farm1.geometry.coordinates);
-                const poly2 = turf.polygon(farm2.geometry.coordinates);
-                
-                if (turf.booleanIntersects(poly1, poly2)) {
-                    const intersection = turf.intersect(poly1, poly2);
-                    
+
+                const poly1 =
+                    turf.polygon(
+                        farm1.geometry.coordinates
+                    );
+
+                const poly2 =
+                    turf.polygon(
+                        farm2.geometry.coordinates
+                    );
+
+
+                if (
+                    turf.booleanIntersects(
+                        poly1,
+                        poly2
+                    )
+                ) {
+
+                    const intersection =
+                        turf.intersect(
+                            poly1,
+                            poly2
+                        );
+
+
                     if (intersection) {
-                        const overlapAreaHa = turf.area(intersection) / 10000;
-                        
-                        if (overlapAreaHa > 0.01) {
-                            let severity = 'low';
-                            if (overlapAreaHa > 5) severity = 'critical';
-                            else if (overlapAreaHa >= 3) severity = 'high';
-                            else if (overlapAreaHa > 1) severity = 'medium';
-                            
+
+                        const overlapAreaHa =
+                            turf.area(
+                                intersection
+                            ) / 10000;
+
+
+                        if (
+                            overlapAreaHa >
+                            0.01
+                        ) {
+
+                            let severity =
+                                'low';
+
+
+                            if (
+                                overlapAreaHa >
+                                5
+                            ) {
+
+                                severity =
+                                    'critical';
+
+                            } else if (
+                                overlapAreaHa >=
+                                3
+                            ) {
+
+                                severity =
+                                    'high';
+
+                            } else if (
+                                overlapAreaHa >
+                                1
+                            ) {
+
+                                severity =
+                                    'medium';
+                            }
+
+
                             polygonAlerts.push({
-                                id: `overlap_${farm1.id}_${farm2.id}`,
-                                type: 'overlap',
-                                severity: severity,
-                                title: `${severity.toUpperCase()} Overlap Detected`,
-                                description: `Farm "${farm1.farmer_name}" overlaps with "${farm2.farmer_name}" by ${overlapAreaHa.toFixed(2)} ha`,
-                                farm1: farm1,
-                                farm2: farm2,
-                                overlapArea: overlapAreaHa,
-                                intersectionGeo: intersection.geometry.coordinates,
-                                supplier: farm1.supplier || 'Unknown',
-                                cooperative: farm1.cooperative || 'Unassigned',
-                                status: 'new',
-                                date: new Date().toISOString()
+
+                                id:
+                                    `overlap_${farm1.id}_${farm2.id}`,
+
+                                type:
+                                    'overlap',
+
+                                severity:
+                                    severity,
+
+                                title:
+                                    `${severity.toUpperCase()} Overlap Detected`,
+
+                                description:
+                                    `Farm "${
+                                        farm1.farmer_name ||
+                                        'Unknown'
+                                    }" overlaps with "${
+                                        farm2.farmer_name ||
+                                        'Unknown'
+                                    }" by ${
+                                        overlapAreaHa.toFixed(
+                                            2
+                                        )
+                                    } ha`,
+
+                                farm1:
+                                    farm1,
+
+                                farm2:
+                                    farm2,
+
+                                overlapArea:
+                                    overlapAreaHa,
+
+                                intersectionGeo:
+                                    intersection
+                                        .geometry
+                                        .coordinates,
+
+                                supplier:
+                                    farm1.supplier ||
+                                    'Unknown',
+
+                                cooperative:
+                                    farm1.cooperative ||
+                                    'Unassigned',
+
+                                status:
+                                    'new',
+
+                                date:
+                                    new Date().toISOString()
                             });
                         }
                     }
                 }
-            } catch(e) {}
+
+            } catch (e) {
+
+                console.warn(
+                    'Overlap check failed:',
+                    e
+                );
+            }
         }
     }
-    
-    console.log(`✅ Generated ${protectedAlerts.length} protected area alerts and ${polygonAlerts.length} polygon alerts`);
-    
-    // Update UI
+
+
+    // -----------------------------------------
+    // 4. PROTECTED AREA INTERSECTIONS
+    // -----------------------------------------
+    if (
+        typeof turf !==
+        'undefined'
+    ) {
+
+        allFarms.forEach(
+            farm => {
+
+                if (
+                    !farm.geometry ||
+                    !farm.geometry.coordinates
+                ) {
+                    return;
+                }
+
+
+                protectedAreas.forEach(
+                    area => {
+
+                        if (
+                            !area.geometry ||
+                            !area.geometry.coordinates
+                        ) {
+                            return;
+                        }
+
+
+                        try {
+
+                            const farmFeature =
+                                turf.feature(
+                                    farm.geometry
+                                );
+
+                            const areaFeature =
+                                turf.feature(
+                                    area.geometry
+                                );
+
+
+                            if (
+                                turf.booleanIntersects(
+                                    farmFeature,
+                                    areaFeature
+                                )
+                            ) {
+
+                                const intersection =
+                                    turf.intersect(
+                                        farmFeature,
+                                        areaFeature
+                                    );
+
+
+                                if (
+                                    intersection
+                                ) {
+
+                                    const areaHa =
+                                        turf.area(
+                                            intersection
+                                        ) / 10000;
+
+
+                                    if (
+                                        areaHa >
+                                        0.01
+                                    ) {
+
+                                        let severity =
+                                            'medium';
+
+
+                                        if (
+                                            areaHa >
+                                            5
+                                        ) {
+
+                                            severity =
+                                                'critical';
+
+                                        } else if (
+                                            areaHa >=
+                                            3
+                                        ) {
+
+                                            severity =
+                                                'high';
+
+                                        } else if (
+                                            areaHa >
+                                            1
+                                        ) {
+
+                                            severity =
+                                                'medium';
+                                        }
+
+
+                                        protectedAlerts.push({
+
+                                            id:
+                                                `protected_overlap_${farm.id}_${area.id}`,
+
+                                            type:
+                                                'protected_area',
+
+                                            severity:
+                                                severity,
+
+                                            title:
+                                                'Protected Area Overlap',
+
+                                            description:
+                                                `Farm "${
+                                                    farm.farmer_name ||
+                                                    'Unknown'
+                                                }" intersects protected area "${
+                                                    area.name ||
+                                                    'Unnamed'
+                                                }" by ${
+                                                    areaHa.toFixed(
+                                                        2
+                                                    )
+                                                } ha`,
+
+                                            farm:
+                                                farm,
+
+                                            protectedArea:
+                                                area,
+
+                                            overlapArea:
+                                                areaHa,
+
+                                            intersectionGeo:
+                                                intersection
+                                                    .geometry
+                                                    .coordinates,
+
+                                            supplier:
+                                                farm.supplier ||
+                                                'Unknown',
+
+                                            cooperative:
+                                                farm.cooperative ||
+                                                'Unassigned',
+
+                                            status:
+                                                'new',
+
+                                            date:
+                                                new Date().toISOString()
+                                        });
+                                    }
+                                }
+                            }
+
+                        } catch (e) {
+
+                            console.warn(
+                                'Protected area check failed:',
+                                e
+                            );
+                        }
+                    }
+                );
+            }
+        );
+    }
+
+
+    // -----------------------------------------
+    // UPDATE ARRAYS
+    // -----------------------------------------
+    filteredProtectedAlerts =
+        [...protectedAlerts];
+
+    filteredPolygonAlerts =
+        [...polygonAlerts];
+
+
     updateBadges();
     updateSupplierFilters();
+
     applyProtectedFilters();
     applyPolygonFilters();
+
     updateStats();
+
+    renderQualityQueue();
+
+
+    console.log(
+        `✅ Generated ${
+            protectedAlerts.length
+        } protected alerts and ${
+            polygonAlerts.length
+        } polygon alerts`
+    );
 }
 
-function updateBadges() {
-    document.getElementById('protectedBadge').textContent = protectedAlerts.length;
-    document.getElementById('polygonBadge').textContent = polygonAlerts.length;
-    
-    // Highlight if critical
-    const criticalProtected = protectedAlerts.filter(a => a.severity === 'critical').length;
-    const criticalPolygon = polygonAlerts.filter(a => a.severity === 'critical').length;
-    
-    const protectedBadge = document.getElementById('protectedBadge');
-    const polygonBadge = document.getElementById('polygonBadge');
-    
-    if (criticalProtected > 0) protectedBadge.classList.add('critical');
-    else protectedBadge.classList.remove('critical');
-    
-    if (criticalPolygon > 0) polygonBadge.classList.add('critical');
-    else polygonBadge.classList.remove('critical');
-}
-
-function updateSupplierFilters() {
-    // Protected alerts suppliers
-    const protectedSuppliers = [...new Set(protectedAlerts.map(a => a.supplier || 'Unknown'))];
-    const protectedSelect = document.getElementById('protectedSupplierFilter');
-    if (protectedSelect) {
-        protectedSelect.innerHTML = '<option value="all">All Suppliers</option>' + 
-            protectedSuppliers.map(s => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join('');
-    }
-    
-    // Polygon alerts suppliers
-    const polygonSuppliers = [...new Set(polygonAlerts.map(a => a.supplier || 'Unknown'))];
-    const polygonSelect = document.getElementById('polygonSupplierFilter');
-    if (polygonSelect) {
-        polygonSelect.innerHTML = '<option value="all">All Suppliers</option>' + 
-            polygonSuppliers.map(s => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join('');
-    }
-}
-
-function updateStats() {
-    const allAlerts = [...protectedAlerts, ...polygonAlerts];
-    document.getElementById('criticalCount').textContent = allAlerts.filter(a => a.severity === 'critical').length;
-    document.getElementById('highCount').textContent = allAlerts.filter(a => a.severity === 'high').length;
-    document.getElementById('mediumCount').textContent = allAlerts.filter(a => a.severity === 'medium').length;
-    document.getElementById('lowCount').textContent = allAlerts.filter(a => a.severity === 'low').length;
-    document.getElementById('totalAlerts').textContent = allAlerts.length;
-}
 
 // ===========================================
-// PROTECTED AREA FILTERS
+// BADGES
+// ===========================================
+function updateBadges() {
+
+    const protectedBadge =
+        document.getElementById(
+            'protectedBadge'
+        );
+
+    const polygonBadge =
+        document.getElementById(
+            'polygonBadge'
+        );
+
+
+    if (protectedBadge) {
+        protectedBadge.textContent =
+            protectedAlerts.length;
+    }
+
+    if (polygonBadge) {
+        polygonBadge.textContent =
+            polygonAlerts.length;
+    }
+
+
+    const criticalProtected =
+        protectedAlerts.filter(
+            a =>
+                a.severity ===
+                'critical'
+        ).length;
+
+
+    const criticalPolygon =
+        polygonAlerts.filter(
+            a =>
+                a.severity ===
+                'critical'
+        ).length;
+
+
+    if (protectedBadge) {
+
+        protectedBadge.classList.toggle(
+            'critical',
+            criticalProtected > 0
+        );
+    }
+
+
+    if (polygonBadge) {
+
+        polygonBadge.classList.toggle(
+            'critical',
+            criticalPolygon > 0
+        );
+    }
+}
+
+
+// ===========================================
+// SUPPLIER FILTERS
+// ===========================================
+function updateSupplierFilters() {
+
+    const protectedSuppliers =
+        [
+            ...new Set(
+                protectedAlerts.map(
+                    a =>
+                        a.supplier ||
+                        'Unknown'
+                )
+            )
+        ];
+
+
+    const polygonSuppliers =
+        [
+            ...new Set(
+                polygonAlerts.map(
+                    a =>
+                        a.supplier ||
+                        'Unknown'
+                )
+            )
+        ];
+
+
+    const protectedSelect =
+        document.getElementById(
+            'protectedSupplierFilter'
+        );
+
+
+    const polygonSelect =
+        document.getElementById(
+            'polygonSupplierFilter'
+        );
+
+
+    if (protectedSelect) {
+
+        protectedSelect.innerHTML =
+            '<option value="all">All Suppliers</option>' +
+            protectedSuppliers
+                .map(
+                    s =>
+                        `<option value="${escapeHtml(
+                            s
+                        )}">
+                            ${escapeHtml(s)}
+                         </option>`
+                )
+                .join('');
+    }
+
+
+    if (polygonSelect) {
+
+        polygonSelect.innerHTML =
+            '<option value="all">All Suppliers</option>' +
+            polygonSuppliers
+                .map(
+                    s =>
+                        `<option value="${escapeHtml(
+                            s
+                        )}">
+                            ${escapeHtml(s)}
+                         </option>`
+                )
+                .join('');
+    }
+}
+
+
+// ===========================================
+// STATISTICS
+// ===========================================
+function updateStats() {
+
+    const allAlerts =
+        [
+            ...protectedAlerts,
+            ...polygonAlerts
+        ];
+
+
+    const setText = (
+        id,
+        value
+    ) => {
+
+        const el =
+            document.getElementById(
+                id
+            );
+
+        if (el) {
+            el.textContent =
+                value;
+        }
+    };
+
+
+    setText(
+        'criticalCount',
+        allAlerts.filter(
+            a =>
+                a.severity ===
+                'critical'
+        ).length
+    );
+
+
+    setText(
+        'highCount',
+        allAlerts.filter(
+            a =>
+                a.severity ===
+                'high'
+        ).length
+    );
+
+
+    setText(
+        'mediumCount',
+        allAlerts.filter(
+            a =>
+                a.severity ===
+                'medium'
+        ).length
+    );
+
+
+    setText(
+        'lowCount',
+        allAlerts.filter(
+            a =>
+                a.severity ===
+                'low'
+        ).length
+    );
+
+
+    setText(
+        'totalAlerts',
+        allAlerts.length
+    );
+}
+
+
+// ===========================================
+// PROTECTED FILTERS
 // ===========================================
 function applyProtectedFilters() {
-    const severity = document.getElementById('protectedSeverityFilter')?.value || 'all';
-    const supplier = document.getElementById('protectedSupplierFilter')?.value || 'all';
-    const status = document.getElementById('protectedStatusFilter')?.value || 'all';
-    
-    filteredProtectedAlerts = protectedAlerts.filter(alert => {
-        if (severity !== 'all' && alert.severity !== severity) return false;
-        if (supplier !== 'all' && (alert.supplier || 'Unknown') !== supplier) return false;
-        if (status !== 'all' && alert.status !== status) return false;
-        return true;
-    });
-    
-    protectedPage = 1;
+
+    const severity =
+        document.getElementById(
+            'protectedSeverityFilter'
+        )?.value ||
+        'all';
+
+
+    const supplier =
+        document.getElementById(
+            'protectedSupplierFilter'
+        )?.value ||
+        'all';
+
+
+    const status =
+        document.getElementById(
+            'protectedStatusFilter'
+        )?.value ||
+        'all';
+
+
+    filteredProtectedAlerts =
+        protectedAlerts.filter(
+            alert => {
+
+                if (
+                    severity !==
+                    'all' &&
+                    alert.severity !==
+                    severity
+                ) {
+                    return false;
+                }
+
+
+                if (
+                    supplier !==
+                    'all' &&
+                    (
+                        alert.supplier ||
+                        'Unknown'
+                    ) !==
+                    supplier
+                ) {
+                    return false;
+                }
+
+
+                if (
+                    status !==
+                    'all' &&
+                    alert.status !==
+                    status
+                ) {
+                    return false;
+                }
+
+
+                return true;
+            }
+        );
+
+
+    protectedPage =
+        1;
+
+
     renderProtectedAlerts();
+
     updateProtectedPagination();
 }
 
+
+// ===========================================
+// PROTECTED ALERT RENDER
+// ===========================================
 function renderProtectedAlerts() {
-    const container = document.getElementById('protectedAlertsList');
-    if (!container) return;
-    
-    const start = (protectedPage - 1) * rowsPerPage;
-    const pageData = filteredProtectedAlerts.slice(start, start + rowsPerPage);
-    
-    document.getElementById('protectedAlertCount').textContent = `${filteredProtectedAlerts.length} alerts`;
-    document.getElementById('protectedShowingCount').textContent = filteredProtectedAlerts.length;
-    
-    if (pageData.length === 0) {
+
+    const container =
+        document.getElementById(
+            'protectedAlertsList'
+        );
+
+
+    if (!container) {
+        return;
+    }
+
+
+    const start =
+        (
+            protectedPage -
+            1
+        ) *
+        rowsPerPage;
+
+
+    const pageData =
+        filteredProtectedAlerts.slice(
+            start,
+            start + rowsPerPage
+        );
+
+
+    const count =
+        document.getElementById(
+            'protectedShowingCount'
+        );
+
+
+    if (count) {
+        count.textContent =
+            filteredProtectedAlerts.length;
+    }
+
+
+    if (
+        pageData.length ===
+        0
+    ) {
+
         container.innerHTML = `
             <div class="empty-state">
                 <i class="fas fa-check-circle"></i>
                 <h3>No Protected Area Alerts</h3>
                 <p>All farms are outside protected areas.</p>
-                ${protectedAreas.length === 0 ? '<p style="font-size:12px;color:#94a3b8;margin-top:8px;">Tip: Upload a GeoJSON file in Live Mapping to define protected areas.</p>' : ''}
             </div>
         `;
+
         return;
     }
-    
-    container.innerHTML = pageData.map(alert => `
-        <div class="alert-item ${alert.status}" onclick="viewAlertOnMap('${alert.id}')">
-            <div class="alert-header">
-                <div class="alert-severity ${alert.severity}">
-                    <i class="fas ${getSeverityIcon(alert.severity)}"></i>
+
+
+    container.innerHTML =
+        pageData
+            .map(
+                alert => `
+                <div
+                    class="alert-item ${escapeHtml(
+                        alert.status
+                    )}"
+                    onclick="viewAlertOnMap('${escapeHtml(
+                        alert.id
+                    )}')"
+                >
+
+                    <div class="alert-header">
+
+                        <div class="alert-severity ${escapeHtml(
+                            alert.severity
+                        )}">
+                            <i class="fas ${getSeverityIcon(
+                                alert.severity
+                            )}"></i>
+                        </div>
+
+                        <div class="alert-title">
+                            ${escapeHtml(
+                                alert.title
+                            )}
+                        </div>
+
+                        <span class="alert-type-badge">
+                            Protected Area
+                        </span>
+
+                        <span class="alert-badge ${escapeHtml(
+                            alert.status
+                        )}">
+                            ${escapeHtml(
+                                alert.status
+                            )}
+                        </span>
+
+                        <div class="alert-date">
+                            ${formatDate(
+                                alert.date
+                            )}
+                        </div>
+
+                    </div>
+
+
+                    <div class="alert-details">
+
+                        <p>
+                            ${escapeHtml(
+                                alert.description
+                            )}
+                        </p>
+
+                        <p>
+                            <strong>Supplier:</strong>
+                            ${escapeHtml(
+                                alert.supplier ||
+                                'N/A'
+                            )}
+
+                            •
+
+                            <strong>Cooperative:</strong>
+                            ${escapeHtml(
+                                alert.cooperative ||
+                                'N/A'
+                            )}
+                        </p>
+
+                        <p>
+                            <strong>
+                                Protected Area:
+                            </strong>
+
+                            ${escapeHtml(
+                                alert.protectedArea
+                                    ?.name ||
+                                'Unnamed'
+                            )}
+                        </p>
+
+                    </div>
+
+
+                    <div class="alert-actions">
+
+                        <button
+                            type="button"
+                            class="action-btn view-map"
+                            onclick="
+                                event.stopPropagation();
+                                viewAlertOnMap(
+                                    '${escapeHtml(
+                                        alert.id
+                                    )}'
+                                )
+                            "
+                        >
+                            <i class="fas fa-map-marker-alt"></i>
+                            View on Map
+                        </button>
+
+
+                        ${
+                            alert.status ===
+                            'new'
+                                ? `
+                                    <button
+                                        type="button"
+                                        class="action-btn acknowledge"
+                                        onclick="
+                                            event.stopPropagation();
+                                            updateAlertStatus(
+                                                '${escapeHtml(
+                                                    alert.id
+                                                )}',
+                                                'acknowledged'
+                                            )
+                                        "
+                                    >
+                                        <i class="fas fa-check"></i>
+                                        Acknowledge
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        class="action-btn resolve"
+                                        onclick="
+                                            event.stopPropagation();
+                                            updateAlertStatus(
+                                                '${escapeHtml(
+                                                    alert.id
+                                                )}',
+                                                'resolved'
+                                            )
+                                        "
+                                    >
+                                        <i class="fas fa-check-double"></i>
+                                        Resolve
+                                    </button>
+                                `
+                                : ''
+                        }
+
+                    </div>
+
                 </div>
-                <div class="alert-title">${escapeHtml(alert.title)}</div>
-                <span class="alert-type-badge protected_overlap">Protected Overlap</span>
-                <span class="alert-badge ${alert.status}">${alert.status}</span>
-                <div class="alert-date">${formatDate(alert.date)}</div>
-            </div>
-            <div class="alert-details">
-                <p>${escapeHtml(alert.description)}</p>
-                <p><strong>Supplier:</strong> ${escapeHtml(alert.supplier || 'N/A')} • <strong>Cooperative:</strong> ${escapeHtml(alert.cooperative || 'N/A')}</p>
-                <p><strong>Protected Area:</strong> ${escapeHtml(alert.protectedArea?.name || 'Unnamed')}</p>
-            </div>
-            <div class="alert-actions">
-                <button class="action-btn view-map" onclick="event.stopPropagation(); viewAlertOnMap('${alert.id}')">
-                    <i class="fas fa-map-marker-alt"></i> View on Map
-                </button>
-                ${alert.status === 'new' ? `
-                    <button class="action-btn acknowledge" onclick="event.stopPropagation(); updateAlertStatus('${alert.id}', 'acknowledged')">
-                        <i class="fas fa-check"></i> Acknowledge
-                    </button>
-                    <button class="action-btn resolve" onclick="event.stopPropagation(); updateAlertStatus('${alert.id}', 'resolved')">
-                        <i class="fas fa-check-double"></i> Resolve
-                    </button>
-                ` : ''}
-            </div>
-        </div>
-    `).join('');
+            `
+            )
+            .join('');
 }
 
+
+// ===========================================
+// PROTECTED PAGINATION
+// ===========================================
 function updateProtectedPagination() {
-    const totalPages = Math.ceil(filteredProtectedAlerts.length / rowsPerPage);
-    document.getElementById('protectedPageInfo').textContent = `Page ${protectedPage} of ${totalPages || 1}`;
-    document.getElementById('protectedPrevBtn').disabled = protectedPage === 1;
-    document.getElementById('protectedNextBtn').disabled = protectedPage === totalPages || totalPages === 0;
+
+    const totalPages =
+        Math.ceil(
+            filteredProtectedAlerts.length /
+            rowsPerPage
+        );
+
+
+    const pageInfo =
+        document.getElementById(
+            'protectedPageInfo'
+        );
+
+
+    const prev =
+        document.getElementById(
+            'protectedPrevBtn'
+        );
+
+
+    const next =
+        document.getElementById(
+            'protectedNextBtn'
+        );
+
+
+    if (pageInfo) {
+
+        pageInfo.textContent =
+            `Page ${
+                protectedPage
+            } of ${
+                totalPages || 1
+            }`;
+    }
+
+
+    if (prev) {
+
+        prev.disabled =
+            protectedPage === 1;
+    }
+
+
+    if (next) {
+
+        next.disabled =
+            protectedPage ===
+                totalPages ||
+            totalPages === 0;
+    }
 }
 
-window.protectedPrevPage = function() {
-    if (protectedPage > 1) { protectedPage--; renderProtectedAlerts(); updateProtectedPagination(); }
-};
 
-window.protectedNextPage = function() {
-    const total = Math.ceil(filteredProtectedAlerts.length / rowsPerPage);
-    if (protectedPage < total) { protectedPage++; renderProtectedAlerts(); updateProtectedPagination(); }
-};
+window.protectedPrevPage =
+    function () {
 
+        if (
+            protectedPage >
+            1
+        ) {
+
+            protectedPage--;
+
+            renderProtectedAlerts();
+
+            updateProtectedPagination();
+        }
+    };
+
+
+window.protectedNextPage =
+    function () {
+
+        const total =
+            Math.ceil(
+                filteredProtectedAlerts.length /
+                rowsPerPage
+            );
+
+
+        if (
+            protectedPage <
+            total
+        ) {
+
+            protectedPage++;
+
+            renderProtectedAlerts();
+
+            updateProtectedPagination();
+        }
+    };
+
+
+// ===========================================
+// CLEAR PROTECTED FILTERS
+// ===========================================
 function clearProtectedFilters() {
-    document.getElementById('protectedSeverityFilter').value = 'all';
-    document.getElementById('protectedSupplierFilter').value = 'all';
-    document.getElementById('protectedStatusFilter').value = 'all';
+
+    const severity =
+        document.getElementById(
+            'protectedSeverityFilter'
+        );
+
+    const supplier =
+        document.getElementById(
+            'protectedSupplierFilter'
+        );
+
+    const status =
+        document.getElementById(
+            'protectedStatusFilter'
+        );
+
+
+    if (severity) {
+        severity.value =
+            'all';
+    }
+
+    if (supplier) {
+        supplier.value =
+            'all';
+    }
+
+    if (status) {
+        status.value =
+            'all';
+    }
+
+
     applyProtectedFilters();
 }
 
-function markProtectedRead() {
-    if (confirm('Mark all new protected area alerts as acknowledged?')) {
-        filteredProtectedAlerts.forEach(a => { if (a.status === 'new') a.status = 'acknowledged'; });
-        protectedAlerts.forEach(a => { if (a.status === 'new') a.status = 'acknowledged'; });
-        renderProtectedAlerts();
-        updateBadges();
-        showNotification('All protected area alerts marked as acknowledged', 'success');
-    }
-}
 
 // ===========================================
-// POLYGON QUALITY FILTERS
+// MARK PROTECTED READ
+// ===========================================
+function markProtectedRead() {
+
+    if (
+        !confirm(
+            'Mark all new protected area alerts as acknowledged?'
+        )
+    ) {
+        return;
+    }
+
+
+    filteredProtectedAlerts.forEach(
+        a => {
+
+            if (
+                a.status ===
+                'new'
+            ) {
+                a.status =
+                    'acknowledged';
+            }
+        }
+    );
+
+
+    protectedAlerts.forEach(
+        a => {
+
+            if (
+                a.status ===
+                'new'
+            ) {
+                a.status =
+                    'acknowledged';
+            }
+        }
+    );
+
+
+    renderProtectedAlerts();
+
+    updateBadges();
+
+    showNotification(
+        'All protected area alerts marked as acknowledged',
+        'success'
+    );
+}
+
+
+// ===========================================
+// POLYGON FILTERS
 // ===========================================
 function applyPolygonFilters() {
-    const type = document.getElementById('polygonTypeFilter')?.value || 'all';
-    const severity = document.getElementById('polygonSeverityFilter')?.value || 'all';
-    const supplier = document.getElementById('polygonSupplierFilter')?.value || 'all';
-    const status = document.getElementById('polygonStatusFilter')?.value || 'all';
-    
-    filteredPolygonAlerts = polygonAlerts.filter(alert => {
-        if (type !== 'all' && alert.type !== type) return false;
-        if (severity !== 'all' && alert.severity !== severity) return false;
-        if (supplier !== 'all' && (alert.supplier || 'Unknown') !== supplier) return false;
-        if (status !== 'all' && alert.status !== status) return false;
-        return true;
-    });
-    
-    polygonPage = 1;
+
+    const type =
+        document.getElementById(
+            'polygonTypeFilter'
+        )?.value ||
+        'all';
+
+
+    const severity =
+        document.getElementById(
+            'polygonSeverityFilter'
+        )?.value ||
+        'all';
+
+
+    const supplier =
+        document.getElementById(
+            'polygonSupplierFilter'
+        )?.value ||
+        'all';
+
+
+    const status =
+        document.getElementById(
+            'polygonStatusFilter'
+        )?.value ||
+        'all';
+
+
+    filteredPolygonAlerts =
+        polygonAlerts.filter(
+            alert => {
+
+                if (
+                    type !==
+                    'all' &&
+                    alert.type !==
+                    type
+                ) {
+                    return false;
+                }
+
+
+                if (
+                    severity !==
+                    'all' &&
+                    alert.severity !==
+                    severity
+                ) {
+                    return false;
+                }
+
+
+                if (
+                    supplier !==
+                    'all' &&
+                    (
+                        alert.supplier ||
+                        'Unknown'
+                    ) !==
+                    supplier
+                ) {
+                    return false;
+                }
+
+
+                if (
+                    status !==
+                    'all' &&
+                    alert.status !==
+                    status
+                ) {
+                    return false;
+                }
+
+
+                return true;
+            }
+        );
+
+
+    polygonPage =
+        1;
+
+
     renderPolygonAlerts();
+
     updatePolygonPagination();
 }
 
+
+// ===========================================
+// POLYGON ALERT RENDER
+// ===========================================
 function renderPolygonAlerts() {
-    const container = document.getElementById('polygonAlertsList');
-    if (!container) return;
-    
-    const start = (polygonPage - 1) * rowsPerPage;
-    const pageData = filteredPolygonAlerts.slice(start, start + rowsPerPage);
-    
-    document.getElementById('polygonAlertCount').textContent = `${filteredPolygonAlerts.length} alerts`;
-    document.getElementById('polygonShowingCount').textContent = filteredPolygonAlerts.length;
-    
-    if (pageData.length === 0) {
+
+    const container =
+        document.getElementById(
+            'polygonAlertsList'
+        );
+
+
+    if (!container) {
+        return;
+    }
+
+
+    const start =
+        (
+            polygonPage -
+            1
+        ) *
+        rowsPerPage;
+
+
+    const pageData =
+        filteredPolygonAlerts.slice(
+            start,
+            start + rowsPerPage
+        );
+
+
+    const count =
+        document.getElementById(
+            'polygonShowingCount'
+        );
+
+
+    if (count) {
+
+        count.textContent =
+            filteredPolygonAlerts.length;
+    }
+
+
+    if (
+        pageData.length ===
+        0
+    ) {
+
         container.innerHTML = `
             <div class="empty-state">
                 <i class="fas fa-check-circle"></i>
@@ -742,803 +2401,898 @@ function renderPolygonAlerts() {
                 <p>All polygons pass quality checks.</p>
             </div>
         `;
+
         return;
     }
-    
-    container.innerHTML = pageData.map(alert => `
-        <div class="alert-item ${alert.status}" onclick="viewAlertOnMap('${alert.id}')">
-            <div class="alert-header">
-                <div class="alert-severity ${alert.severity}">
-                    <i class="fas ${getSeverityIcon(alert.severity)}"></i>
+
+
+    container.innerHTML =
+        pageData
+            .map(
+                alert => `
+
+                <div
+                    class="alert-item ${escapeHtml(
+                        alert.status
+                    )}"
+                    onclick="
+                        viewAlertOnMap(
+                            '${escapeHtml(
+                                alert.id
+                            )}'
+                        )
+                    "
+                >
+
+                    <div class="alert-header">
+
+                        <div class="alert-severity ${escapeHtml(
+                            alert.severity
+                        )}">
+                            <i class="fas ${getSeverityIcon(
+                                alert.severity
+                            )}"></i>
+                        </div>
+
+                        <div class="alert-title">
+                            ${escapeHtml(
+                                alert.title
+                            )}
+                        </div>
+
+                        <span class="alert-type-badge">
+                            ${getTypeLabel(
+                                alert.type
+                            )}
+                        </span>
+
+                        <span class="alert-badge ${escapeHtml(
+                            alert.status
+                        )}">
+                            ${escapeHtml(
+                                alert.status
+                            )}
+                        </span>
+
+                        <div class="alert-date">
+                            ${formatDate(
+                                alert.date
+                            )}
+                        </div>
+
+                    </div>
+
+
+                    <div class="alert-details">
+
+                        <p>
+                            ${escapeHtml(
+                                alert.description
+                            )}
+                        </p>
+
+                        <p>
+                            <strong>Supplier:</strong>
+                            ${escapeHtml(
+                                alert.supplier ||
+                                'N/A'
+                            )}
+
+                            •
+
+                            <strong>Cooperative:</strong>
+                            ${escapeHtml(
+                                alert.cooperative ||
+                                'N/A'
+                            )}
+                        </p>
+
+                    </div>
+
+
+                    <div class="alert-actions">
+
+                        <button
+                            type="button"
+                            class="action-btn view-map"
+                            onclick="
+                                event.stopPropagation();
+                                viewAlertOnMap(
+                                    '${escapeHtml(
+                                        alert.id
+                                    )}'
+                                )
+                            "
+                        >
+                            <i class="fas fa-map-marker-alt"></i>
+                            View on Map
+                        </button>
+
+
+                        ${
+                            alert.status ===
+                            'new'
+                                ? `
+                                    <button
+                                        type="button"
+                                        class="action-btn acknowledge"
+                                        onclick="
+                                            event.stopPropagation();
+                                            updateAlertStatus(
+                                                '${escapeHtml(
+                                                    alert.id
+                                                )}',
+                                                'acknowledged'
+                                            )
+                                        "
+                                    >
+                                        <i class="fas fa-check"></i>
+                                        Acknowledge
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        class="action-btn resolve"
+                                        onclick="
+                                            event.stopPropagation();
+                                            updateAlertStatus(
+                                                '${escapeHtml(
+                                                    alert.id
+                                                )}',
+                                                'resolved'
+                                            )
+                                        "
+                                    >
+                                        <i class="fas fa-check-double"></i>
+                                        Resolve
+                                    </button>
+                                `
+                                : ''
+                        }
+
+                    </div>
+
                 </div>
-                <div class="alert-title">${escapeHtml(alert.title)}</div>
-                <span class="alert-type-badge ${alert.type}">${getTypeLabel(alert.type)}</span>
-                <span class="alert-badge ${alert.status}">${alert.status}</span>
-                <div class="alert-date">${formatDate(alert.date)}</div>
-            </div>
-            <div class="alert-details">
-                <p>${escapeHtml(alert.description)}</p>
-                <p><strong>Supplier:</strong> ${escapeHtml(alert.supplier || 'N/A')} • <strong>Cooperative:</strong> ${escapeHtml(alert.cooperative || 'N/A')}</p>
-            </div>
-            <div class="alert-actions">
-                <button class="action-btn view-map" onclick="event.stopPropagation(); viewAlertOnMap('${alert.id}')">
-                    <i class="fas fa-map-marker-alt"></i> View on Map
-                </button>
-                ${alert.status === 'new' ? `
-                    <button class="action-btn acknowledge" onclick="event.stopPropagation(); updateAlertStatus('${alert.id}', 'acknowledged')">
-                        <i class="fas fa-check"></i> Acknowledge
-                    </button>
-                    <button class="action-btn resolve" onclick="event.stopPropagation(); updateAlertStatus('${alert.id}', 'resolved')">
-                        <i class="fas fa-check-double"></i> Resolve
-                    </button>
-                ` : ''}
-            </div>
-        </div>
-    `).join('');
+            `
+            )
+            .join('');
 }
 
+
+// ===========================================
+// POLYGON PAGINATION
+// ===========================================
 function updatePolygonPagination() {
-    const totalPages = Math.ceil(filteredPolygonAlerts.length / rowsPerPage);
-    document.getElementById('polygonPageInfo').textContent = `Page ${polygonPage} of ${totalPages || 1}`;
-    document.getElementById('polygonPrevBtn').disabled = polygonPage === 1;
-    document.getElementById('polygonNextBtn').disabled = polygonPage === totalPages || totalPages === 0;
+
+    const totalPages =
+        Math.ceil(
+            filteredPolygonAlerts.length /
+            rowsPerPage
+        );
+
+
+    const pageInfo =
+        document.getElementById(
+            'polygonPageInfo'
+        );
+
+
+    const prev =
+        document.getElementById(
+            'polygonPrevBtn'
+        );
+
+
+    const next =
+        document.getElementById(
+            'polygonNextBtn'
+        );
+
+
+    if (pageInfo) {
+
+        pageInfo.textContent =
+            `Page ${
+                polygonPage
+            } of ${
+                totalPages || 1
+            }`;
+    }
+
+
+    if (prev) {
+
+        prev.disabled =
+            polygonPage === 1;
+    }
+
+
+    if (next) {
+
+        next.disabled =
+            polygonPage ===
+                totalPages ||
+            totalPages === 0;
+    }
 }
 
-window.polygonPrevPage = function() {
-    if (polygonPage > 1) { polygonPage--; renderPolygonAlerts(); updatePolygonPagination(); }
-};
 
-window.polygonNextPage = function() {
-    const total = Math.ceil(filteredPolygonAlerts.length / rowsPerPage);
-    if (polygonPage < total) { polygonPage++; renderPolygonAlerts(); updatePolygonPagination(); }
-};
+window.polygonPrevPage =
+    function () {
 
+        if (
+            polygonPage >
+            1
+        ) {
+
+            polygonPage--;
+
+            renderPolygonAlerts();
+
+            updatePolygonPagination();
+        }
+    };
+
+
+window.polygonNextPage =
+    function () {
+
+        const total =
+            Math.ceil(
+                filteredPolygonAlerts.length /
+                rowsPerPage
+            );
+
+
+        if (
+            polygonPage <
+            total
+        ) {
+
+            polygonPage++;
+
+            renderPolygonAlerts();
+
+            updatePolygonPagination();
+        }
+    };
+
+
+// ===========================================
+// CLEAR POLYGON FILTERS
+// ===========================================
 function clearPolygonFilters() {
-    document.getElementById('polygonTypeFilter').value = 'all';
-    document.getElementById('polygonSeverityFilter').value = 'all';
-    document.getElementById('polygonSupplierFilter').value = 'all';
-    document.getElementById('polygonStatusFilter').value = 'all';
+
+    const type =
+        document.getElementById(
+            'polygonTypeFilter'
+        );
+
+    const severity =
+        document.getElementById(
+            'polygonSeverityFilter'
+        );
+
+    const supplier =
+        document.getElementById(
+            'polygonSupplierFilter'
+        );
+
+    const status =
+        document.getElementById(
+            'polygonStatusFilter'
+        );
+
+
+    if (type) {
+        type.value =
+            'all';
+    }
+
+    if (severity) {
+        severity.value =
+            'all';
+    }
+
+    if (supplier) {
+        supplier.value =
+            'all';
+    }
+
+    if (status) {
+        status.value =
+            'all';
+    }
+
+
     applyPolygonFilters();
 }
 
+
+// ===========================================
+// MARK POLYGON READ
+// ===========================================
 function markPolygonRead() {
-    if (confirm('Mark all new polygon quality alerts as acknowledged?')) {
-        filteredPolygonAlerts.forEach(a => { if (a.status === 'new') a.status = 'acknowledged'; });
-        polygonAlerts.forEach(a => { if (a.status === 'new') a.status = 'acknowledged'; });
-        renderPolygonAlerts();
-        updateBadges();
-        showNotification('All polygon quality alerts marked as acknowledged', 'success');
+
+    if (
+        !confirm(
+            'Mark all new polygon alerts as acknowledged?'
+        )
+    ) {
+        return;
     }
+
+
+    filteredPolygonAlerts.forEach(
+        a => {
+
+            if (
+                a.status ===
+                'new'
+            ) {
+                a.status =
+                    'acknowledged';
+            }
+        }
+    );
+
+
+    polygonAlerts.forEach(
+        a => {
+
+            if (
+                a.status ===
+                'new'
+            ) {
+                a.status =
+                    'acknowledged';
+            }
+        }
+    );
+
+
+    renderPolygonAlerts();
+
+    updateBadges();
+
+    showNotification(
+        'All polygon alerts marked as acknowledged',
+        'success'
+    );
 }
 
-// ===========================================
-// TAB SWITCHING
-// ===========================================
-window.switchTab = function(tab) {
-    document.querySelectorAll('.tab-btn').forEach(btn => {
-        btn.classList.toggle('active', btn.dataset.tab === tab);
-    });
-    document.querySelectorAll('.tab-content').forEach(content => {
-        content.classList.toggle('active', content.id === tab + 'Tab');
-    });
-};
 
 // ===========================================
-// HELPER FUNCTIONS
+// ALERT MAP
 // ===========================================
-function getSeverityIcon(severity) {
-    const icons = { critical: 'fa-skull-crossbones', high: 'fa-exclamation-triangle', medium: 'fa-exclamation', low: 'fa-info-circle' };
-    return icons[severity] || 'fa-bell';
-}
+function viewAlertOnMap(
+    alertId
+) {
 
-function getTypeLabel(type) {
-    const labels = { 
-        overlap: 'Overlap', 
-        duplicate: 'Duplicate', 
-        self_intersection: 'Self-Intersection', 
-        protected_overlap: 'Protected Overlap' 
-    };
-    return labels[type] || type;
-}
+    const alert =
+        [
+            ...protectedAlerts,
+            ...polygonAlerts
+        ].find(
+            a =>
+                a.id ===
+                alertId
+        );
 
-function formatDate(dateString) {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffHours = Math.floor((now - date) / 3600000);
-    if (diffHours < 24) return `${diffHours} hours ago`;
-    if (diffHours < 48) return 'Yesterday';
-    return date.toLocaleDateString();
-}
 
-function convertCoords(coords) {
-    if (!coords || !Array.isArray(coords)) return coords;
-    if (coords.length === 2 && typeof coords[0] === 'number') return [coords[1], coords[0]];
-    if (Array.isArray(coords[0]) && Array.isArray(coords[0][0])) {
-        return coords.map(ring => ring.map(point => [point[1], point[0]]));
-    }
-    return coords;
-}
-
-// ===========================================
-// VIEW ALERT ON MAP
-// ===========================================
-window.viewAlertOnMap = function(alertId) {
-    const allAlerts = [...protectedAlerts, ...polygonAlerts];
-    const alert = allAlerts.find(a => a.id === alertId);
     if (!alert) {
-        showNotification('Alert not found', 'error');
+
+        showNotification(
+            'Alert not found.',
+            'error'
+        );
+
         return;
     }
-    
-    const existingModal = document.querySelector('.modal-overlay');
-    if (existingModal) existingModal.remove();
-    
-    const severityColors = { critical: '#dc2626', high: '#f97316', medium: '#eab308', low: '#22c55e' };
-    
-    const modal = document.createElement('div');
-    modal.className = 'modal-overlay';
-    
-    if (alert.type === 'overlap' && alert.farm1 && alert.farm2) {
-        modal.innerHTML = `
-            <div class="modal-content">
-                <div class="modal-header" style="background: linear-gradient(135deg, ${severityColors[alert.severity]}, #7f1d1d);">
-                    <h3><i class="fas fa-exclamation-triangle"></i> Overlap Analysis - ${alert.severity.toUpperCase()}</h3>
-                    <button class="modal-close" onclick="this.closest('.modal-overlay').remove()"><i class="fas fa-times"></i></button>
+
+
+    const modal =
+        document.createElement(
+            'div'
+        );
+
+    modal.className =
+        'map-modal-overlay';
+
+
+    modal.innerHTML = `
+        <div class="map-modal">
+
+            <div class="map-modal-header">
+
+                <div>
+                    <h3>
+                        ${escapeHtml(
+                            alert.title
+                        )}
+                    </h3>
+
+                    <p>
+                        ${escapeHtml(
+                            alert.description
+                        )}
+                    </p>
                 </div>
-                <div class="modal-body">
-                    <div class="modal-grid">
-                        <div class="modal-row"><div class="modal-label">Overlap Area:</div><div class="modal-value">${alert.overlapArea?.toFixed(2)} ha</div></div>
-                        <div class="modal-row"><div class="modal-label">Status:</div><div class="modal-value"><span class="alert-badge ${alert.status}">${alert.status}</span></div></div>
-                    </div>
-                    <div class="two-farm-layout">
-                        <div class="farm-card">
-                            <h4><i class="fas fa-tractor"></i> Farm 1: ${escapeHtml(alert.farm1.farmer_name)}</h4>
-                            <div><strong>Supplier:</strong> ${escapeHtml(alert.farm1.supplier || 'N/A')}</div>
-                            <div><strong>Cooperative:</strong> ${escapeHtml(alert.farm1.cooperative || 'N/A')}</div>
-                            <div><strong>Area:</strong> ${(alert.farm1.area || 0).toFixed(2)} ha</div>
-                        </div>
-                        <div class="farm-card">
-                            <h4><i class="fas fa-tractor"></i> Farm 2: ${escapeHtml(alert.farm2.farmer_name)}</h4>
-                            <div><strong>Supplier:</strong> ${escapeHtml(alert.farm2.supplier || 'N/A')}</div>
-                            <div><strong>Cooperative:</strong> ${escapeHtml(alert.farm2.cooperative || 'N/A')}</div>
-                            <div><strong>Area:</strong> ${(alert.farm2.area || 0).toFixed(2)} ha</div>
-                        </div>
-                    </div>
-                    <div id="alertMap"></div>
-                    <div class="modal-actions">
-                        ${alert.status === 'new' ? `
-                            <button class="modal-btn acknowledge" onclick="updateAlertStatus('${alert.id}', 'acknowledged'); document.querySelector('.modal-overlay').remove()">
-                                <i class="fas fa-check"></i> Acknowledge
-                            </button>
-                            <button class="modal-btn resolve" onclick="updateAlertStatus('${alert.id}', 'resolved'); document.querySelector('.modal-overlay').remove()">
-                                <i class="fas fa-check-double"></i> Resolve
-                            </button>
-                        ` : ''}
-                        <button class="modal-btn cancel" onclick="this.closest('.modal-overlay').remove()">Close</button>
-                    </div>
-                </div>
+
+                <button
+                    class="modal-close"
+                    type="button"
+                >
+                    ×
+                </button>
+
             </div>
-        `;
-    } else if (alert.type === 'protected_overlap' && alert.farm) {
-        modal.innerHTML = `
-            <div class="modal-content">
-                <div class="modal-header" style="background: linear-gradient(135deg, ${severityColors[alert.severity]}, #7f1d1d);">
-                    <h3><i class="fas fa-shield-alt"></i> Protected Area Overlap - ${alert.severity.toUpperCase()}</h3>
-                    <button class="modal-close" onclick="this.closest('.modal-overlay').remove()"><i class="fas fa-times"></i></button>
-                </div>
-                <div class="modal-body">
-                    <div class="modal-grid">
-                        <div class="modal-row"><div class="modal-label">Overlap Area:</div><div class="modal-value">${alert.overlapArea?.toFixed(2)} ha</div></div>
-                        <div class="modal-row"><div class="modal-label">Protected Area:</div><div class="modal-value">${escapeHtml(alert.protectedArea?.name || 'Unnamed')}</div></div>
-                        <div class="modal-row"><div class="modal-label">Status:</div><div class="modal-value"><span class="alert-badge ${alert.status}">${alert.status}</span></div></div>
-                    </div>
-                    <div class="farm-card">
-                        <h4><i class="fas fa-tractor"></i> Farm: ${escapeHtml(alert.farm.farmer_name)}</h4>
-                        <div><strong>Supplier:</strong> ${escapeHtml(alert.farm.supplier || 'N/A')}</div>
-                        <div><strong>Cooperative:</strong> ${escapeHtml(alert.farm.cooperative || 'N/A')}</div>
-                        <div><strong>Area:</strong> ${(alert.farm.area || 0).toFixed(2)} ha</div>
-                        <div><strong>Overlap:</strong> ${alert.overlapArea?.toFixed(2)} ha</div>
-                    </div>
-                    <div id="alertMap"></div>
-                    <div class="modal-actions">
-                        ${alert.status === 'new' ? `
-                            <button class="modal-btn acknowledge" onclick="updateAlertStatus('${alert.id}', 'acknowledged'); document.querySelector('.modal-overlay').remove()">
-                                <i class="fas fa-check"></i> Acknowledge
-                            </button>
-                            <button class="modal-btn resolve" onclick="updateAlertStatus('${alert.id}', 'resolved'); document.querySelector('.modal-overlay').remove()">
-                                <i class="fas fa-check-double"></i> Resolve
-                            </button>
-                        ` : ''}
-                        <button class="modal-btn cancel" onclick="this.closest('.modal-overlay').remove()">Close</button>
-                    </div>
-                </div>
-            </div>
-        `;
-    } else {
-        modal.innerHTML = `
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h3><i class="fas fa-map-marker-alt"></i> Alert Details</h3>
-                    <button class="modal-close" onclick="this.closest('.modal-overlay').remove()"><i class="fas fa-times"></i></button>
-                </div>
-                <div class="modal-body">
-                    <div id="alertMap"></div>
-                    <div class="modal-actions">
-                        <button class="modal-btn cancel" onclick="this.closest('.modal-overlay').remove()">Close</button>
-                    </div>
-                </div>
-            </div>
-        `;
-    }
-    
-    document.body.appendChild(modal);
-    
-    setTimeout(() => {
-        const mapContainer = document.getElementById('alertMap');
-        if (mapContainer) {
-            if (currentMap) currentMap.remove();
-            
-            currentMap = L.map('alertMap').setView([7.539989, -5.547080], 14);
-            L.control.zoom({ position: 'topright' }).addTo(currentMap);
-            L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
-                maxZoom: 22, subdomains: ['mt0','mt1','mt2','mt3']
-            }).addTo(currentMap);
-            
-            let bounds = null;
-            
-            if (alert.type === 'overlap') {
-                if (alert.farm1?.geometry?.coordinates) {
-                    const coords = convertCoords(alert.farm1.geometry.coordinates);
-                    const poly = L.polygon(coords, { color: '#22c55e', weight: 3, fillColor: '#22c55e', fillOpacity: 0.3 }).addTo(currentMap);
-                    if (poly.getBounds && poly.getBounds().isValid()) bounds = bounds ? bounds.extend(poly.getBounds()) : poly.getBounds();
+
+            <div
+                id="alertMap"
+                class="alert-map"
+            ></div>
+
+        </div>
+    `;
+
+
+    document.body.appendChild(
+        modal
+    );
+
+
+    modal
+        .querySelector(
+            '.modal-close'
+        )
+        .addEventListener(
+            'click',
+            () => {
+
+                if (
+                    currentMap
+                ) {
+
+                    currentMap.remove();
+
+                    currentMap =
+                        null;
                 }
-                
-                if (alert.farm2?.geometry?.coordinates) {
-                    const coords = convertCoords(alert.farm2.geometry.coordinates);
-                    const poly = L.polygon(coords, { color: '#f97316', weight: 3, fillColor: '#f97316', fillOpacity: 0.3 }).addTo(currentMap);
-                    if (poly.getBounds && poly.getBounds().isValid()) bounds = bounds ? bounds.extend(poly.getBounds()) : poly.getBounds();
-                }
-                
-                if (alert.intersectionGeo) {
-                    const overlapCoords = convertCoords(alert.intersectionGeo);
-                    L.polygon(overlapCoords, { color: '#dc2626', weight: 4, fillColor: '#dc2626', fillOpacity: 0.6 }).addTo(currentMap);
-                }
-            } else if (alert.type === 'protected_overlap' && alert.farm?.geometry?.coordinates) {
-                // Show farm polygon in red
-                const coords = convertCoords(alert.farm.geometry.coordinates);
-                const poly = L.polygon(coords, { 
-                    color: '#dc2626', 
-                    weight: 3, 
-                    fillColor: '#dc2626', 
-                    fillOpacity: 0.4 
-                }).addTo(currentMap);
-                if (poly.getBounds && poly.getBounds().isValid()) bounds = poly.getBounds();
-                
-                // Show protected area with dashed border
-                if (alert.protectedArea?.geometry) {
-                    let areaCoords;
-                    if (alert.protectedArea.geometry.type === 'Polygon') {
-                        areaCoords = convertCoords([alert.protectedArea.geometry.coordinates]);
-                    } else {
-                        areaCoords = convertCoords(alert.protectedArea.geometry.coordinates);
-                    }
-                    L.polygon(areaCoords, { 
-                        color: '#8B4513', 
-                        weight: 2, 
-                        fillColor: '#8B4513', 
-                        fillOpacity: 0.15,
-                        dashArray: '5,5'
-                    }).addTo(currentMap);
-                    
-                    // Add label for protected area
-                    const center = turf.center(alert.protectedArea.geometry);
-                    if (center) {
-                        L.marker([center.geometry.coordinates[1], center.geometry.coordinates[0]], {
-                            icon: L.divIcon({
-                                className: 'protected-label',
-                                html: `<div style="background:rgba(139,69,19,0.8);color:white;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;">${escapeHtml(alert.protectedArea.name || 'Protected')}</div>`,
-                                iconSize: [100, 20],
-                                iconAnchor: [50, 10]
-                            })
-                        }).addTo(currentMap);
-                    }
-                }
-            } else if (alert.farm?.geometry?.coordinates) {
-                const coords = convertCoords(alert.farm.geometry.coordinates);
-                const poly = L.polygon(coords, { color: '#eab308', weight: 3, fillColor: '#eab308', fillOpacity: 0.3 }).addTo(currentMap);
-                if (poly.getBounds && poly.getBounds().isValid()) bounds = poly.getBounds();
+
+                modal.remove();
             }
-            
-            if (bounds && bounds.isValid()) {
-                currentMap.fitBounds(bounds, { padding: [50, 50] });
+        );
+
+
+    setTimeout(
+        () => {
+
+            currentMap =
+                L.map(
+                    'alertMap'
+                );
+
+
+            L.tileLayer(
+                'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+                {
+                    attribution:
+                        '&copy; OpenStreetMap contributors'
+                }
+            ).addTo(
+                currentMap
+            );
+
+
+            let bounds =
+                null;
+
+
+            // ---------------------------------
+            // FARM
+            // ---------------------------------
+            if (
+                alert.farm?.geometry
+            ) {
+
+                const coords =
+                    convertCoords(
+                        alert.farm.geometry
+                    );
+
+
+                const poly =
+                    L.polygon(
+                        coords,
+                        {
+                            color:
+                                '#eab308',
+
+                            weight:
+                                3,
+
+                            fillColor:
+                                '#eab308',
+
+                            fillOpacity:
+                                0.3
+                        }
+                    ).addTo(
+                        currentMap
+                    );
+
+
+                if (
+                    poly.getBounds()
+                        .isValid()
+                ) {
+
+                    bounds =
+                        poly.getBounds();
+                }
+            }
+
+
+            // ---------------------------------
+            // FARM 1 / FARM 2
+            // ---------------------------------
+            if (
+                alert.farm1?.geometry
+            ) {
+
+                const coords =
+                    convertCoords(
+                        alert.farm1.geometry
+                    );
+
+
+                const poly =
+                    L.polygon(
+                        coords,
+                        {
+                            weight:
+                                3,
+
+                            fillOpacity:
+                                0.25
+                        }
+                    ).addTo(
+                        currentMap
+                    );
+
+
+                if (
+                    poly.getBounds()
+                        .isValid()
+                ) {
+
+                    bounds =
+                        poly.getBounds();
+                }
+            }
+
+
+            if (
+                alert.farm2?.geometry
+            ) {
+
+                const coords =
+                    convertCoords(
+                        alert.farm2.geometry
+                    );
+
+
+                const poly =
+                    L.polygon(
+                        coords,
+                        {
+                            weight:
+                                3,
+
+                            fillOpacity:
+                                0.25
+                        }
+                    ).addTo(
+                        currentMap
+                    );
+
+
+                if (
+                    poly.getBounds()
+                        .isValid()
+                ) {
+
+                    bounds =
+                        bounds
+                            ? bounds.extend(
+                                poly.getBounds()
+                            )
+                            : poly.getBounds();
+                }
+            }
+
+
+            // ---------------------------------
+            // INTERSECTION
+            // ---------------------------------
+            if (
+                alert.intersectionGeo
+            ) {
+
+                try {
+
+                    const intersection =
+                        L.geoJSON({
+                            type:
+                                'MultiPolygon',
+
+                            coordinates:
+                                alert.intersectionGeo
+                        });
+
+
+                    intersection
+                        .addTo(
+                            currentMap
+                        );
+
+
+                    if (
+                        intersection
+                            .getBounds()
+                            .isValid()
+                    ) {
+
+                        bounds =
+                            intersection
+                                .getBounds();
+                    }
+
+                } catch (e) {
+
+                    console.warn(
+                        'Intersection display error:',
+                        e
+                    );
+                }
+            }
+
+
+            // ---------------------------------
+            // PROTECTED AREA
+            // ---------------------------------
+            if (
+                alert.protectedArea
+                    ?.geometry
+            ) {
+
+                const protectedLayer =
+                    L.geoJSON(
+                        alert.protectedArea
+                            .geometry,
+                        {
+                            style: {
+                                weight:
+                                    2,
+
+                                fillOpacity:
+                                    0.15,
+
+                                dashArray:
+                                    '5,5'
+                            }
+                        }
+                    ).addTo(
+                        currentMap
+                    );
+
+
+                if (
+                    protectedLayer
+                        .getBounds()
+                        .isValid()
+                ) {
+
+                    bounds =
+                        bounds
+                            ? bounds.extend(
+                                protectedLayer
+                                    .getBounds()
+                            )
+                            : protectedLayer
+                                .getBounds();
+                }
+            }
+
+
+            if (
+                bounds &&
+                bounds.isValid()
+            ) {
+
+                currentMap.fitBounds(
+                    bounds,
+                    {
+                        padding:
+                            [40, 40]
+                    }
+                );
+
             } else {
-                currentMap.setView([7.539989, -5.547080], 7);
-            }
-            
-            L.control.scale({ metric: true, imperial: false, position: 'bottomleft' }).addTo(currentMap);
-        }
-    }, 150);
-};
 
-/* =========================================================
-   MAPPINGTRACE QUALITY CENTER
-   GIS / VALIDATOR / MANAGER DECISION LAYER
-   ========================================================= */
-
-let currentUserRole = null;
-let qualityPermissions = {
-    canView: false,
-    canDecide: false
-};
-
-
-/* =========================================================
-   ROLE CONFIGURATION
-   ========================================================= */
-
-const QUALITY_ROLES = {
-    owner: {
-        view: true,
-        decide: true
-    },
-
-    super_manager: {
-        view: true,
-        decide: true,
-        validatedOnly: true
-    },
-
-    manager: {
-        view: true,
-        decide: true
-    },
-
-    validator: {
-        view: true,
-        decide: true
-    },
-
-    gis: {
-        view: true,
-        decide: true
-    },
-
-    gis_team: {
-        view: true,
-        decide: true
-    },
-
-    field_officer: {
-        view: false,
-        decide: false
-    },
-
-    enumerator: {
-        view: false,
-        decide: false
-    },
-
-    viewer: {
-        view: false,
-        decide: false
-    }
-};
-
-
-/* =========================================================
-   LOAD ROLE
-   ========================================================= */
-
-async function loadQualityPermissions() {
-
-    if (!currentUser || !supabaseClient) {
-        return false;
-    }
-
-    try {
-
-        const { data, error } = await supabaseClient
-            .from('project_members')
-            .select('role, project_id')
-            .eq('user_id', currentUser.id)
-            .eq('status', 'active');
-
-        if (error) {
-            console.error('Quality role error:', error);
-            return false;
-        }
-
-        if (!data || data.length === 0) {
-            return false;
-        }
-
-        /*
-         * Highest permission wins.
-         */
-
-        const priority = [
-            'owner',
-            'super_manager',
-            'manager',
-            'validator',
-            'gis',
-            'gis_team',
-            'field_officer',
-            'enumerator',
-            'viewer'
-        ];
-
-        let role = 'viewer';
-
-        for (const candidate of priority) {
-
-            if (data.some(m => m.role === candidate)) {
-                role = candidate;
-                break;
+                currentMap.setView(
+                    [
+                        7.539989,
+                        -5.547080
+                    ],
+                    7
+                );
             }
 
-        }
 
-        currentUserRole = role;
+            L.control
+                .scale({
+                    metric:
+                        true,
 
-        const permissions =
-            QUALITY_ROLES[role] ||
-            QUALITY_ROLES.viewer;
+                    imperial:
+                        false
+                })
+                .addTo(
+                    currentMap
+                );
 
-        qualityPermissions = {
-            ...permissions
-        };
-
-        console.log(
-            'Quality role:',
-            currentUserRole,
-            qualityPermissions
-        );
-
-        applyQualityRoleUI();
-
-        return true;
-
-    } catch (error) {
-
-        console.error(
-            'Failed to load Quality permissions:',
-            error
-        );
-
-        return false;
-    }
+        },
+        100
+    );
 }
 
 
-/* =========================================================
-   APPLY UI PERMISSIONS
-   ========================================================= */
-
-function applyQualityRoleUI() {
-
-    const qualityPage =
-        document.querySelector('.quality-page') ||
-        document.body;
-
-    if (!qualityPermissions.canView) {
-
-        document
-            .querySelectorAll(
-                '.quality-restricted, .quality-decision-btn'
-            )
-            .forEach(el => {
-
-                el.style.display = 'none';
-
-            });
-
-    }
-
-    if (!qualityPermissions.canDecide) {
-
-        document
-            .querySelectorAll(
-                '.quality-decision-btn, .quality-reject-btn, .quality-validate-btn'
-            )
-            .forEach(el => {
-
-                el.style.display = 'none';
-
-            });
-
-    }
-
-    /*
-     * Super Manager:
-     * Operational Quality view only shows validated plots.
-     */
-
-    if (currentUserRole === 'super_manager') {
-
-        document.body.classList.add(
-            'super-manager-quality-view'
-        );
-
-    }
-
-}
-
-
-/* =========================================================
-   LOAD QUALITY DATA FOR FARM
-   ========================================================= */
-
-async function loadFarmQuality(farmId) {
-
-    if (!farmId) {
-        return null;
-    }
-
-    const { data, error } = await supabaseClient
-        .from('farm_quality')
-        .select('*')
-        .eq('farm_id', farmId)
-        .maybeSingle();
-
-    if (error) {
-
-        console.error(
-            'Quality load error:',
-            error
-        );
-
-        return null;
-    }
-
-    return data;
-}
-
-
-/* =========================================================
-   CREATE / UPDATE QUALITY SUMMARY
-   ========================================================= */
-
-async function saveFarmQuality(
-    farm,
-    result
+// ===========================================
+// COORDINATE CONVERTER
+// ===========================================
+function convertCoords(
+    geometry
 ) {
 
-    if (!farm?.id) {
-        throw new Error(
-            'Farm ID is required'
-        );
+    if (!geometry) {
+        return [];
     }
 
-    const payload = {
 
-        farm_id: farm.id,
+    if (
+        geometry.type ===
+        'Polygon'
+    ) {
 
-        project_id:
-            farm.project_id ||
-            currentProject?.id ||
-            null,
+        return geometry.coordinates
+            .map(
+                ring =>
+                    ring.map(
+                        coord =>
+                            [
+                                coord[1],
+                                coord[0]
+                            ]
+                    )
+            );
+    }
 
-        overall_score:
-            result.overall_score ?? null,
 
-        quality_status:
-            result.quality_status ||
-            'issues_detected',
+    if (
+        geometry.type ===
+        'MultiPolygon'
+    ) {
 
-        geometry_score:
-            result.geometry_score ?? null,
+        return geometry.coordinates
+            .flat(
+                1
+            )
+            .map(
+                ring =>
+                    ring.map(
+                        coord =>
+                            [
+                                coord[1],
+                                coord[0]
+                            ]
+                    )
+            );
+    }
 
-        mapping_score:
-            result.mapping_score ?? null,
 
-        spatial_score:
-            result.spatial_score ?? null,
+    return [];
+}
 
-        attribute_score:
-            result.attribute_score ?? null,
 
-        traceability_score:
-            result.traceability_score ?? null,
+// ===========================================
+// ALERT STATUS
+// ===========================================
+window.updateAlertStatus =
+    function (
+        alertId,
+        newStatus
+    ) {
 
-        geometry_valid:
-            result.geometry_valid ?? null,
+        const allAlerts =
+            [
+                ...protectedAlerts,
+                ...polygonAlerts
+            ];
 
-        self_intersection:
-            !!result.self_intersection,
 
-        spike_detected:
-            !!result.spike_detected,
+        const alert =
+            allAlerts.find(
+                a =>
+                    a.id ===
+                    alertId
+            );
 
-        duplicate_detected:
-            !!result.duplicate_detected,
 
-        near_duplicate_detected:
-            !!result.near_duplicate_detected,
+        if (!alert) {
+            return;
+        }
 
-        empty_geometry:
-            !!result.empty_geometry,
 
-        multipart_geometry:
-            !!result.multipart_geometry,
+        alert.status =
+            newStatus;
 
-        hole_detected:
-            !!result.hole_detected,
 
-        projection_issue:
-            !!result.projection_issue,
+        const protectedAlert =
+            protectedAlerts.find(
+                a =>
+                    a.id ===
+                    alertId
+            );
 
-        location_issue:
-            !!result.location_issue,
 
-        protected_area_conflict:
-            !!result.protected_area_conflict,
+        if (
+            protectedAlert
+        ) {
+            protectedAlert.status =
+                newStatus;
+        }
 
-        forest_conflict:
-            !!result.forest_conflict,
 
-        overlap_detected:
-            !!result.overlap_detected,
+        const polygonAlert =
+            polygonAlerts.find(
+                a =>
+                    a.id ===
+                    alertId
+            );
 
-        critical_issue_count:
-            result.critical_issue_count || 0,
 
-        major_issue_count:
-            result.major_issue_count || 0,
+        if (
+            polygonAlert
+        ) {
+            polygonAlert.status =
+                newStatus;
+        }
 
-        warning_issue_count:
-            result.warning_issue_count || 0,
 
-        last_checked_at:
-            new Date().toISOString(),
+        applyProtectedFilters();
 
-        checked_by:
-            currentUser?.id || null
+        applyPolygonFilters();
+
+        updateBadges();
+
+        renderQualityQueue();
+
+
+        showNotification(
+            `Alert marked as ${newStatus}`,
+            'success'
+        );
     };
 
 
-    const { data, error } =
-        await supabaseClient
-            .from('farm_quality')
-            .upsert(
-                payload,
-                {
-                    onConflict: 'farm_id'
-                }
-            )
-            .select()
-            .single();
+// ===========================================
+// REFRESH
+// ===========================================
+function refreshProtectedAlerts() {
 
-
-    if (error) {
-
-        console.error(
-            'Quality save error:',
-            error
-        );
-
-        throw error;
-    }
-
-    return data;
-}
-
-
-/* =========================================================
-   QUALITY DECISION
-   ========================================================= */
-
-async function makeQualityDecision(
-    farmId,
-    decision
-) {
-
-    if (!qualityPermissions.canDecide) {
-
-        showNotification(
-            'You do not have permission to make a Quality decision.',
-            'error'
-        );
-
-        return;
-    }
-
-
-    const quality =
-        await loadFarmQuality(farmId);
-
-
-    if (!quality) {
-
-        showNotification(
-            'Quality assessment not found.',
-            'error'
-        );
-
-        return;
-    }
-
-
-    /* ---------------------------------------------
-       VALIDATION PRE-CHECK
-       --------------------------------------------- */
-
-    if (decision === 'validate') {
-
-        if (
-            Number(
-                quality.critical_issue_count || 0
-            ) > 0
-        ) {
-
-            showNotification(
-                'Validation blocked: critical Quality issues remain.',
-                'error'
-            );
-
-            return;
-        }
-
-
-        if (
-            ![
-                'passed',
-                'rechecked'
-            ].includes(
-                quality.quality_status
-            )
-        ) {
-
-            showNotification(
-                'Validation blocked: Quality has not passed.',
-                'warning'
-            );
-
-            return;
-        }
-
-    }
-
-
-    /* ---------------------------------------------
-       REJECTION REASON
-       --------------------------------------------- */
-
-    let reason = null;
-
-    if (decision === 'reject') {
-
-        reason = prompt(
-            'Enter the reason for rejecting this plot:'
-        );
-
-        if (
-            reason === null ||
-            !reason.trim()
-        ) {
-
-            showNotification(
-                'A rejection reason is required.',
-                'warning'
-            );
-
-            return;
-        }
-
-    }
-
-
-    /* ---------------------------------------------
-       CONFIRM
-       --------------------------------------------- */
-
-    const message =
-        decision === 'reject'
-            ? 'Reject this plot?'
-            : 'Validate this GIS Quality review?';
-
-
-    if (!confirm(message)) {
+    if (!currentProject) {
         return;
     }
 
@@ -1546,26 +3300,1609 @@ async function makeQualityDecision(
     showLoading(true);
 
 
+    Promise.all([
+        loadFarms(
+            currentProject.id
+        ),
+
+        loadProtectedAreas(
+            currentProject.id
+        )
+    ])
+        .then(
+            () => {
+
+                generateAlerts();
+
+                showLoading(false);
+            }
+        )
+        .catch(
+            error => {
+
+                console.error(
+                    error
+                );
+
+                showLoading(false);
+
+                showNotification(
+                    'Unable to refresh alerts.',
+                    'error'
+                );
+            }
+        );
+}
+
+
+function refreshPolygonAlerts() {
+
+    if (!currentProject) {
+        return;
+    }
+
+
+    showLoading(true);
+
+
+    Promise.all([
+        loadFarms(
+            currentProject.id
+        ),
+
+        loadProtectedAreas(
+            currentProject.id
+        )
+    ])
+        .then(
+            () => {
+
+                generateAlerts();
+
+                showLoading(false);
+            }
+        )
+        .catch(
+            error => {
+
+                console.error(
+                    error
+                );
+
+                showLoading(false);
+
+                showNotification(
+                    'Unable to refresh alerts.',
+                    'error'
+                );
+            }
+        );
+}
+
+
+// ===========================================
+// HELPERS
+// ===========================================
+function showNotification(
+    message,
+    type = 'info'
+) {
+
+    const colors = {
+        success:
+            '#4CAF50',
+
+        error:
+            '#F44336',
+
+        warning:
+            '#FFC107',
+
+        info:
+            '#2196F3'
+    };
+
+
+    const notification =
+        document.createElement(
+            'div'
+        );
+
+
+    notification.style.cssText =
+        `
+        position:fixed;
+        bottom:20px;
+        right:20px;
+        padding:12px 24px;
+        background:${colors[type]};
+        color:white;
+        border-radius:8px;
+        z-index:10001;
+        font-size:13px;
+        font-weight:500;
+        display:flex;
+        align-items:center;
+        gap:8px;
+        box-shadow:
+            0 4px 12px
+            rgba(0,0,0,0.15);
+        `;
+
+
+    notification.innerHTML =
+        `
+        <i class="fas ${
+            type === 'success'
+                ? 'fa-check-circle'
+                : 'fa-exclamation-circle'
+        }"></i>
+        ${escapeHtml(message)}
+        `;
+
+
+    document.body.appendChild(
+        notification
+    );
+
+
+    setTimeout(
+        () =>
+            notification.remove(),
+        3000
+    );
+}
+
+
+function showLoading(
+    show
+) {
+
+    const overlay =
+        document.getElementById(
+            'loadingOverlay'
+        );
+
+
+    if (overlay) {
+
+        overlay.style.display =
+            show
+                ? 'flex'
+                : 'none';
+    }
+}
+
+
+function escapeHtml(
+    value
+) {
+
+    if (
+        value === null ||
+        value === undefined
+    ) {
+        return '';
+    }
+
+
+    return String(value)
+        .replace(
+            /&/g,
+            '&amp;'
+        )
+        .replace(
+            /</g,
+            '&lt;'
+        )
+        .replace(
+            />/g,
+            '&gt;'
+        )
+        .replace(
+            /"/g,
+            '&quot;'
+        )
+        .replace(
+            /'/g,
+            '&#039;'
+        );
+}
+
+
+function formatDate(
+    value
+) {
+
+    if (!value) {
+        return '—';
+    }
+
+
+    const date =
+        new Date(value);
+
+
+    if (
+        Number.isNaN(
+            date.getTime()
+        )
+    ) {
+        return '—';
+    }
+
+
+    return date.toLocaleDateString(
+        undefined,
+        {
+            year:
+                'numeric',
+
+            month:
+                'short',
+
+            day:
+                'numeric'
+        }
+    );
+}
+
+
+function getSeverityIcon(
+    severity
+) {
+
+    switch (
+        String(
+            severity || ''
+        ).toLowerCase()
+    ) {
+
+        case 'critical':
+            return 'fa-times-circle';
+
+        case 'high':
+            return 'fa-exclamation-triangle';
+
+        case 'medium':
+            return 'fa-exclamation-circle';
+
+        default:
+            return 'fa-info-circle';
+    }
+}
+
+
+function getTypeLabel(
+    type
+) {
+
+    const labels = {
+
+        overlap:
+            'Overlap',
+
+        self_intersection:
+            'Invalid Geometry',
+
+        duplicate:
+            'Duplicate',
+
+        protected_area:
+            'Protected Area'
+    };
+
+
+    return labels[type] ||
+        type ||
+        'Quality';
+}
+
+
+// ===========================================
+// TABS
+// ===========================================
+function switchTab(
+    tab
+) {
+
+    document
+        .querySelectorAll(
+            '.tab-content'
+        )
+        .forEach(
+            content =>
+                content.classList.remove(
+                    'active'
+                )
+        );
+
+
+    document
+        .querySelectorAll(
+            '.tab-btn'
+        )
+        .forEach(
+            button =>
+                button.classList.remove(
+                    'active'
+                )
+        );
+
+
+    const content =
+        document.getElementById(
+            `${tab}Tab`
+        );
+
+
+    if (content) {
+        content.classList.add(
+            'active'
+        );
+    }
+
+
+    const button =
+        document.querySelector(
+            `[data-tab="${tab}"]`
+        );
+
+
+    if (button) {
+        button.classList.add(
+            'active'
+        );
+    }
+}
+
+
+// ===========================================
+// EVENT LISTENERS
+// ===========================================
+function setupEventListeners() {
+
+    document
+        .getElementById(
+            'refreshBtn'
+        )
+        ?.addEventListener(
+            'click',
+            () => {
+
+                if (
+                    !currentProject
+                ) {
+                    return;
+                }
+
+
+                showLoading(true);
+
+
+                Promise.all([
+                    loadFarms(
+                        currentProject.id
+                    ),
+
+                    loadProtectedAreas(
+                        currentProject.id
+                    )
+                ])
+                    .then(
+                        () => {
+
+                            generateAlerts();
+
+                            showLoading(false);
+                        }
+                    )
+                    .catch(
+                        error => {
+
+                            console.error(
+                                error
+                            );
+
+                            showLoading(false);
+                        }
+                    );
+            }
+        );
+
+
+    document
+        .getElementById(
+            'logoutBtn'
+        )
+        ?.addEventListener(
+            'click',
+            async () => {
+
+                await supabaseClient
+                    .auth
+                    .signOut();
+
+                localStorage.clear();
+
+                window.location.href =
+                    '../login.html';
+            }
+        );
+}
+
+
+// ===========================================
+// GLOBAL FUNCTIONS
+// ===========================================
+window.applyProtectedFilters =
+    applyProtectedFilters;
+
+window.applyPolygonFilters =
+    applyPolygonFilters;
+
+window.clearProtectedFilters =
+    clearProtectedFilters;
+
+window.clearPolygonFilters =
+    clearPolygonFilters;
+
+window.markProtectedRead =
+    markProtectedRead;
+
+window.markPolygonRead =
+    markPolygonRead;
+
+window.viewAlertOnMap =
+    viewAlertOnMap;
+
+window.refreshProtectedAlerts =
+    refreshProtectedAlerts;
+
+window.refreshPolygonAlerts =
+    refreshPolygonAlerts;
+
+window.switchTab =
+    switchTab;
+
+window.protectedPrevPage =
+    window.protectedPrevPage;
+
+window.protectedNextPage =
+    window.protectedNextPage;
+
+window.polygonPrevPage =
+    window.polygonPrevPage;
+
+window.polygonNextPage =
+    window.polygonNextPage;
+
+
+// ===========================================
+// QUALITY REVIEW MODULE
+// ===========================================
+
+const GIS_QUALITY_ROLES = [
+    'gis',
+    'gis_specialist',
+    'gis_lead',
+    'validator',
+    'manager',
+    'owner'
+];
+
+const READ_ONLY_ROLES = [
+    'super_manager',
+    'viewer'
+];
+
+let qualityReviewFarm = null;
+let qualityReviewResult = null;
+let qualityReviewMap = null;
+let qualityIssueLayers = [];
+
+
+// ===========================================
+// QUALITY ROLE
+// ===========================================
+function getCurrentQualityRole() {
+
+    const role =
+        window.currentProjectRole ||
+        currentProjectRole ||
+        document
+            .getElementById(
+                'userRole'
+            )?.textContent ||
+        '';
+
+
+    return String(role)
+        .toLowerCase()
+        .trim()
+        .replace(
+            /\s+/g,
+            '_'
+        );
+}
+
+
+function canReviewQuality() {
+
+    return GIS_QUALITY_ROLES.includes(
+        getCurrentQualityRole()
+    );
+}
+
+
+function isSuperManager() {
+
+    return (
+        getCurrentQualityRole() ===
+        'super_manager'
+    );
+}
+
+
+// ===========================================
+// QUALITY REVIEW ENTRY
+// ===========================================
+window.openGISQualityReview =
+    async function (
+        farmId
+    ) {
+
+        if (
+            !canReviewQuality()
+        ) {
+
+            showNotification(
+                'You do not have permission to perform GIS quality review.',
+                'error'
+            );
+
+            return;
+        }
+
+
+        let farm =
+            (
+                window.farmsData ||
+                allFarms ||
+                []
+            ).find(
+                f =>
+                    String(f.id) ===
+                    String(farmId)
+            );
+
+
+        if (!farm) {
+
+            try {
+
+                const {
+                    data,
+                    error
+                } =
+                    await supabaseClient
+                        .from('farms')
+                        .select('*')
+                        .eq(
+                            'id',
+                            farmId
+                        )
+                        .maybeSingle();
+
+
+                if (error) {
+                    throw error;
+                }
+
+
+                farm =
+                    data;
+
+            } catch (
+                error
+            ) {
+
+                console.error(
+                    error
+                );
+
+                showNotification(
+                    'Unable to load farm: ' +
+                    error.message,
+                    'error'
+                );
+
+                return;
+            }
+        }
+
+
+        if (!farm) {
+
+            showNotification(
+                'Farm not found.',
+                'error'
+            );
+
+            return;
+        }
+
+
+        qualityReviewFarm =
+            farm;
+
+
+        createQualityModal();
+
+
+        await runQualityCheck(
+            farm.id
+        );
+    };
+
+
+// ===========================================
+// CREATE QUALITY MODAL
+// ===========================================
+function createQualityModal() {
+
+    const existing =
+        document.getElementById(
+            'gisQualityModal'
+        );
+
+
+    if (existing) {
+        existing.remove();
+    }
+
+
+    const modal =
+        document.createElement(
+            'div'
+        );
+
+
+    modal.id =
+        'gisQualityModal';
+
+    modal.className =
+        'gis-quality-modal';
+
+
+    modal.innerHTML = `
+        <div class="gis-quality-modal-content">
+
+            <div class="gis-quality-header">
+
+                <div>
+                    <div class="eyebrow">
+                        GIS QUALITY REVIEW
+                    </div>
+
+                    <h2>
+                        ${escapeHtml(
+                            qualityReviewFarm
+                                ?.farmer_name ||
+                            'Farm Review'
+                        )}
+                    </h2>
+
+                    <p>
+                        Review geometry,
+                        mapping,
+                        spatial,
+                        attributes and
+                        traceability quality.
+                    </p>
+                </div>
+
+                <button
+                    type="button"
+                    class="quality-close"
+                    onclick="closeGISQualityReview()"
+                >
+                    ×
+                </button>
+
+            </div>
+
+
+            <div class="gis-quality-summary">
+
+                <div class="quality-score-card">
+
+                    <span>
+                        Overall Score
+                    </span>
+
+                    <strong
+                        id="gisQualityScore"
+                    >
+                        —
+                    </strong>
+
+                    <span
+                        id="gisQualityStatus"
+                        class="quality-status-badge pending"
+                    >
+                        PENDING
+                    </span>
+
+                </div>
+
+
+                <div
+                    id="gisQualityComponents"
+                    class="quality-components"
+                ></div>
+
+            </div>
+
+
+            <div class="gis-quality-grid">
+
+                <div
+                    id="gisQualityIssues"
+                    class="gis-quality-issues"
+                >
+                    <div class="quality-loading">
+                        <i class="fas fa-spinner fa-spin"></i>
+                        Running GIS quality checks...
+                    </div>
+                </div>
+
+
+                <div
+                    id="gisQualityMap"
+                    class="gis-quality-map"
+                ></div>
+
+            </div>
+
+
+            <div
+                class="gis-quality-actions"
+                id="gisQualityActions"
+            >
+
+                <button
+                    type="button"
+                    class="quality-action correction"
+                    onclick="
+                        requestGISCorrection()
+                    "
+                >
+                    <i class="fas fa-edit"></i>
+                    Request Correction
+                </button>
+
+
+                <button
+                    type="button"
+                    class="quality-action reject"
+                    onclick="
+                        makeGISQualityDecision(
+                            'rejected'
+                        )
+                    "
+                >
+                    <i class="fas fa-times"></i>
+                    Reject
+                </button>
+
+
+                <button
+                    type="button"
+                    class="quality-action validate"
+                    onclick="
+                        makeGISQualityDecision(
+                            'validated'
+                        )
+                    "
+                >
+                    <i class="fas fa-check"></i>
+                    Validate
+                </button>
+
+            </div>
+
+        </div>
+    `;
+
+
+    document.body.appendChild(
+        modal
+    );
+
+
+    initializeQualityReviewMap();
+}
+
+
+// ===========================================
+// RUN QUALITY CHECK
+// ===========================================
+async function runQualityCheck(
+    farmId
+) {
+
+    const issueBox =
+        document.getElementById(
+            'gisQualityIssues'
+        );
+
+
+    if (issueBox) {
+
+        issueBox.innerHTML = `
+            <div class="quality-loading">
+                <i class="fas fa-spinner fa-spin"></i>
+                Running GIS quality checks...
+            </div>
+        `;
+    }
+
+
     try {
 
-        const { data, error } =
+        const {
+            data,
+            error
+        } =
             await supabaseClient.rpc(
-                'quality_decision',
+                'run_full_quality_check',
                 {
-                    p_farm_id: farmId,
-                    p_decision: decision,
-                    p_reason: reason
+                    p_farm_id:
+                        farmId
                 }
             );
 
 
         if (error) {
+            throw error;
+        }
 
-            console.error(
-                'Quality decision error:',
-                error
+
+        qualityReviewResult =
+            data;
+
+
+        renderQualityResult(
+            data
+        );
+
+
+        await loadQualityIssues(
+            farmId
+        );
+
+
+        renderQualityReviewMap();
+
+    } catch (
+        error
+    ) {
+
+        console.error(
+            'GIS Quality Check Error:',
+            error
+        );
+
+
+        if (issueBox) {
+
+            issueBox.innerHTML = `
+                <div class="quality-error">
+
+                    <i class="fas fa-exclamation-circle"></i>
+
+                    <strong>
+                        Quality check failed
+                    </strong>
+
+                    <span>
+                        ${escapeHtml(
+                            error.message
+                        )}
+                    </span>
+
+                </div>
+            `;
+        }
+
+
+        showNotification(
+            'Quality check failed: ' +
+            error.message,
+            'error'
+        );
+    }
+}
+
+
+// ===========================================
+// RENDER QUALITY RESULT
+// ===========================================
+function renderQualityResult(
+    result
+) {
+
+    const score =
+        Number(
+            result?.overall_score
+        );
+
+
+    const status =
+        result?.quality_status ||
+        'pending';
+
+
+    const scoreBox =
+        document.getElementById(
+            'gisQualityScore'
+        );
+
+
+    const statusBox =
+        document.getElementById(
+            'gisQualityStatus'
+        );
+
+
+    if (scoreBox) {
+
+        scoreBox.textContent =
+            Number.isFinite(score)
+                ? score.toFixed(0)
+                : '—';
+    }
+
+
+    if (statusBox) {
+
+        statusBox.className =
+            `quality-status-badge ${
+                qualityStatusClass(
+                    status
+                )
+            }`;
+
+
+        statusBox.textContent =
+            status ===
+            'passed'
+                ? 'PASSED'
+                : status ===
+                    'review_required'
+                    ? 'REVIEW REQUIRED'
+                    : status ===
+                        'issues_detected'
+                        ? 'ISSUES DETECTED'
+                        : status.toUpperCase();
+    }
+
+
+    const scoreDetails =
+        result?.score_details ||
+        {};
+
+
+    const components =
+        document.getElementById(
+            'gisQualityComponents'
+        );
+
+
+    if (!components) {
+        return;
+    }
+
+
+    const rows = [
+
+        [
+            'Geometry',
+            scoreDetails.geometry_score
+        ],
+
+        [
+            'Mapping',
+            scoreDetails.mapping_score
+        ],
+
+        [
+            'Spatial',
+            scoreDetails.spatial_score
+        ],
+
+        [
+            'Attributes',
+            scoreDetails.attribute_score
+        ],
+
+        [
+            'Traceability',
+            scoreDetails.traceability_score
+        ]
+
+    ];
+
+
+    components.innerHTML =
+        rows
+            .map(
+                ([label, value]) => `
+
+                    <div class="quality-component">
+
+                        <span>
+                            ${escapeHtml(
+                                label
+                            )}
+                        </span>
+
+                        <strong>
+                            ${
+                                Number.isFinite(
+                                    Number(value)
+                                )
+                                    ? Number(value).toFixed(0)
+                                    : '—'
+                            }
+                        </strong>
+
+                    </div>
+                `
+            )
+            .join('');
+}
+
+
+// ===========================================
+// QUALITY STATUS
+// ===========================================
+function qualityStatusClass(
+    status
+) {
+
+    switch (
+        String(
+            status || ''
+        ).toLowerCase()
+    ) {
+
+        case 'passed':
+            return 'passed';
+
+        case 'review_required':
+            return 'review';
+
+        case 'issues_detected':
+            return 'failed';
+
+        default:
+            return 'pending';
+    }
+}
+
+
+// ===========================================
+// QUALITY ISSUES
+// ===========================================
+async function loadQualityIssues(
+    farmId
+) {
+
+    const {
+        data,
+        error
+    } =
+        await supabaseClient
+            .from(
+                'farm_quality_issues'
+            )
+            .select('*')
+            .eq(
+                'farm_id',
+                farmId
+            )
+            .order(
+                'severity',
+                {
+                    ascending:
+                        true
+                }
             );
 
+
+    if (error) {
+
+        console.error(
+            'Unable to load quality issues:',
+            error
+        );
+
+        return;
+    }
+
+
+    window._gisQualityIssues =
+        data || [];
+
+
+    renderQualityIssues(
+        data || []
+    );
+}
+
+
+function renderQualityIssues(
+    issues
+) {
+
+    const box =
+        document.getElementById(
+            'gisQualityIssues'
+        );
+
+
+    if (!box) {
+        return;
+    }
+
+
+    if (
+        !issues ||
+        issues.length === 0
+    ) {
+
+        box.innerHTML = `
+            <div class="quality-empty">
+
+                <i class="fas fa-check-circle"></i>
+
+                <strong>
+                    No quality issues detected
+                </strong>
+
+                <span>
+                    This farm passed the
+                    available GIS issue checks.
+                </span>
+
+            </div>
+        `;
+
+        return;
+    }
+
+
+    box.innerHTML = `
+        <div class="quality-issues-title">
+            Quality Issues
+            <span>
+                ${issues.length}
+            </span>
+        </div>
+
+        <div class="quality-issue-list">
+
+            ${
+                issues
+                    .map(
+                        issue => `
+
+                            <div
+                                class="quality-issue-item ${escapeHtml(
+                                    String(
+                                        issue.severity ||
+                                        'info'
+                                    ).toLowerCase()
+                                )}"
+                            >
+
+                                <div class="issue-icon">
+                                    ${severityIcon(
+                                        issue.severity
+                                    )}
+                                </div>
+
+                                <div class="issue-body">
+
+                                    <strong>
+                                        ${escapeHtml(
+                                            issue.issue_type ||
+                                            issue.type ||
+                                            'Quality Issue'
+                                        )}
+                                    </strong>
+
+                                    <p>
+                                        ${escapeHtml(
+                                            issue.description ||
+                                            issue.message ||
+                                            ''
+                                        )}
+                                    </p>
+
+                                </div>
+
+                            </div>
+                        `
+                    )
+                    .join('')
+            }
+
+        </div>
+    `;
+}
+
+
+// ===========================================
+// SEVERITY
+// ===========================================
+function severityIcon(
+    severity
+) {
+
+    switch (
+        String(
+            severity || ''
+        ).toLowerCase()
+    ) {
+
+        case 'critical':
+            return '🔴';
+
+        case 'major':
+            return '🟠';
+
+        case 'high':
+            return '🟠';
+
+        case 'warning':
+            return '🟡';
+
+        default:
+            return '🔵';
+    }
+}
+
+
+// ===========================================
+// QUALITY REVIEW MAP
+// ===========================================
+function initializeQualityReviewMap() {
+
+    const mapElement =
+        document.getElementById(
+            'gisQualityMap'
+        );
+
+
+    if (
+        !mapElement ||
+        typeof L ===
+            'undefined'
+    ) {
+        return;
+    }
+
+
+    qualityReviewMap =
+        L.map(
+            mapElement
+        );
+
+
+    L.tileLayer(
+        'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+        {
+            attribution:
+                '&copy; OpenStreetMap contributors'
+        }
+    ).addTo(
+        qualityReviewMap
+    );
+}
+
+
+function renderQualityReviewMap() {
+
+    if (
+        !qualityReviewMap ||
+        !qualityReviewFarm
+    ) {
+        return;
+    }
+
+
+    qualityIssueLayers.forEach(
+        layer => {
+
+            try {
+                qualityReviewMap.removeLayer(
+                    layer
+                );
+            } catch (_) {}
+        }
+    );
+
+
+    qualityIssueLayers =
+        [];
+
+
+    const farm =
+        qualityReviewFarm;
+
+
+    if (
+        farm.geometry
+    ) {
+
+        const farmLayer =
+            L.geoJSON(
+                farm.geometry,
+                {
+                    style: {
+                        weight:
+                            3,
+
+                        fillOpacity:
+                            0.25
+                    }
+                }
+            ).addTo(
+                qualityReviewMap
+            );
+
+
+        qualityIssueLayers.push(
+            farmLayer
+        );
+
+
+        if (
+            farmLayer
+                .getBounds()
+                .isValid()
+        ) {
+
+            qualityReviewMap.fitBounds(
+                farmLayer.getBounds(),
+                {
+                    padding:
+                        [30, 30]
+                }
+            );
+        }
+    }
+
+
+    const issues =
+        window._gisQualityIssues ||
+        [];
+
+
+    issues.forEach(
+        issue => {
+
+            if (
+                !issue.geometry
+            ) {
+                return;
+            }
+
+
+            try {
+
+                const layer =
+                    L.geoJSON(
+                        issue.geometry,
+                        {
+                            style: {
+                                weight:
+                                    3,
+
+                                fillOpacity:
+                                    0.35
+                            }
+                        }
+                    ).addTo(
+                        qualityReviewMap
+                    );
+
+
+                qualityIssueLayers.push(
+                    layer
+                );
+
+            } catch (
+                error
+            ) {
+
+                console.warn(
+                    'Issue geometry error:',
+                    error
+                );
+            }
+        }
+    );
+
+
+    setTimeout(
+        () =>
+            qualityReviewMap.invalidateSize(),
+        100
+    );
+}
+
+
+// ===========================================
+// DECISION
+// ===========================================
+window.makeGISQualityDecision =
+    async function (
+        decision
+    ) {
+
+        if (
+            !qualityReviewFarm
+        ) {
+            return;
+        }
+
+
+        const issues =
+            window._gisQualityIssues ||
+            [];
+
+
+        const critical =
+            issues.some(
+                issue =>
+                    String(
+                        issue.severity ||
+                        ''
+                    ).toLowerCase() ===
+                    'critical'
+            );
+
+
+        if (
+            decision ===
+                'validated' &&
+            critical
+        ) {
+
+            showNotification(
+                'Validation blocked: critical quality issue detected.',
+                'error'
+            );
+
+            return;
+        }
+
+
+        let reason =
+            '';
+
+
+        if (
+            decision ===
+            'rejected'
+        ) {
+
+            reason =
+                prompt(
+                    'Enter rejection reason:'
+                );
+
+
+            if (
+                !reason ||
+                !reason.trim()
+            ) {
+                return;
+            }
+        }
+
+
+        if (
+            !confirm(
+                decision ===
+                    'validated'
+                    ? 'Validate this farm?'
+                    : 'Reject this farm?'
+            )
+        ) {
+            return;
+        }
+
+
+        await executeQualityDecision(
+            decision,
+            reason.trim()
+        );
+    };
+
+
+// ===========================================
+// REQUEST CORRECTION
+// ===========================================
+window.requestGISCorrection =
+    async function () {
+
+        if (
+            !qualityReviewFarm
+        ) {
+            return;
+        }
+
+
+        const reason =
+            prompt(
+                'Enter correction reason:'
+            );
+
+
+        if (
+            !reason ||
+            !reason.trim()
+        ) {
+            return;
+        }
+
+
+        await executeQualityDecision(
+            'correction_required',
+            reason.trim()
+        );
+    };
+
+
+// ===========================================
+// EXECUTE QUALITY DECISION
+// ===========================================
+async function executeQualityDecision(
+    decision,
+    reason
+) {
+
+    try {
+
+        showLoading(true);
+
+
+        const {
+            data,
+            error
+        } =
+            await supabaseClient.rpc(
+                'quality_decision',
+                {
+                    p_farm_id:
+                        qualityReviewFarm.id,
+
+                    p_decision:
+                        decision,
+
+                    p_reason:
+                        reason ||
+                        null
+                }
+            );
+
+
+        if (error) {
             throw error;
         }
 
@@ -1577,537 +4914,612 @@ async function makeQualityDecision(
 
 
         showNotification(
-            decision === 'reject'
-                ? 'Plot rejected successfully.'
-                : 'GIS Quality validated successfully.',
+            decision ===
+                'validated'
+                ? 'Farm quality validated successfully.'
+                : decision ===
+                    'rejected'
+                    ? 'Farm rejected successfully.'
+                    : 'Correction requested successfully.',
             'success'
         );
 
 
-        /*
-         * Reload everything so Submission and Quality
-         * show the same workflow state.
-         */
+        closeGISQualityReview();
 
-        if (currentProject) {
 
-            await loadFarms(
-                currentProject.id
+        if (
+            typeof loadProjectData ===
+                'function' &&
+            window.currentProject
+        ) {
+
+            await loadProjectData(
+                window.currentProject.id
             );
 
-            await loadProtectedAreas(
-                currentProject.id
+        } else if (
+            typeof loadSubmissions ===
+                'function' &&
+            window.currentProject
+        ) {
+
+            await loadSubmissions(
+                window.currentProject.id
             );
-
-            generateAlerts();
-
         }
 
 
-    } catch (error) {
+    } catch (
+        error
+    ) {
 
-        console.error(error);
+        console.error(
+            'Quality decision error:',
+            error
+        );
+
 
         showNotification(
-            error.message ||
-            'Unable to complete Quality decision.',
+            'Quality decision failed: ' +
+            error.message,
             'error'
         );
+
 
     } finally {
 
         showLoading(false);
-
     }
-
 }
 
 
-/* =========================================================
-   GLOBAL BUTTON FUNCTIONS
-   ========================================================= */
+// ===========================================
+// CLOSE QUALITY REVIEW
+// ===========================================
+window.closeGISQualityReview =
+    function () {
 
-window.validateQualityFarm =
-    function(farmId) {
+        const modal =
+            document.getElementById(
+                'gisQualityModal'
+            );
 
-        return makeQualityDecision(
-            farmId,
-            'validate'
-        );
 
+        if (
+            qualityReviewMap
+        ) {
+
+            qualityReviewMap.remove();
+
+            qualityReviewMap =
+                null;
+        }
+
+
+        if (modal) {
+            modal.remove();
+        }
+
+
+        qualityReviewFarm =
+            null;
+
+        qualityReviewResult =
+            null;
+
+        qualityIssueLayers =
+            [];
     };
 
 
-window.rejectQualityFarm =
-    function(farmId) {
+// ===========================================
+// QUALITY QUEUE
+// ===========================================
+function renderQualityQueue() {
 
-        return makeQualityDecision(
-            farmId,
-            'reject'
+    const container =
+        document.getElementById(
+            'qualityQueue'
         );
 
-    };
+
+    if (!container) {
+        return;
+    }
 
 
-/* =========================================================
-   QUALITY BADGE
-   ========================================================= */
+    const alerts =
+        [
+            ...protectedAlerts,
+            ...polygonAlerts
+        ];
 
-function qualityBadgeHtml(
-    quality
-) {
 
-    if (!quality) {
+    if (
+        alerts.length ===
+        0
+    ) {
 
-        return `
-            <span class="quality-badge not-checked">
-                Not Checked
-            </span>
+        container.innerHTML = `
+            <div class="empty-state">
+
+                <i class="fas fa-check-circle"></i>
+
+                <h3>
+                    No Quality Alerts
+                </h3>
+
+                <p>
+                    All farms currently pass
+                    the available alert checks.
+                </p>
+
+            </div>
         `;
 
+        return;
     }
 
 
-    const status =
-        quality.quality_status ||
-        'not_checked';
+    container.innerHTML =
+        alerts
+            .map(
+                alert => `
+
+                    <div
+                        class="quality-queue-row"
+                        data-alert-id="${escapeHtml(
+                            alert.id
+                        )}"
+                    >
+
+                        <div class="queue-main">
+
+                            <strong>
+                                ${escapeHtml(
+                                    alert.title
+                                )}
+                            </strong>
+
+                            <span>
+                                ${escapeHtml(
+                                    alert.supplier ||
+                                    'Unknown'
+                                )}
+                            </span>
+
+                        </div>
 
 
-    const score =
-        quality.overall_score;
+                        <span
+                            class="queue-severity ${escapeHtml(
+                                alert.severity
+                            )}"
+                        >
+                            ${escapeHtml(
+                                alert.severity
+                            )}
+                        </span>
 
 
-    const label = {
-
-        passed: 'Passed',
-
-        rechecked: 'Passed',
-
-        warning: 'Warning',
-
-        issues_detected:
-            'Issues Detected',
-
-        correction_required:
-            'Correction Required',
-
-        blocked:
-            'Blocked',
-
-        not_checked:
-            'Not Checked'
-
-    }[status] || status;
+                        <span
+                            class="queue-status ${escapeHtml(
+                                alert.status
+                            )}"
+                        >
+                            ${escapeHtml(
+                                alert.status
+                            )}
+                        </span>
 
 
-    return `
-        <span class="quality-badge ${status}">
-            ${score !== null && score !== undefined
-                ? `${Number(score).toFixed(0)}% · `
-                : ''
-            }
-            ${escapeHtml(label)}
-        </span>
-    `;
-}
+                        <button
+                            type="button"
+                            class="queue-review-btn"
+                            onclick="
+                                event.stopPropagation();
+                                openQualityFromAlertId(
+                                    '${escapeHtml(
+                                        alert.id
+                                    )}'
+                                )
+                            "
+                        >
+                            <i class="fas fa-shield-alt"></i>
+                            Review
+                        </button>
 
-
-/* =========================================================
-   DECISION BUTTONS
-   ========================================================= */
-
-function qualityDecisionButtons(
-    farm,
-    quality
-) {
-
-    if (!qualityPermissions.canDecide) {
-        return '';
-    }
-
-
-    const critical =
-        Number(
-            quality?.critical_issue_count || 0
-        );
-
-
-    const passed =
-        [
-            'passed',
-            'rechecked'
-        ].includes(
-            quality?.quality_status
-        );
-
-
-    return `
-
-        <div class="quality-decision-actions">
-
-            <button
-                class="quality-reject-btn"
-                onclick="
-                    event.stopPropagation();
-                    rejectQualityFarm('${farm.id}');
-                "
-            >
-                <i class="fas fa-times-circle"></i>
-                Reject Plot
-            </button>
-
-
-            <button
-                class="quality-validate-btn"
-                ${(!passed || critical > 0)
-                    ? 'disabled'
-                    : ''
-                }
-                title="${
-                    critical > 0
-                        ? 'Critical Quality issues remain'
-                        : !passed
-                            ? 'Quality assessment has not passed'
-                            : 'Validate plot'
-                }"
-                onclick="
-                    event.stopPropagation();
-                    validateQualityFarm('${farm.id}');
-                "
-            >
-                <i class="fas fa-check-circle"></i>
-                Validate Plot
-            </button>
-
-        </div>
-
-    `;
-}
-
-
-/* =========================================================
-   QUALITY HISTORY
-   ========================================================= */
-
-async function loadQualityHistory(
-    farmId
-) {
-
-    const { data, error } =
-        await supabaseClient
-            .from('farm_quality_history')
-            .select('*')
-            .eq('farm_id', farmId)
-            .order(
-                'checked_at',
-                {
-                    ascending: false
-                }
-            );
-
-
-    if (error) {
-
-        console.error(
-            'Quality history error:',
-            error
-        );
-
-        return [];
-
-    }
-
-
-    return data || [];
-}
-
-
-/* =========================================================
-   INDIVIDUAL ISSUE LOADING
-   ========================================================= */
-
-async function loadQualityIssues(
-    farmId
-) {
-
-    const { data, error } =
-        await supabaseClient
-            .from('farm_quality_issues')
-            .select('*')
-            .eq('farm_id', farmId)
-            .eq('status', 'open')
-            .order(
-                'severity',
-                {
-                    ascending: true
-                }
-            );
-
-
-    if (error) {
-
-        console.error(
-            'Quality issues error:',
-            error
-        );
-
-        return [];
-
-    }
-
-
-    return data || [];
-}
-
-
-/* =========================================================
-   LOCATE QUALITY ISSUE
-   ========================================================= */
-
-window.locateQualityIssue =
-    function(issue) {
-
-        if (!issue) {
-            return;
-        }
-
-
-        /*
-         * Prefer exact issue coordinates.
-         */
-
-        if (
-            currentMap &&
-            Number.isFinite(
-                Number(issue.latitude)
-            ) &&
-            Number.isFinite(
-                Number(issue.longitude)
+                    </div>
+                `
             )
-        ) {
-
-            const lat =
-                Number(issue.latitude);
-
-            const lng =
-                Number(issue.longitude);
+            .join('');
+}
 
 
-            currentMap.setView(
-                [lat, lng],
-                18
+// ===========================================
+// ALERT → QUALITY REVIEW BRIDGE
+// ===========================================
+function farmIdFromAlertId(
+    alertId
+) {
+
+    const id =
+        String(
+            alertId || ''
+        );
+
+
+    if (
+        id.startsWith(
+            'self_intersection_'
+        )
+    ) {
+
+        return id.substring(
+            'self_intersection_'
+                .length
+        );
+    }
+
+
+    if (
+        id.startsWith(
+            'invalid_geom_'
+        )
+    ) {
+
+        return id.substring(
+            'invalid_geom_'
+                .length
+        );
+    }
+
+
+    if (
+        id.startsWith(
+            'duplicate_'
+        )
+    ) {
+
+        return id.substring(
+            'duplicate_'
+                .length
+        );
+    }
+
+
+    if (
+        id.startsWith(
+            'protected_overlap_'
+        )
+    ) {
+
+        const rest =
+            id.substring(
+                'protected_overlap_'
+                    .length
             );
 
 
-            L.marker(
-                [lat, lng]
-            )
-                .addTo(currentMap)
-                .bindPopup(
-                    `
-                    <strong>
-                        ${escapeHtml(
-                            issue.title ||
-                            'Quality Issue'
-                        )}
-                    </strong>
-                    <br>
-                    ${escapeHtml(
-                        issue.description ||
-                        ''
-                    )}
-                    `
-                )
-                .openPopup();
+        return rest.split('_')[0] ||
+            null;
+    }
 
+
+    if (
+        id.startsWith(
+            'overlap_'
+        )
+    ) {
+
+        const rest =
+            id.substring(
+                'overlap_'
+                    .length
+            );
+
+
+        return rest.split('_')[0] ||
+            null;
+    }
+
+
+    return null;
+}
+
+
+window.openQualityFromAlertId =
+    async function (
+        alertId
+    ) {
+
+        const farmId =
+            farmIdFromAlertId(
+                alertId
+            );
+
+
+        if (!farmId) {
+
+            showNotification(
+                'Could not identify the farm for this alert.',
+                'error'
+            );
 
             return;
         }
 
 
-        /*
-         * Fallback:
-         * locate farm polygon.
-         */
-
-        const farm =
+        let farm =
             allFarms.find(
                 f =>
-                    f.id === issue.farm_id
+                    String(f.id) ===
+                    String(farmId)
             );
 
 
-        if (
-            farm?.geometry &&
-            currentMap
-        ) {
+        if (!farm) {
 
-            const coords =
-                convertCoords(
-                    farm.geometry.coordinates
-                );
+            try {
+
+                const {
+                    data,
+                    error
+                } =
+                    await supabaseClient
+                        .from('farms')
+                        .select('*')
+                        .eq(
+                            'id',
+                            farmId
+                        )
+                        .maybeSingle();
 
 
-            const polygon =
-                L.polygon(
-                    coords
-                ).addTo(
-                    currentMap
-                );
+                if (error) {
+                    throw error;
+                }
 
 
-            if (
-                polygon
-                    .getBounds()
-                    .isValid()
+                farm =
+                    data;
+
+            } catch (
+                error
             ) {
 
-                currentMap.fitBounds(
-                    polygon.getBounds(),
-                    {
-                        padding: [
-                            50,
-                            50
-                        ]
+                console.error(
+                    error
+                );
+
+                showNotification(
+                    'Unable to load farm: ' +
+                    error.message,
+                    'error'
+                );
+
+                return;
+            }
+        }
+
+
+        if (!farm) {
+
+            showNotification(
+                'Farm not found.',
+                'error'
+            );
+
+            return;
+        }
+
+
+        openGISQualityReview(
+            farm.id
+        );
+    };
+
+
+// ===========================================
+// REVIEW BUTTON IN ALERT CARDS
+// ===========================================
+function addReviewButtons() {
+
+    document
+        .querySelectorAll(
+            '.alert-actions'
+        )
+        .forEach(
+            actions => {
+
+                if (
+                    actions.querySelector(
+                        '.review-quality-btn'
+                    )
+                ) {
+                    return;
+                }
+
+
+                const alertItem =
+                    actions.closest(
+                        '.alert-item'
+                    );
+
+
+                if (!alertItem) {
+                    return;
+                }
+
+
+                const mapButton =
+                    actions.querySelector(
+                        '.view-map'
+                    );
+
+
+                if (!mapButton) {
+                    return;
+                }
+
+
+                const match =
+                    mapButton
+                        .getAttribute(
+                            'onclick'
+                        )
+                        ?.match(
+                            /viewAlertOnMap\(['"]([^'"]+)['"]\)/
+                        );
+
+
+                if (!match) {
+                    return;
+                }
+
+
+                const alertId =
+                    match[1];
+
+
+                const button =
+                    document.createElement(
+                        'button'
+                    );
+
+
+                button.type =
+                    'button';
+
+
+                button.className =
+                    'action-btn review-quality-btn';
+
+
+                button.innerHTML =
+                    `
+                    <i class="fas fa-shield-alt"></i>
+                    Review Quality
+                    `;
+
+
+                button.addEventListener(
+                    'click',
+                    function (
+                        event
+                    ) {
+
+                        event.stopPropagation();
+
+                        window.openQualityFromAlertId(
+                            alertId
+                        );
                     }
                 );
 
+
+                actions.appendChild(
+                    button
+                );
             }
-
-        }
-
-    };
-
-
-/* =========================================================
-   INITIALIZE PERMISSIONS
-   ========================================================= */
-
-async function initializeQualityPermissions() {
-
-    await loadQualityPermissions();
-
+        );
 }
 
 
-/* =========================================================
-   PATCH EXISTING INITIALIZATION
-   ========================================================= */
+// ===========================================
+// MUTATION OBSERVER
+// ===========================================
+const qualityAlertObserver =
+    new MutationObserver(
+        addReviewButtons
+    );
 
-const originalQualityInit =
-    window.initializeQualityPermissions;
+
+function startQualityBridge() {
+
+    addReviewButtons();
 
 
-document.addEventListener(
-    'DOMContentLoaded',
-    async function() {
-
-        /*
-         * Existing page initialization already
-         * loads the authenticated user.
-         *
-         * Give it a short moment, then apply
-         * Quality permissions.
-         */
-
-        setTimeout(
-            initializeQualityPermissions,
-            300
+    const protectedList =
+        document.getElementById(
+            'protectedAlertsList'
         );
 
+
+    const polygonList =
+        document.getElementById(
+            'polygonAlertsList'
+        );
+
+
+    if (
+        protectedList
+    ) {
+
+        qualityAlertObserver.observe(
+            protectedList,
+            {
+                childList:
+                    true,
+
+                subtree:
+                    true
+            }
+        );
     }
-);
+
+
+    if (
+        polygonList
+    ) {
+
+        qualityAlertObserver.observe(
+            polygonList,
+            {
+                childList:
+                    true,
+
+                subtree:
+                    true
+            }
+        );
+    }
+}
+
+
+if (
+    document.readyState ===
+    'loading'
+) {
+
+    document.addEventListener(
+        'DOMContentLoaded',
+        startQualityBridge
+    );
+
+} else {
+
+    startQualityBridge();
+}
+
+
+// ===========================================
+// FINAL GLOBAL EXPORTS
+// ===========================================
+window.generateAlerts =
+    generateAlerts;
+
+window.renderQualityQueue =
+    renderQualityQueue;
+
+window.getCurrentQualityRole =
+    getCurrentQualityRole;
+
+window.canReviewQuality =
+    canReviewQuality;
 
 
 console.log(
-    '✅ Quality decision layer loaded'
+    '✅ Quality Alerts + GIS Quality Review module ready'
 );
-// ===========================================
-// REFRESH FUNCTIONS
-// ===========================================
-function refreshProtectedAlerts() {
-    if (currentProject) {
-        showLoading(true);
-        Promise.all([
-            loadFarms(currentProject.id),
-            loadProtectedAreas(currentProject.id)
-        ]).then(() => {
-            generateAlerts();
-            showLoading(false);
-        });
-    }
-}
-
-function refreshPolygonAlerts() {
-    if (currentProject) {
-        showLoading(true);
-        Promise.all([
-            loadFarms(currentProject.id),
-            loadProtectedAreas(currentProject.id)
-        ]).then(() => {
-            generateAlerts();
-            showLoading(false);
-        });
-    }
-}
-
-// ===========================================
-// HELPER FUNCTIONS
-// ===========================================
-function showNotification(message, type = 'info') {
-    const colors = { success: '#4CAF50', error: '#F44336', warning: '#FFC107', info: '#2196F3' };
-    const notification = document.createElement('div');
-    notification.style.cssText = `position:fixed;bottom:20px;right:20px;padding:12px 24px;background:${colors[type]};color:white;border-radius:8px;z-index:10001;font-size:13px;font-weight:500;display:flex;align-items:center;gap:8px;box-shadow:0 4px 12px rgba(0,0,0,0.15);`;
-    notification.innerHTML = `<i class="fas ${type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle'}"></i> ${message}`;
-    document.body.appendChild(notification);
-    setTimeout(() => notification.remove(), 3000);
-}
-
-function showLoading(show) {
-    const overlay = document.getElementById('loadingOverlay');
-    if (overlay) overlay.style.display = show ? 'flex' : 'none';
-}
-
-function escapeHtml(str) {
-    if (!str) return '';
-    return str.replace(/[&<>]/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[m] || m));
-}
-
-function setupEventListeners() {
-    document.getElementById('refreshBtn')?.addEventListener('click', () => {
-        if (currentProject) {
-            showLoading(true);
-            Promise.all([
-                loadFarms(currentProject.id),
-                loadProtectedAreas(currentProject.id)
-            ]).then(() => {
-                generateAlerts();
-                showLoading(false);
-            });
-        }
-    });
-    document.getElementById('logoutBtn')?.addEventListener('click', async () => {
-        await supabaseClient.auth.signOut();
-        localStorage.clear();
-        window.location.href = '../login.html';
-    });
-}
-
-// Make functions global
-window.applyProtectedFilters = applyProtectedFilters;
-window.applyPolygonFilters = applyPolygonFilters;
-window.clearProtectedFilters = clearProtectedFilters;
-window.clearPolygonFilters = clearPolygonFilters;
-window.markProtectedRead = markProtectedRead;
-window.markPolygonRead = markPolygonRead;
-window.viewAlertOnMap = viewAlertOnMap;
-window.updateAlertStatus = updateAlertStatus;
-window.refreshProtectedAlerts = refreshProtectedAlerts;
-window.refreshPolygonAlerts = refreshPolygonAlerts;
-window.switchTab = switchTab;
-window.protectedPrevPage = protectedPrevPage;
-window.protectedNextPage = protectedNextPage;
-window.polygonPrevPage = polygonPrevPage;
-window.polygonNextPage = polygonNextPage;
-
-console.log('✅ Quality Alerts page ready');
