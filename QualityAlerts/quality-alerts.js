@@ -1060,27 +1060,968 @@ window.viewAlertOnMap = function(alertId) {
     }, 150);
 };
 
-// ===========================================
-// UPDATE ALERT STATUS
-// ===========================================
-window.updateAlertStatus = function(alertId, newStatus) {
-    const allAlerts = [...protectedAlerts, ...polygonAlerts];
-    const alert = allAlerts.find(a => a.id === alertId);
-    if (alert) {
-        alert.status = newStatus;
-        // Update in both arrays
-        const pAlert = protectedAlerts.find(a => a.id === alertId);
-        if (pAlert) pAlert.status = newStatus;
-        const poAlert = polygonAlerts.find(a => a.id === alertId);
-        if (poAlert) poAlert.status = newStatus;
-        
-        applyProtectedFilters();
-        applyPolygonFilters();
-        updateBadges();
-        showNotification(`Alert marked as ${newStatus}`, 'success');
+/* =========================================================
+   MAPPINGTRACE QUALITY CENTER
+   GIS / VALIDATOR / MANAGER DECISION LAYER
+   ========================================================= */
+
+let currentUserRole = null;
+let qualityPermissions = {
+    canView: false,
+    canDecide: false
+};
+
+
+/* =========================================================
+   ROLE CONFIGURATION
+   ========================================================= */
+
+const QUALITY_ROLES = {
+    owner: {
+        view: true,
+        decide: true
+    },
+
+    super_manager: {
+        view: true,
+        decide: true,
+        validatedOnly: true
+    },
+
+    manager: {
+        view: true,
+        decide: true
+    },
+
+    validator: {
+        view: true,
+        decide: true
+    },
+
+    gis: {
+        view: true,
+        decide: true
+    },
+
+    gis_team: {
+        view: true,
+        decide: true
+    },
+
+    field_officer: {
+        view: false,
+        decide: false
+    },
+
+    enumerator: {
+        view: false,
+        decide: false
+    },
+
+    viewer: {
+        view: false,
+        decide: false
     }
 };
 
+
+/* =========================================================
+   LOAD ROLE
+   ========================================================= */
+
+async function loadQualityPermissions() {
+
+    if (!currentUser || !supabaseClient) {
+        return false;
+    }
+
+    try {
+
+        const { data, error } = await supabaseClient
+            .from('project_members')
+            .select('role, project_id')
+            .eq('user_id', currentUser.id)
+            .eq('status', 'active');
+
+        if (error) {
+            console.error('Quality role error:', error);
+            return false;
+        }
+
+        if (!data || data.length === 0) {
+            return false;
+        }
+
+        /*
+         * Highest permission wins.
+         */
+
+        const priority = [
+            'owner',
+            'super_manager',
+            'manager',
+            'validator',
+            'gis',
+            'gis_team',
+            'field_officer',
+            'enumerator',
+            'viewer'
+        ];
+
+        let role = 'viewer';
+
+        for (const candidate of priority) {
+
+            if (data.some(m => m.role === candidate)) {
+                role = candidate;
+                break;
+            }
+
+        }
+
+        currentUserRole = role;
+
+        const permissions =
+            QUALITY_ROLES[role] ||
+            QUALITY_ROLES.viewer;
+
+        qualityPermissions = {
+            ...permissions
+        };
+
+        console.log(
+            'Quality role:',
+            currentUserRole,
+            qualityPermissions
+        );
+
+        applyQualityRoleUI();
+
+        return true;
+
+    } catch (error) {
+
+        console.error(
+            'Failed to load Quality permissions:',
+            error
+        );
+
+        return false;
+    }
+}
+
+
+/* =========================================================
+   APPLY UI PERMISSIONS
+   ========================================================= */
+
+function applyQualityRoleUI() {
+
+    const qualityPage =
+        document.querySelector('.quality-page') ||
+        document.body;
+
+    if (!qualityPermissions.canView) {
+
+        document
+            .querySelectorAll(
+                '.quality-restricted, .quality-decision-btn'
+            )
+            .forEach(el => {
+
+                el.style.display = 'none';
+
+            });
+
+    }
+
+    if (!qualityPermissions.canDecide) {
+
+        document
+            .querySelectorAll(
+                '.quality-decision-btn, .quality-reject-btn, .quality-validate-btn'
+            )
+            .forEach(el => {
+
+                el.style.display = 'none';
+
+            });
+
+    }
+
+    /*
+     * Super Manager:
+     * Operational Quality view only shows validated plots.
+     */
+
+    if (currentUserRole === 'super_manager') {
+
+        document.body.classList.add(
+            'super-manager-quality-view'
+        );
+
+    }
+
+}
+
+
+/* =========================================================
+   LOAD QUALITY DATA FOR FARM
+   ========================================================= */
+
+async function loadFarmQuality(farmId) {
+
+    if (!farmId) {
+        return null;
+    }
+
+    const { data, error } = await supabaseClient
+        .from('farm_quality')
+        .select('*')
+        .eq('farm_id', farmId)
+        .maybeSingle();
+
+    if (error) {
+
+        console.error(
+            'Quality load error:',
+            error
+        );
+
+        return null;
+    }
+
+    return data;
+}
+
+
+/* =========================================================
+   CREATE / UPDATE QUALITY SUMMARY
+   ========================================================= */
+
+async function saveFarmQuality(
+    farm,
+    result
+) {
+
+    if (!farm?.id) {
+        throw new Error(
+            'Farm ID is required'
+        );
+    }
+
+    const payload = {
+
+        farm_id: farm.id,
+
+        project_id:
+            farm.project_id ||
+            currentProject?.id ||
+            null,
+
+        overall_score:
+            result.overall_score ?? null,
+
+        quality_status:
+            result.quality_status ||
+            'issues_detected',
+
+        geometry_score:
+            result.geometry_score ?? null,
+
+        mapping_score:
+            result.mapping_score ?? null,
+
+        spatial_score:
+            result.spatial_score ?? null,
+
+        attribute_score:
+            result.attribute_score ?? null,
+
+        traceability_score:
+            result.traceability_score ?? null,
+
+        geometry_valid:
+            result.geometry_valid ?? null,
+
+        self_intersection:
+            !!result.self_intersection,
+
+        spike_detected:
+            !!result.spike_detected,
+
+        duplicate_detected:
+            !!result.duplicate_detected,
+
+        near_duplicate_detected:
+            !!result.near_duplicate_detected,
+
+        empty_geometry:
+            !!result.empty_geometry,
+
+        multipart_geometry:
+            !!result.multipart_geometry,
+
+        hole_detected:
+            !!result.hole_detected,
+
+        projection_issue:
+            !!result.projection_issue,
+
+        location_issue:
+            !!result.location_issue,
+
+        protected_area_conflict:
+            !!result.protected_area_conflict,
+
+        forest_conflict:
+            !!result.forest_conflict,
+
+        overlap_detected:
+            !!result.overlap_detected,
+
+        critical_issue_count:
+            result.critical_issue_count || 0,
+
+        major_issue_count:
+            result.major_issue_count || 0,
+
+        warning_issue_count:
+            result.warning_issue_count || 0,
+
+        last_checked_at:
+            new Date().toISOString(),
+
+        checked_by:
+            currentUser?.id || null
+    };
+
+
+    const { data, error } =
+        await supabaseClient
+            .from('farm_quality')
+            .upsert(
+                payload,
+                {
+                    onConflict: 'farm_id'
+                }
+            )
+            .select()
+            .single();
+
+
+    if (error) {
+
+        console.error(
+            'Quality save error:',
+            error
+        );
+
+        throw error;
+    }
+
+    return data;
+}
+
+
+/* =========================================================
+   QUALITY DECISION
+   ========================================================= */
+
+async function makeQualityDecision(
+    farmId,
+    decision
+) {
+
+    if (!qualityPermissions.canDecide) {
+
+        showNotification(
+            'You do not have permission to make a Quality decision.',
+            'error'
+        );
+
+        return;
+    }
+
+
+    const quality =
+        await loadFarmQuality(farmId);
+
+
+    if (!quality) {
+
+        showNotification(
+            'Quality assessment not found.',
+            'error'
+        );
+
+        return;
+    }
+
+
+    /* ---------------------------------------------
+       VALIDATION PRE-CHECK
+       --------------------------------------------- */
+
+    if (decision === 'validate') {
+
+        if (
+            Number(
+                quality.critical_issue_count || 0
+            ) > 0
+        ) {
+
+            showNotification(
+                'Validation blocked: critical Quality issues remain.',
+                'error'
+            );
+
+            return;
+        }
+
+
+        if (
+            ![
+                'passed',
+                'rechecked'
+            ].includes(
+                quality.quality_status
+            )
+        ) {
+
+            showNotification(
+                'Validation blocked: Quality has not passed.',
+                'warning'
+            );
+
+            return;
+        }
+
+    }
+
+
+    /* ---------------------------------------------
+       REJECTION REASON
+       --------------------------------------------- */
+
+    let reason = null;
+
+    if (decision === 'reject') {
+
+        reason = prompt(
+            'Enter the reason for rejecting this plot:'
+        );
+
+        if (
+            reason === null ||
+            !reason.trim()
+        ) {
+
+            showNotification(
+                'A rejection reason is required.',
+                'warning'
+            );
+
+            return;
+        }
+
+    }
+
+
+    /* ---------------------------------------------
+       CONFIRM
+       --------------------------------------------- */
+
+    const message =
+        decision === 'reject'
+            ? 'Reject this plot?'
+            : 'Validate this GIS Quality review?';
+
+
+    if (!confirm(message)) {
+        return;
+    }
+
+
+    showLoading(true);
+
+
+    try {
+
+        const { data, error } =
+            await supabaseClient.rpc(
+                'quality_decision',
+                {
+                    p_farm_id: farmId,
+                    p_decision: decision,
+                    p_reason: reason
+                }
+            );
+
+
+        if (error) {
+
+            console.error(
+                'Quality decision error:',
+                error
+            );
+
+            throw error;
+        }
+
+
+        console.log(
+            'Quality decision:',
+            data
+        );
+
+
+        showNotification(
+            decision === 'reject'
+                ? 'Plot rejected successfully.'
+                : 'GIS Quality validated successfully.',
+            'success'
+        );
+
+
+        /*
+         * Reload everything so Submission and Quality
+         * show the same workflow state.
+         */
+
+        if (currentProject) {
+
+            await loadFarms(
+                currentProject.id
+            );
+
+            await loadProtectedAreas(
+                currentProject.id
+            );
+
+            generateAlerts();
+
+        }
+
+
+    } catch (error) {
+
+        console.error(error);
+
+        showNotification(
+            error.message ||
+            'Unable to complete Quality decision.',
+            'error'
+        );
+
+    } finally {
+
+        showLoading(false);
+
+    }
+
+}
+
+
+/* =========================================================
+   GLOBAL BUTTON FUNCTIONS
+   ========================================================= */
+
+window.validateQualityFarm =
+    function(farmId) {
+
+        return makeQualityDecision(
+            farmId,
+            'validate'
+        );
+
+    };
+
+
+window.rejectQualityFarm =
+    function(farmId) {
+
+        return makeQualityDecision(
+            farmId,
+            'reject'
+        );
+
+    };
+
+
+/* =========================================================
+   QUALITY BADGE
+   ========================================================= */
+
+function qualityBadgeHtml(
+    quality
+) {
+
+    if (!quality) {
+
+        return `
+            <span class="quality-badge not-checked">
+                Not Checked
+            </span>
+        `;
+
+    }
+
+
+    const status =
+        quality.quality_status ||
+        'not_checked';
+
+
+    const score =
+        quality.overall_score;
+
+
+    const label = {
+
+        passed: 'Passed',
+
+        rechecked: 'Passed',
+
+        warning: 'Warning',
+
+        issues_detected:
+            'Issues Detected',
+
+        correction_required:
+            'Correction Required',
+
+        blocked:
+            'Blocked',
+
+        not_checked:
+            'Not Checked'
+
+    }[status] || status;
+
+
+    return `
+        <span class="quality-badge ${status}">
+            ${score !== null && score !== undefined
+                ? `${Number(score).toFixed(0)}% · `
+                : ''
+            }
+            ${escapeHtml(label)}
+        </span>
+    `;
+}
+
+
+/* =========================================================
+   DECISION BUTTONS
+   ========================================================= */
+
+function qualityDecisionButtons(
+    farm,
+    quality
+) {
+
+    if (!qualityPermissions.canDecide) {
+        return '';
+    }
+
+
+    const critical =
+        Number(
+            quality?.critical_issue_count || 0
+        );
+
+
+    const passed =
+        [
+            'passed',
+            'rechecked'
+        ].includes(
+            quality?.quality_status
+        );
+
+
+    return `
+
+        <div class="quality-decision-actions">
+
+            <button
+                class="quality-reject-btn"
+                onclick="
+                    event.stopPropagation();
+                    rejectQualityFarm('${farm.id}');
+                "
+            >
+                <i class="fas fa-times-circle"></i>
+                Reject Plot
+            </button>
+
+
+            <button
+                class="quality-validate-btn"
+                ${(!passed || critical > 0)
+                    ? 'disabled'
+                    : ''
+                }
+                title="${
+                    critical > 0
+                        ? 'Critical Quality issues remain'
+                        : !passed
+                            ? 'Quality assessment has not passed'
+                            : 'Validate plot'
+                }"
+                onclick="
+                    event.stopPropagation();
+                    validateQualityFarm('${farm.id}');
+                "
+            >
+                <i class="fas fa-check-circle"></i>
+                Validate Plot
+            </button>
+
+        </div>
+
+    `;
+}
+
+
+/* =========================================================
+   QUALITY HISTORY
+   ========================================================= */
+
+async function loadQualityHistory(
+    farmId
+) {
+
+    const { data, error } =
+        await supabaseClient
+            .from('farm_quality_history')
+            .select('*')
+            .eq('farm_id', farmId)
+            .order(
+                'checked_at',
+                {
+                    ascending: false
+                }
+            );
+
+
+    if (error) {
+
+        console.error(
+            'Quality history error:',
+            error
+        );
+
+        return [];
+
+    }
+
+
+    return data || [];
+}
+
+
+/* =========================================================
+   INDIVIDUAL ISSUE LOADING
+   ========================================================= */
+
+async function loadQualityIssues(
+    farmId
+) {
+
+    const { data, error } =
+        await supabaseClient
+            .from('farm_quality_issues')
+            .select('*')
+            .eq('farm_id', farmId)
+            .eq('status', 'open')
+            .order(
+                'severity',
+                {
+                    ascending: true
+                }
+            );
+
+
+    if (error) {
+
+        console.error(
+            'Quality issues error:',
+            error
+        );
+
+        return [];
+
+    }
+
+
+    return data || [];
+}
+
+
+/* =========================================================
+   LOCATE QUALITY ISSUE
+   ========================================================= */
+
+window.locateQualityIssue =
+    function(issue) {
+
+        if (!issue) {
+            return;
+        }
+
+
+        /*
+         * Prefer exact issue coordinates.
+         */
+
+        if (
+            currentMap &&
+            Number.isFinite(
+                Number(issue.latitude)
+            ) &&
+            Number.isFinite(
+                Number(issue.longitude)
+            )
+        ) {
+
+            const lat =
+                Number(issue.latitude);
+
+            const lng =
+                Number(issue.longitude);
+
+
+            currentMap.setView(
+                [lat, lng],
+                18
+            );
+
+
+            L.marker(
+                [lat, lng]
+            )
+                .addTo(currentMap)
+                .bindPopup(
+                    `
+                    <strong>
+                        ${escapeHtml(
+                            issue.title ||
+                            'Quality Issue'
+                        )}
+                    </strong>
+                    <br>
+                    ${escapeHtml(
+                        issue.description ||
+                        ''
+                    )}
+                    `
+                )
+                .openPopup();
+
+
+            return;
+        }
+
+
+        /*
+         * Fallback:
+         * locate farm polygon.
+         */
+
+        const farm =
+            allFarms.find(
+                f =>
+                    f.id === issue.farm_id
+            );
+
+
+        if (
+            farm?.geometry &&
+            currentMap
+        ) {
+
+            const coords =
+                convertCoords(
+                    farm.geometry.coordinates
+                );
+
+
+            const polygon =
+                L.polygon(
+                    coords
+                ).addTo(
+                    currentMap
+                );
+
+
+            if (
+                polygon
+                    .getBounds()
+                    .isValid()
+            ) {
+
+                currentMap.fitBounds(
+                    polygon.getBounds(),
+                    {
+                        padding: [
+                            50,
+                            50
+                        ]
+                    }
+                );
+
+            }
+
+        }
+
+    };
+
+
+/* =========================================================
+   INITIALIZE PERMISSIONS
+   ========================================================= */
+
+async function initializeQualityPermissions() {
+
+    await loadQualityPermissions();
+
+}
+
+
+/* =========================================================
+   PATCH EXISTING INITIALIZATION
+   ========================================================= */
+
+const originalQualityInit =
+    window.initializeQualityPermissions;
+
+
+document.addEventListener(
+    'DOMContentLoaded',
+    async function() {
+
+        /*
+         * Existing page initialization already
+         * loads the authenticated user.
+         *
+         * Give it a short moment, then apply
+         * Quality permissions.
+         */
+
+        setTimeout(
+            initializeQualityPermissions,
+            300
+        );
+
+    }
+);
+
+
+console.log(
+    '✅ Quality decision layer loaded'
+);
 // ===========================================
 // REFRESH FUNCTIONS
 // ===========================================
