@@ -206,7 +206,7 @@
 
                         <div class="filter-section">
                             <label><i class="fas fa-route"></i> Workflow Stage</label>
-                            <div class="checkbox-list workflow-list" id="workflowList" class="checkbox-list workflow-list">
+                            <div class="checkbox-list workflow-list" id="workflowList">
                                 <label class="checkbox-item"><input type="checkbox" class="workflow-checkbox" value="submitted" checked><span class="checkbox-label">Submitted</span></label>
                                 <label class="checkbox-item"><input type="checkbox" class="workflow-checkbox" value="enumerator_review" checked><span class="checkbox-label">Enumerator Review</span></label>
                                 <label class="checkbox-item"><input type="checkbox" class="workflow-checkbox" value="field_officer_review" checked><span class="checkbox-label">Field Officer Review</span></label>
@@ -237,7 +237,7 @@
                         </div>
                         <div class="advanced-filters hidden" id="advancedFilters">
                             <div class="advanced-grid">
-                                <div class="advanced-field"><label>Workflow date basis</label><select id="dateBasis"><option value="created_at">Mapping / submission date</option><option value="validated_at">Validation date</option><option value="rejected_at">Rejection date</option></select></div>
+                                <div class="advanced-field"><label>Workflow date basis</label><select id="dateBasis"><option value="created_at">Mapping / submission date</option><option value="updated_at">Last update</option><option value="validated_at">Validation date</option><option value="rejected_at">Rejection date</option></select></div>
                                 <div class="advanced-field"><label>Minimum area (ha)</label><input id="areaMin" type="number" min="0" step="0.01" placeholder="No minimum"></div>
                                 <div class="advanced-field"><label>Maximum area (ha)</label><input id="areaMax" type="number" min="0" step="0.01" placeholder="No maximum"></div>
                                 <div class="advanced-field"><label>Quality condition</label><select id="qualityFilter"><option value="all">All records</option><option value="missing_geometry">Missing geometry</option><option value="rejection_reason">Has rejection reason</option><option value="correction_required">Correction required</option></select></div>
