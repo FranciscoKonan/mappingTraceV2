@@ -2,1697 +2,383 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-
-    <meta
-        name="viewport"
-        content="width=device-width, initial-scale=1.0"
-    >
-
-    <title>
-        MappingTrace — Export Center
-    </title>
-
-    <link
-        rel="stylesheet"
-        href="exports.css"
-    >
-
-    <link
-        rel="stylesheet"
-        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
-    >
-
-    <!-- Supabase -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
-    <!-- Excel -->
-    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-
-    <!-- ZIP / KMZ -->
-    <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-
-    <!-- File download -->
-    <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Exports | MappingTrace</title>
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <link rel="stylesheet" href="exports.css">
+    <link rel="icon" type="image/x-icon" href="../assets/favicon.ico">
 </head>
-
 <body>
+    <!-- Mobile Sidebar Overlay -->
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
 
-<div
-    id="loadingOverlay"
-    class="loading-overlay"
-    style="display:none;"
->
-    <div class="loading-box">
-
-        <div class="spinner"></div>
-
-        <strong>
-            Preparing export...
-        </strong>
-
-        <span>
-            Please wait
-        </span>
-
-    </div>
-</div>
-
-
-<div
-    id="sidebarOverlay"
-    class="sidebar-overlay"
-></div>
-
-
-<!-- =========================================================
-     SIDEBAR
-     ========================================================= -->
-
-<aside
-    id="sidebar"
-    class="sidebar"
->
-
-    <div class="sidebar-brand">
-
-        <div class="brand-mark">
-            MT
-        </div>
-
-        <div class="brand-text">
-            <strong>
-                MappingTrace
-            </strong>
-
-            <span>
-                Traceability Platform
-            </span>
-        </div>
-
-    </div>
-
-
-    <nav class="sidebar-nav">
-
-        <a
-            href="../dashboard.html"
-            class="nav-item"
-        >
-            <i class="fas fa-chart-line"></i>
-            <span>
-                Dashboard
-            </span>
-        </a>
-
-
-        <a
-            href="../submissions.html"
-            class="nav-item"
-        >
-            <i class="fas fa-layer-group"></i>
-            <span>
-                Submissions
-            </span>
-        </a>
-
-
-        <a
-            href="../farms.html"
-            class="nav-item"
-        >
-            <i class="fas fa-map"></i>
-            <span>
-                Farms
-            </span>
-        </a>
-
-
-        <a
-            href="exports.html"
-            class="nav-item active"
-        >
-            <i class="fas fa-file-export"></i>
-            <span>
-                Export Center
-            </span>
-        </a>
-
-
-        <a
-            href="../members.html"
-            class="nav-item"
-        >
-            <i class="fas fa-users"></i>
-            <span>
-                Members
-            </span>
-        </a>
-
-    </nav>
-
-
-    <div class="sidebar-footer">
-
-        <button
-            id="sidebarToggle"
-            class="sidebar-toggle"
-        >
-            <i class="fas fa-angle-left"></i>
-            <span>
-                Collapse
-            </span>
-        </button>
-
-    </div>
-
-</aside>
-
-
-<!-- =========================================================
-     MAIN
-     ========================================================= -->
-
-<main class="main-content">
-
-    <!-- HEADER -->
-
-    <header class="topbar">
-
-        <button
-            id="burgerBtn"
-            class="icon-button mobile-only"
-        >
-            <i class="fas fa-bars"></i>
-        </button>
-
-
-        <div class="topbar-project">
-
-            <div class="project-label">
-                PROJECT
-            </div>
-
-
-            <div
-                id="customDropdown"
-                class="project-dropdown"
-            >
-
-                <button
-                    id="dropdownSelected"
-                    class="dropdown-selected"
-                >
-
-                    <span
-                        id="selectedProjectName"
-                    >
-                        Loading project...
-                    </span>
-
-                    <i class="fas fa-chevron-down"></i>
-
+    <div class="layout">
+        <!-- SIDEBAR -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <h2>
+                    <i class="fas fa-map-marked-alt"></i>
+                    <span>MappingTrace</span>
+                </h2>
+                <button class="sidebar-toggle" id="sidebarToggle" title="Toggle sidebar">
+                    <i class="fas fa-chevron-left"></i>
                 </button>
+            </div>
+            <nav class="menu">
+                <div class="menu-label">Main</div>
+                <a href="../Dashboard.html" data-page="dashboard">
+                    <i class="fas fa-tachometer-alt"></i>
+                    <span>Dashboard</span>
+                </a>
+                <a href="../LiveMapping/live-mapping.html" data-page="live-mapping">
+                    <i class="fas fa-map"></i>
+                    <span>Live Mapping</span>
+                </a>
+                <a href="../Submissions/submissions.html" data-page="submissions">
+                    <i class="fas fa-clipboard-list"></i>
+                    <span>Submissions</span>
+                </a>
+                <a href="../QualityAlerts/quality-alerts.html" data-page="quality-alerts">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <span>Quality Alerts</span>
+                </a>
+                <a href="#" class="active" data-page="exports">
+                    <i class="fas fa-file-export"></i>
+                    <span>Exports</span>
+                </a>
+                
+                <hr class="menu-divider">
+                <div class="data-mgmt-link">
+                    <a href="../DataManagement.html" id="dataMgmtLink">
+                        <i class="fas fa-database"></i>
+                        <span>Data Management</span>
+                    </a>
+                </div>
+                
+                <div class="menu-bottom">
+                    <a href="#" id="logoutBtn">
+                        <i class="fas fa-sign-out-alt"></i>
+                        <span>Logout</span>
+                    </a>
+                </div>
+            </nav>
+        </aside>
 
+        <!-- MAIN CONTENT -->
+        <main class="main">
+            <!-- HEADER -->
+            <header class="main-header">
+                <div class="header-left">
+                    <button class="burger-btn" id="burgerBtn" aria-label="Toggle sidebar">
+                        <i class="fas fa-bars"></i>
+                    </button>
+                    <div class="header-title">
+                        <div>
+                            <h1>
+                                Exports
+                                <span class="project-badge" id="projectBadge">Loading...</span>
+                            </h1>
+                            <div class="breadcrumb">Home / Exports</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="user-info">
+                    <div class="project-selector-container hidden" id="projectSelectorContainer">
+                        <label><i class="fas fa-folder-open"></i> Project:</label>
+                        <div class="custom-dropdown" id="customDropdown">
+                            <div class="dropdown-selected" id="dropdownSelected">
+                                <span id="selectedProjectName">Loading...</span>
+                                <i class="fas fa-chevron-down"></i>
+                            </div>
+                            <div class="dropdown-menu" id="dropdownMenu">
+                                <div class="dropdown-search">
+                                    <input type="text" id="projectSearch" placeholder="Search projects...">
+                                </div>
+                                <div id="dropdownItems"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="user-avatar" id="userAvatar">JD</div>
+                    <div class="user-details">
+                        <div class="user-name" id="userName">User</div>
+                        <div class="user-role" id="userRole">Role</div>
+                    </div>
+                    <button class="sync-btn" id="refreshBtn"><i class="fas fa-sync-alt"></i> Refresh</button>
+                </div>
+            </header>
 
-                <div
-                    id="dropdownMenu"
-                    class="dropdown-menu"
-                >
+            <!-- EXPORTS CONTENT -->
+            <div class="exports-container">
+                <!-- Stats Cards -->
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon"><i class="fas fa-tractor"></i></div>
+                        <div class="stat-info">
+                            <h4>Total Farms</h4>
+                            <div class="stat-value" id="totalFarms">0</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon"><i class="fas fa-ruler-combined"></i></div>
+                        <div class="stat-info">
+                            <h4>Total Area</h4>
+                            <div class="stat-value" id="totalArea">0 ha</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon"><i class="fas fa-check-circle"></i></div>
+                        <div class="stat-info">
+                            <h4>Validated</h4>
+                            <div class="stat-value" id="validatedCount">0</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon"><i class="fas fa-clock"></i></div>
+                        <div class="stat-info">
+                            <h4>Pending</h4>
+                            <div class="stat-value" id="pendingCount">0</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon"><i class="fas fa-times-circle"></i></div>
+                        <div class="stat-info">
+                            <h4>Rejected</h4>
+                            <div class="stat-value" id="rejectedCount">0</div>
+                        </div>
+                    </div>
+                </div>
 
-                    <div class="dropdown-search">
-
-                        <i class="fas fa-search"></i>
-
-                        <input
-                            id="projectSearch"
-                            type="text"
-                            placeholder="Search project..."
-                        >
-
+                <!-- EXPORT CENTER -->
+                <div class="export-panel">
+                    <div class="panel-heading-row">
+                        <div>
+                            <h3><i class="fas fa-file-export"></i> Export Center</h3>
+                            <p class="panel-subtitle">Filter the project, review performance, then export the selected dataset.</p>
+                        </div>
+                        <div class="permission-badge" id="exportPermissionBadge">Checking permission...</div>
                     </div>
 
+                    <!-- Filters -->
+                    <div class="filters-grid">
+                        <div class="filter-section">
+                            <label><i class="fas fa-building"></i> Supplier</label>
+                            <div class="filter-search-box">
+                                <i class="fas fa-search"></i>
+                                <input type="text" id="supplierSearch" placeholder="Search suppliers...">
+                            </div>
+                            <div class="checkbox-list" id="supplierList"></div>
+                            <button class="btn-link" id="selectAllSuppliers">Select All</button>
+                        </div>
 
-                    <div
-                        id="dropdownItems"
-                        class="dropdown-items"
-                    ></div>
+                        <div class="filter-section">
+                            <label><i class="fas fa-users"></i> Cooperative</label>
+                            <div class="filter-search-box">
+                                <i class="fas fa-search"></i>
+                                <input type="text" id="coopSearch" placeholder="Search cooperatives...">
+                            </div>
+                            <div class="checkbox-list" id="cooperativeList"></div>
+                            <button class="btn-link" id="selectAllCooperatives">Select All</button>
+                        </div>
 
+                        <div class="filter-section">
+                            <label><i class="fas fa-user-edit"></i> Enumerator</label>
+                            <div class="filter-search-box">
+                                <i class="fas fa-search"></i>
+                                <input type="text" id="enumeratorSearch" placeholder="Search enumerators...">
+                            </div>
+                            <div class="checkbox-list" id="enumeratorList"></div>
+                            <button class="btn-link" id="selectAllEnumerators">Select All</button>
+                        </div>
+
+                        <div class="filter-section">
+                            <label><i class="fas fa-user-check"></i> Field Officer</label>
+                            <div class="filter-search-box">
+                                <i class="fas fa-search"></i>
+                                <input type="text" id="fieldOfficerSearch" placeholder="Search field officers...">
+                            </div>
+                            <div class="checkbox-list" id="fieldOfficerList"></div>
+                            <button class="btn-link" id="selectAllFieldOfficers">Select All</button>
+                        </div>
+
+                        <div class="filter-section">
+                            <label><i class="fas fa-route"></i> Workflow Stage</label>
+                            <div class="checkbox-list workflow-list" id="workflowList" class="checkbox-list workflow-list">
+                                <label class="checkbox-item"><input type="checkbox" class="workflow-checkbox" value="submitted" checked><span class="checkbox-label">Submitted</span></label>
+                                <label class="checkbox-item"><input type="checkbox" class="workflow-checkbox" value="enumerator_review" checked><span class="checkbox-label">Enumerator Review</span></label>
+                                <label class="checkbox-item"><input type="checkbox" class="workflow-checkbox" value="field_officer_review" checked><span class="checkbox-label">Field Officer Review</span></label>
+                                <label class="checkbox-item"><input type="checkbox" class="workflow-checkbox" value="gis_compliance_review" checked><span class="checkbox-label">GIS / Compliance</span></label>
+                                <label class="checkbox-item"><input type="checkbox" class="workflow-checkbox" value="final_validation" checked><span class="checkbox-label">Final Validation</span></label>
+                                <label class="checkbox-item"><input type="checkbox" class="workflow-checkbox" value="correction_required" checked><span class="checkbox-label">Correction Required</span></label>
+                                <label class="checkbox-item"><input type="checkbox" class="workflow-checkbox" value="validated" checked><span class="checkbox-label">Validated</span></label>
+                                <label class="checkbox-item"><input type="checkbox" class="workflow-checkbox" value="rejected" checked><span class="checkbox-label">Rejected</span></label>
+                            </div>
+                        </div>
+
+                        <div class="filter-section date-filter-section">
+                            <label><i class="fas fa-calendar-alt"></i> Date Range</label>
+                            <div class="date-row">
+                                <input type="date" id="dateFrom">
+                                <span>to</span>
+                                <input type="date" id="dateTo">
+                            </div>
+                            <button class="btn-link" id="clearDates">Clear dates</button>
+                        </div>
+                    </div>
+
+                    <!-- Advanced Filters -->
+                    <div class="advanced-filters-section">
+                        <div class="advanced-toggle-row">
+                            <div><h3><i class="fas fa-sliders-h"></i> Advanced Filters</h3><p class="panel-subtitle">Use these controls for audit, quality and workload analysis.</p></div>
+                            <button class="btn-secondary" id="advancedToggleBtn"><i class="fas fa-chevron-down"></i> Show advanced filters</button>
+                        </div>
+                        <div class="advanced-filters hidden" id="advancedFilters">
+                            <div class="advanced-grid">
+                                <div class="advanced-field"><label>Workflow date basis</label><select id="dateBasis"><option value="created_at">Mapping / submission date</option><option value="validated_at">Validation date</option><option value="rejected_at">Rejection date</option></select></div>
+                                <div class="advanced-field"><label>Minimum area (ha)</label><input id="areaMin" type="number" min="0" step="0.01" placeholder="No minimum"></div>
+                                <div class="advanced-field"><label>Maximum area (ha)</label><input id="areaMax" type="number" min="0" step="0.01" placeholder="No maximum"></div>
+                                <div class="advanced-field"><label>Quality condition</label><select id="qualityFilter"><option value="all">All records</option><option value="missing_geometry">Missing geometry</option><option value="rejection_reason">Has rejection reason</option><option value="correction_required">Correction required</option></select></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Format -->
+                    <div class="format-section">
+                        <div class="format-heading">
+                            <label><i class="fas fa-file"></i> Export Type</label>
+                            <span class="format-help" id="formatHelp">Excel is available for all workflow stages. GeoJSON/KMZ are restricted to final outcomes.</span>
+                        </div>
+                        <div class="format-options" id="formatOptions">
+                            <div class="format-option selected" data-format="excel"><i class="fas fa-file-excel"></i><span>Excel</span></div>
+                            <div class="format-option" data-format="geojson"><i class="fas fa-draw-polygon"></i><span>GeoJSON</span></div>
+                            <div class="format-option" data-format="kmz"><i class="fas fa-map"></i><span>KMZ</span></div>
+                            <div class="format-option" data-format="report"><i class="fas fa-file-alt"></i><span>Progress Report</span></div>
+                        </div>
+                    </div>
+
+                    <!-- Performance -->
+                    <div class="performance-section">
+                        <div class="section-title-row">
+                            <div>
+                                <h3><i class="fas fa-chart-line"></i> Performance Overview</h3>
+                                <p class="panel-subtitle">Performance follows the same filters selected above.</p>
+                            </div>
+                            <div class="performance-tabs">
+                                <button class="performance-tab active" data-tab="enumerators">Enumerators</button>
+                                <button class="performance-tab" data-tab="cooperatives">Cooperatives</button>
+                                <button class="performance-tab" data-tab="workflow">Workflow</button>
+                            </div>
+                        </div>
+
+                        <div class="performance-table-wrap" id="enumeratorPerformance">
+                            <table class="performance-table">
+                                <thead><tr>
+                                    <th>Enumerator</th><th>Mapped</th><th>Submitted</th><th>Validated</th>
+                                    <th>Rejected</th><th>Correction</th><th>Pending</th><th>Validation Rate</th>
+                                </tr></thead>
+                                <tbody id="enumeratorPerformanceBody"></tbody>
+                            </table>
+                        </div>
+
+                        <div class="performance-table-wrap hidden" id="cooperativePerformance">
+                            <table class="performance-table">
+                                <thead><tr>
+                                    <th>Cooperative</th><th>Farms</th><th>Area (ha)</th><th>Validated</th>
+                                    <th>Rejected</th><th>Correction</th><th>Pending</th><th>Validation Rate</th>
+                                </tr></thead>
+                                <tbody id="cooperativePerformanceBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Performance Highlights -->
+                    <div class="performance-highlights">
+                        <div><span>Top validation rate</span><strong id="topPerformer">—</strong></div>
+                        <div><span>Highest workload</span><strong id="highestWorkload">—</strong></div>
+                        <div><span>Highest correction rate</span><strong id="highestCorrection">—</strong></div>
+                    </div>
+                    <div class="performance-table-wrap hidden" id="workflowPerformance">
+                        <table class="performance-table"><thead><tr><th>Workflow Stage</th><th>Farms</th><th>Area (ha)</th></tr></thead><tbody id="workflowPerformanceBody"></tbody></table>
+                    </div>
+
+                    <!-- Summary -->
+                    <div class="export-summary">
+                        <div class="summary-item"><span>📊 Records:</span><strong id="exportCount">0</strong></div>
+                        <div class="summary-item"><span>📐 Area:</span><strong id="exportArea">0 ha</strong></div>
+                        <div class="summary-item"><span>✓ Validated:</span><strong id="filteredValidated">0</strong></div>
+                        <div class="summary-item"><span>✕ Rejected:</span><strong id="filteredRejected">0</strong></div>
+                    </div>
+
+                    <!-- Actions -->
+                    <div class="export-actions">
+                        <button class="btn-primary" id="exportBtn"><i class="fas fa-download"></i> Generate Export</button>
+                        <button class="btn-secondary" id="previewBtn"><i class="fas fa-eye"></i> Preview</button>
+                        <button class="btn-secondary" id="resetBtn"><i class="fas fa-undo"></i> Reset Filters</button>
+                    </div>
+
+                    <!-- Permission Management -->
+                    <div class="permission-management hidden" id="permissionManagement">
+                        <div class="section-title-row">
+                            <div>
+                                <h3><i class="fas fa-user-shield"></i> Export Permissions</h3>
+                                <p class="panel-subtitle">Only Owners, Managers and Super Managers can grant project-level export access.</p>
+                            </div>
+                        </div>
+                        <div id="permissionList" class="permission-list"></div>
+                    </div>
                 </div>
 
-            </div>
-
-        </div>
-
-
-        <div class="topbar-actions">
-
-            <button
-                id="refreshBtn"
-                class="icon-button"
-                title="Refresh"
-            >
-                <i class="fas fa-sync-alt"></i>
-            </button>
-
-
-            <div class="user-menu">
-
-                <div
-                    id="userAvatar"
-                    class="user-avatar"
-                >
-                    U
+                <!-- Preview Section -->
+                <div class="preview-section" id="previewSection" style="display: none;">
+                    <div class="preview-header">
+                        <h3><i class="fas fa-eye"></i> Export Preview</h3>
+                        <button class="close-preview" onclick="hidePreview()"><i class="fas fa-times"></i></button>
+                    </div>
+                    <div class="preview-table-container">
+                        <table class="preview-table">
+                            <thead id="previewHeader"></thead>
+                            <tbody id="previewBody"></tbody>
+                        </table>
+                    </div>
+                    <div class="preview-footer">
+                        <span>Showing first 10 records of <span id="previewTotal">0</span></span>
+                    </div>
                 </div>
 
-
-                <div class="user-info">
-
-                    <strong
-                        id="userName"
-                    >
-                        User
-                    </strong>
-
-                    <span
-                        id="userRole"
-                    >
-                        User
-                    </span>
-
+                <!-- Audit Tools -->
+                <div class="audit-tools-section">
+                    <div class="section-title-row">
+                        <div><h3><i class="fas fa-shield-alt"></i> Audit Tools</h3><p class="panel-subtitle">Rejected records remain exportable for audit and corrective-action review.</p></div>
+                        <button class="btn-secondary" id="rejectedAuditBtn"><i class="fas fa-file-signature"></i> Export Rejected Audit</button>
+                    </div>
                 </div>
 
-
-                <button
-                    id="logoutBtn"
-                    class="logout-button"
-                    title="Sign out"
-                >
-                    <i class="fas fa-sign-out-alt"></i>
-                </button>
-
-            </div>
-
-        </div>
-
-    </header>
-
-
-    <!-- PAGE HEADER -->
-
-    <section class="page-header">
-
-        <div>
-
-            <div class="eyebrow">
-                DATA MANAGEMENT
-            </div>
-
-            <h1>
-                Export Center
-            </h1>
-
-            <p>
-                Generate controlled project outputs and
-                audit-ready datasets.
-            </p>
-
-        </div>
-
-
-        <div
-            id="exportPermissionBadge"
-            class="permission-badge"
-        >
-            Checking export access...
-        </div>
-
-    </section>
-
-
-    <!-- =====================================================
-         KPI STRIP
-         ===================================================== -->
-
-    <section class="kpi-grid">
-
-        <article class="kpi-card">
-
-            <div class="kpi-icon">
-                <i class="fas fa-database"></i>
-            </div>
-
-            <div>
-
-                <span>
-                    Selected plots
-                </span>
-
-                <strong id="totalFarms">
-                    0
-                </strong>
-
-            </div>
-
-        </article>
-
-
-        <article class="kpi-card">
-
-            <div class="kpi-icon">
-                <i class="fas fa-ruler-combined"></i>
-            </div>
-
-            <div>
-
-                <span>
-                    Area
-                </span>
-
-                <strong id="totalArea">
-                    0 ha
-                </strong>
-
-            </div>
-
-        </article>
-
-
-        <article class="kpi-card">
-
-            <div class="kpi-icon success">
-                <i class="fas fa-check-circle"></i>
-            </div>
-
-            <div>
-
-                <span>
-                    Validated
-                </span>
-
-                <strong id="validatedCount">
-                    0
-                </strong>
-
-            </div>
-
-        </article>
-
-
-        <article class="kpi-card">
-
-            <div class="kpi-icon warning">
-                <i class="fas fa-hourglass-half"></i>
-            </div>
-
-            <div>
-
-                <span>
-                    In progress
-                </span>
-
-                <strong id="pendingCount">
-                    0
-                </strong>
-
-            </div>
-
-        </article>
-
-
-        <article class="kpi-card">
-
-            <div class="kpi-icon danger">
-                <i class="fas fa-times-circle"></i>
-            </div>
-
-            <div>
-
-                <span>
-                    Rejected
-                </span>
-
-                <strong id="rejectedCount">
-                    0
-                </strong>
-
-            </div>
-
-        </article>
-
-    </section>
-
-
-    <!-- =====================================================
-         FILTERS
-         ===================================================== -->
-
-    <section class="panel filter-panel">
-
-        <div class="panel-header">
-
-            <div>
-
-                <span class="section-kicker">
-                    DATASET
-                </span>
-
-                <h2>
-                    Filter dataset
-                </h2>
-
-                <p>
-                    Select the records you want to review
-                    or export.
-                </p>
-
-            </div>
-
-
-            <div class="filter-actions">
-
-                <button
-                    id="resetBtn"
-                    class="btn btn-secondary"
-                >
-                    <i class="fas fa-undo"></i>
-                    Reset
-                </button>
-
-
-                <button
-                    id="applyFiltersBtn"
-                    class="btn btn-primary"
-                >
-                    <i class="fas fa-filter"></i>
-                    Apply filters
-                </button>
-
-            </div>
-
-        </div>
-
-
-        <div class="filter-grid">
-
-
-            <!-- SUPPLIER -->
-
-            <div class="filter-group">
-
-                <label>
-                    Supplier
-                </label>
-
-
-                <div class="filter-search">
-
-                    <i class="fas fa-search"></i>
-
-                    <input
-                        id="supplierSearch"
-                        type="text"
-                        placeholder="Search supplier..."
-                    >
-
+                <!-- Export History -->
+                <div class="history-section">
+                    <div class="history-title"><h3><i class="fas fa-history"></i> Recent Exports</h3><button class="btn-link" id="refreshHistoryBtn">Refresh</button></div>
+                    <div class="history-list" id="historyList">
+                        <div class="empty-history">
+                            <i class="fas fa-box-open"></i>
+                            <p>No exports yet</p>
+                        </div>
+                    </div>
                 </div>
-
-
-                <div class="filter-list-actions">
-
-                    <button
-                        type="button"
-                        id="selectAllSuppliers"
-                    >
-                        Select / clear all
-                    </button>
-
-                </div>
-
-
-                <div
-                    id="supplierList"
-                    class="checkbox-list"
-                ></div>
-
             </div>
-
-
-            <!-- COOPERATIVE -->
-
-            <div class="filter-group">
-
-                <label>
-                    Cooperative
-                </label>
-
-
-                <div class="filter-search">
-
-                    <i class="fas fa-search"></i>
-
-                    <input
-                        id="coopSearch"
-                        type="text"
-                        placeholder="Search cooperative..."
-                    >
-
-                </div>
-
-
-                <div class="filter-list-actions">
-
-                    <button
-                        type="button"
-                        id="selectAllCooperatives"
-                    >
-                        Select / clear all
-                    </button>
-
-                </div>
-
-
-                <div
-                    id="cooperativeList"
-                    class="checkbox-list"
-                ></div>
-
-            </div>
-
-
-            <!-- ENUMERATOR -->
-
-            <div class="filter-group">
-
-                <label>
-                    Enumerator
-                </label>
-
-
-                <div class="filter-search">
-
-                    <i class="fas fa-search"></i>
-
-                    <input
-                        id="enumeratorSearch"
-                        type="text"
-                        placeholder="Search enumerator..."
-                    >
-
-                </div>
-
-
-                <div class="filter-list-actions">
-
-                    <button
-                        type="button"
-                        id="selectAllEnumerators"
-                    >
-                        Select / clear all
-                    </button>
-
-                </div>
-
-
-                <div
-                    id="enumeratorList"
-                    class="checkbox-list"
-                ></div>
-
-            </div>
-
-
-            <!-- FIELD OFFICER -->
-
-            <div class="filter-group">
-
-                <label>
-                    Field Officer
-                </label>
-
-
-                <div class="filter-search">
-
-                    <i class="fas fa-search"></i>
-
-                    <input
-                        id="fieldOfficerSearch"
-                        type="text"
-                        placeholder="Search field officer..."
-                    >
-
-                </div>
-
-
-                <div class="filter-list-actions">
-
-                    <button
-                        type="button"
-                        id="selectAllFieldOfficers"
-                    >
-                        Select / clear all
-                    </button>
-
-                </div>
-
-
-                <div
-                    id="fieldOfficerList"
-                    class="checkbox-list"
-                ></div>
-
-            </div>
-
-
-            <!-- WORKFLOW -->
-
-            <div class="filter-group workflow-filter-group">
-
-                <div class="filter-title-row">
-
-                    <label>
-                        Workflow Stage
-                    </label>
-
-                    <span
-                        id="workflowStageCount"
-                        class="filter-count"
-                    >
-                        8 selected
-                    </span>
-
-                </div>
-
-
-                <div
-                    id="workflowFilterList"
-                    class="checkbox-list workflow-list"
-                >
-
-                    <label class="checkbox-item">
-
-                        <input
-                            type="checkbox"
-                            class="workflow-checkbox"
-                            value="submitted"
-                            checked
-                        >
-
-                        <span class="checkbox-label">
-                            Submitted
-                        </span>
-
-                    </label>
-
-
-                    <label class="checkbox-item">
-
-                        <input
-                            type="checkbox"
-                            class="workflow-checkbox"
-                            value="enumerator_review"
-                            checked
-                        >
-
-                        <span class="checkbox-label">
-                            Enumerator Review
-                        </span>
-
-                    </label>
-
-
-                    <label class="checkbox-item">
-
-                        <input
-                            type="checkbox"
-                            class="workflow-checkbox"
-                            value="field_officer_review"
-                            checked
-                        >
-
-                        <span class="checkbox-label">
-                            Field Officer Review
-                        </span>
-
-                    </label>
-
-
-                    <label class="checkbox-item">
-
-                        <input
-                            type="checkbox"
-                            class="workflow-checkbox"
-                            value="gis_compliance_review"
-                            checked
-                        >
-
-                        <span class="checkbox-label">
-                            GIS / Compliance Review
-                        </span>
-
-                    </label>
-
-
-                    <label class="checkbox-item">
-
-                        <input
-                            type="checkbox"
-                            class="workflow-checkbox"
-                            value="final_validation"
-                            checked
-                        >
-
-                        <span class="checkbox-label">
-                            Final Validation
-                        </span>
-
-                    </label>
-
-
-                    <label class="checkbox-item">
-
-                        <input
-                            type="checkbox"
-                            class="workflow-checkbox"
-                            value="correction_required"
-                            checked
-                        >
-
-                        <span class="checkbox-label">
-                            Correction Required
-                        </span>
-
-                    </label>
-
-
-                    <label class="checkbox-item">
-
-                        <input
-                            type="checkbox"
-                            class="workflow-checkbox"
-                            value="validated"
-                            checked
-                        >
-
-                        <span class="checkbox-label">
-                            Validated
-                        </span>
-
-                    </label>
-
-
-                    <label class="checkbox-item">
-
-                        <input
-                            type="checkbox"
-                            class="workflow-checkbox"
-                            value="rejected"
-                            checked
-                        >
-
-                        <span class="checkbox-label">
-                            Rejected
-                        </span>
-
-                    </label>
-
-                </div>
-
-            </div>
-
-        </div>
-
-
-        <!-- ADVANCED -->
-
-        <div class="advanced-filter-toggle">
-
-            <button
-                id="advancedToggleBtn"
-                type="button"
-                class="link-button"
-            >
-                <i class="fas fa-chevron-down"></i>
-                Show advanced filters
-            </button>
-
-        </div>
-
-
-        <div
-            id="advancedFilters"
-            class="advanced-filters hidden"
-        >
-
-            <div class="advanced-field">
-
-                <label>
-                    Date basis
-                </label>
-
-                <select
-                    id="dateBasis"
-                >
-                    <option value="created_at">
-                        Created date
-                    </option>
-
-                    <option value="updated_at">
-                        Updated date
-                    </option>
-
-                    <option value="final_validated_at">
-                        Validation date
-                    </option>
-
-                    <option value="rejected_at">
-                        Rejection date
-                    </option>
-                </select>
-
-            </div>
-
-
-            <div class="advanced-field">
-
-                <label>
-                    From
-                </label>
-
-                <input
-                    id="dateFrom"
-                    type="date"
-                >
-
-            </div>
-
-
-            <div class="advanced-field">
-
-                <label>
-                    To
-                </label>
-
-                <input
-                    id="dateTo"
-                    type="date"
-                >
-
-            </div>
-
-
-            <div class="advanced-field">
-
-                <label>
-                    Minimum area (ha)
-                </label>
-
-                <input
-                    id="areaMin"
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    placeholder="0"
-                >
-
-            </div>
-
-
-            <div class="advanced-field">
-
-                <label>
-                    Maximum area (ha)
-                </label>
-
-                <input
-                    id="areaMax"
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    placeholder="No limit"
-                >
-
-            </div>
-
-
-            <div class="advanced-field">
-
-                <label>
-                    Data quality
-                </label>
-
-                <select
-                    id="qualityFilter"
-                >
-
-                    <option value="all">
-                        All records
-                    </option>
-
-                    <option value="missing_geometry">
-                        Missing geometry
-                    </option>
-
-                    <option value="rejection_reason">
-                        Has rejection reason
-                    </option>
-
-                    <option value="correction_required">
-                        Correction required
-                    </option>
-
-                </select>
-
-            </div>
-
-
-            <button
-                id="clearDates"
-                type="button"
-                class="clear-date-button"
-            >
-                Clear dates
-            </button>
-
-        </div>
-
-    </section>
-
-
-    <!-- =====================================================
-         SCOPE
-         ===================================================== -->
-
-    <section class="scope-summary">
-
-        <div class="scope-main">
-
-            <div class="scope-icon">
-                <i class="fas fa-layer-group"></i>
-            </div>
-
-            <div>
-
-                <span>
-                    Current export scope
-                </span>
-
-                <strong>
-                    <span id="scopePlots">
-                        0
-                    </span>
-                    plots
-                    ·
-                    <span id="scopeArea">
-                        0 ha
-                    </span>
-                </strong>
-
-            </div>
-
-        </div>
-
-
-        <div class="scope-stats">
-
-            <div>
-                <span>
-                    Validated
-                </span>
-
-                <strong id="scopeValidated">
-                    0
-                </strong>
-            </div>
-
-
-            <div>
-                <span>
-                    Rejected
-                </span>
-
-                <strong id="scopeRejected">
-                    0
-                </strong>
-            </div>
-
-
-            <div>
-                <span>
-                    In progress
-                </span>
-
-                <strong id="scopeInProgress">
-                    0
-                </strong>
-            </div>
-
-        </div>
-
-
-        <div
-            id="scopeWorkflowBreakdown"
-            class="scope-chips"
-        ></div>
-
-    </section>
-
-
-    <!-- =====================================================
-         EXPORT FORMAT
-         ===================================================== -->
-
-    <section class="panel export-panel">
-
-        <div class="panel-header">
-
-            <div>
-
-                <span class="section-kicker">
-                    OUTPUT
-                </span>
-
-                <h2>
-                    Export format
-                </h2>
-
-                <p>
-                    Choose the format appropriate for
-                    your workflow.
-                </p>
-
-            </div>
-
-        </div>
-
-
-        <div class="format-grid">
-
-
-            <button
-                type="button"
-                class="format-option selected"
-                data-format="excel"
-            >
-
-                <div class="format-icon">
-                    <i class="fas fa-file-excel"></i>
-                </div>
-
-                <div>
-
-                    <strong>
-                        Excel
-                    </strong>
-
-                    <span>
-                        Complete tabular dataset
-                    </span>
-
-                </div>
-
-                <i class="fas fa-check format-check"></i>
-
-            </button>
-
-
-            <button
-                type="button"
-                class="format-option"
-                data-format="geojson"
-            >
-
-                <div class="format-icon">
-                    <i class="fas fa-draw-polygon"></i>
-                </div>
-
-                <div>
-
-                    <strong>
-                        GeoJSON
-                    </strong>
-
-                    <span>
-                        GIS-ready spatial dataset
-                    </span>
-
-                </div>
-
-                <i class="fas fa-check format-check"></i>
-
-            </button>
-
-
-            <button
-                type="button"
-                class="format-option"
-                data-format="kmz"
-            >
-
-                <div class="format-icon">
-                    <i class="fas fa-globe"></i>
-                </div>
-
-                <div>
-
-                    <strong>
-                        KMZ
-                    </strong>
-
-                    <span>
-                        Google Earth / field review
-                    </span>
-
-                </div>
-
-                <i class="fas fa-check format-check"></i>
-
-            </button>
-
-
-            <button
-                type="button"
-                class="format-option"
-                data-format="report"
-            >
-
-                <div class="format-icon">
-                    <i class="fas fa-chart-pie"></i>
-                </div>
-
-                <div>
-
-                    <strong>
-                        Progress Report
-                    </strong>
-
-                    <span>
-                        Management and performance summary
-                    </span>
-
-                </div>
-
-                <i class="fas fa-check format-check"></i>
-
-            </button>
-
-        </div>
-
-
-        <div
-            id="formatHelp"
-            class="format-help"
-        >
-            Excel and Progress Report are available for
-            all workflow stages.
-        </div>
-
-
-        <div class="export-actions">
-
-            <button
-                id="previewBtn"
-                type="button"
-                class="btn btn-secondary btn-large"
-            >
-                <i class="fas fa-eye"></i>
-                Preview
-            </button>
-
-
-            <button
-                id="exportBtn"
-                type="button"
-                class="btn btn-primary btn-large"
-            >
-                <i class="fas fa-download"></i>
-                Export selected data
-            </button>
-
-
-            <button
-                id="rejectedAuditBtn"
-                type="button"
-                class="btn btn-danger-outline btn-large"
-            >
-                <i class="fas fa-file-shield"></i>
-                Rejected audit
-            </button>
-
-        </div>
-
-    </section>
-
-
-    <!-- =====================================================
-         PERFORMANCE
-         ===================================================== -->
-
-    <section class="panel performance-panel">
-
-        <div class="panel-header">
-
-            <div>
-
-                <span class="section-kicker">
-                    PERFORMANCE
-                </span>
-
-                <h2>
-                    Performance snapshot
-                </h2>
-
-                <p>
-                    Review performance before exporting
-                    the selected dataset.
-                </p>
-
-            </div>
-
-        </div>
-
-
-        <div class="performance-tabs">
-
-            <button
-                class="performance-tab active"
-                data-tab="enumerators"
-            >
-                Enumerators
-            </button>
-
-            <button
-                class="performance-tab"
-                data-tab="cooperatives"
-            >
-                Cooperatives
-            </button>
-
-            <button
-                class="performance-tab"
-                data-tab="workflow"
-            >
-                Workflow
-            </button>
-
-        </div>
-
-
-        <div
-            id="performanceHighlights"
-            class="performance-highlights"
-        >
-
-            <div class="highlight-card">
-
-                <span>
-                    Top validation rate
-                </span>
-
-                <strong
-                    id="topPerformer"
-                >
-                    —
-                </strong>
-
-            </div>
-
-
-            <div class="highlight-card">
-
-                <span>
-                    Highest workload
-                </span>
-
-                <strong
-                    id="highestWorkload"
-                >
-                    —
-                </strong>
-
-            </div>
-
-
-            <div class="highlight-card">
-
-                <span>
-                    Highest correction rate
-                </span>
-
-                <strong
-                    id="highestCorrection"
-                >
-                    —
-                </strong>
-
-            </div>
-
-        </div>
-
-
-        <!-- ENUMERATORS -->
-
-        <div
-            id="enumeratorPerformance"
-            class="performance-table-wrapper"
-        >
-
-            <table>
-
-                <thead>
-
-                    <tr>
-
-                        <th>
-                            Enumerator
-                        </th>
-
-                        <th>
-                            Mapped
-                        </th>
-
-                        <th>
-                            Validated
-                        </th>
-
-                        <th>
-                            Rejected
-                        </th>
-
-                        <th>
-                            Correction
-                        </th>
-
-                        <th>
-                            Pending
-                        </th>
-
-                        <th>
-                            Validation rate
-                        </th>
-
-                        <th>
-                            Correction rate
-                        </th>
-
-                    </tr>
-
-                </thead>
-
-
-                <tbody
-                    id="enumeratorPerformanceBody"
-                ></tbody>
-
-            </table>
-
-        </div>
-
-
-        <!-- COOPERATIVES -->
-
-        <div
-            id="cooperativePerformance"
-            class="performance-table-wrapper hidden"
-        >
-
-            <table>
-
-                <thead>
-
-                    <tr>
-
-                        <th>
-                            Cooperative
-                        </th>
-
-                        <th>
-                            Plots
-                        </th>
-
-                        <th>
-                            Area (ha)
-                        </th>
-
-                        <th>
-                            Validated
-                        </th>
-
-                        <th>
-                            Rejected
-                        </th>
-
-                        <th>
-                            Correction
-                        </th>
-
-                        <th>
-                            Pending
-                        </th>
-
-                        <th>
-                            Validation rate
-                        </th>
-
-                    </tr>
-
-                </thead>
-
-
-                <tbody
-                    id="cooperativePerformanceBody"
-                ></tbody>
-
-            </table>
-
-        </div>
-
-
-        <!-- WORKFLOW -->
-
-        <div
-            id="workflowPerformance"
-            class="performance-table-wrapper hidden"
-        >
-
-            <table>
-
-                <thead>
-
-                    <tr>
-
-                        <th>
-                            Workflow Stage
-                        </th>
-
-                        <th>
-                            Plots
-                        </th>
-
-                        <th>
-                            Area (ha)
-                        </th>
-
-                    </tr>
-
-                </thead>
-
-
-                <tbody
-                    id="workflowPerformanceBody"
-                ></tbody>
-
-            </table>
-
-        </div>
-
-    </section>
-
-
-    <!-- =====================================================
-         PREVIEW
-         ===================================================== -->
-
-    <section
-        id="previewSection"
-        class="panel preview-panel hidden"
-        style="display:none;"
-    >
-
-        <div class="panel-header">
-
-            <div>
-
-                <span class="section-kicker">
-                    PREVIEW
-                </span>
-
-                <h2>
-                    Export preview
-                </h2>
-
-                <p>
-                    Showing the first records from the
-                    current export scope.
-                </p>
-
-            </div>
-
-
-            <button
-                type="button"
-                class="icon-button"
-                onclick="hidePreview()"
-                title="Close preview"
-            >
-                <i class="fas fa-times"></i>
-            </button>
-
-        </div>
-
-
-        <div class="preview-meta">
-
-            <strong>
-                <span id="previewTotal">
-                    0
-                </span>
-                total records
-            </strong>
-
-            <span>
-                Preview limited to first 20 records
-            </span>
-
-        </div>
-
-
-        <div class="performance-table-wrapper">
-
-            <table>
-
-                <thead
-                    id="previewHeader"
-                ></thead>
-
-                <tbody
-                    id="previewBody"
-                ></tbody>
-
-            </table>
-
-        </div>
-
-    </section>
-
-
-    <!-- =====================================================
-         PERMISSION MANAGEMENT
-         ===================================================== -->
-
-    <section
-        id="permissionManagement"
-        class="panel permission-panel hidden"
-    >
-
-        <div class="panel-header">
-
-            <div>
-
-                <span class="section-kicker">
-                    ACCESS CONTROL
-                </span>
-
-                <h2>
-                    Export permissions
-                </h2>
-
-                <p>
-                    Managers can grant export access to
-                    approved project members.
-                </p>
-
-            </div>
-
-        </div>
-
-
-        <div
-            id="permissionList"
-            class="permission-list"
-        ></div>
-
-    </section>
-
-
-    <!-- =====================================================
-         EXPORT HISTORY
-         ===================================================== -->
-
-    <section class="panel history-panel">
-
-        <div class="panel-header">
-
-            <div>
-
-                <span class="section-kicker">
-                    AUDIT TRAIL
-                </span>
-
-                <h2>
-                    Export history
-                </h2>
-
-                <p>
-                    Recent exports generated for this project.
-                </p>
-
-            </div>
-
-
-            <button
-                id="refreshHistoryBtn"
-                type="button"
-                class="btn btn-secondary"
-            >
-                <i class="fas fa-sync-alt"></i>
-                Refresh
-            </button>
-
-        </div>
-
-
-        <div
-            id="historyList"
-            class="history-list"
-        >
-
-            <div class="empty-history">
-                Loading export history...
-            </div>
-
-        </div>
-
-    </section>
-
-
-    <footer class="page-footer">
-
-        <span>
-            MappingTrace
-        </span>
-
-        <span>
-            Controlled data export & audit
-        </span>
-
-    </footer>
-
-</main>
-
-
-<script
-    src="exports.js"
-></script>
-
+        </main>
+    </div>
+
+    <div id="loadingOverlay" class="loading-spinner">
+        <i class="fas fa-spinner fa-spin"></i><span>Loading...</span>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="exports.js"></script>
 </body>
 </html>
