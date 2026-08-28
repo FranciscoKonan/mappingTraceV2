@@ -1,139 +1,123 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Quality Control | MappingTrace</title>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-  <link rel="stylesheet" href="quality-alerts.css">
-  <link rel="icon" type="image/x-icon" href="../assets/favicon.ico">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Quality Control</title>
+<link rel="stylesheet" href="quality-alerts.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
+
 <div id="sidebarOverlay" class="sidebar-overlay"></div>
 
-<div class="layout">
-  <aside id="sidebar" class="sidebar">
-    <div class="sidebar-header">
-      <h2><i class="fas fa-map-marked-alt"></i><span>MappingTrace</span></h2>
-      <button id="sidebarToggle" class="sidebar-toggle" title="Toggle sidebar"><i class="fas fa-chevron-left"></i></button>
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-brand">
+    <div class="brand-mark">M</div>
+    <div class="brand-text"><strong>MappingTrace</strong><span>GIS PLATFORM</span></div>
+  </div>
+
+  <nav class="sidebar-nav">
+    <a data-page="dashboard" href="#"><i class="fas fa-grid-2"></i><span>Dashboard</span></a>
+    <a data-page="live-mapping" href="#"><i class="fas fa-map"></i><span>Live Mapping</span></a>
+    <a data-page="submissions" href="#"><i class="fas fa-file-arrow-up"></i><span>Submissions</span></a>
+    <a data-page="quality-alerts" class="active" href="#"><i class="fas fa-shield-check"></i><span>Quality Control</span><span id="navAlertCount" class="nav-count">0</span></a>
+    <a data-page="exports" href="#"><i class="fas fa-file-export"></i><span>Exports</span></a>
+    <a id="dataMgmtLink" href="#"><i class="fas fa-database"></i><span>Data Management</span></a>
+  </nav>
+
+  <div class="sidebar-bottom">
+    <button id="sidebarToggle" class="sidebar-toggle"><i class="fas fa-angles-left"></i><span>Collapse</span></button>
+    <a href="#" id="logoutBtn"><i class="fas fa-right-from-bracket"></i><span>Sign out</span></a>
+  </div>
+</aside>
+
+<main class="main-content">
+  <header class="topbar">
+    <div class="topbar-left">
+      <button id="burgerBtn" class="icon-btn mobile-only"><i class="fas fa-bars"></i></button>
+      <div class="header-title">
+        <div class="eyebrow">GIS WORKFLOW</div>
+        <h1>Quality Control <span id="projectBadge" class="project-badge">PROJECT</span></h1>
+      </div>
     </div>
-    <nav class="menu">
-      <div class="menu-label">Main</div>
-      <a href="../Dashboard.html" data-page="dashboard"><i class="fas fa-tachometer-alt"></i><span>Dashboard</span></a>
-      <a href="../LiveMapping/live-mapping.html" data-page="live-mapping"><i class="fas fa-map"></i><span>Live Mapping</span></a>
-      <a href="../Submissions/submissions.html" data-page="submissions"><i class="fas fa-clipboard-list"></i><span>Submissions</span></a>
-      <a href="#" class="active" data-page="quality-alerts"><i class="fas fa-shield-alt"></i><span>Quality Control</span></a>
-      <a href="../Exports/exports.html" data-page="exports"><i class="fas fa-file-export"></i><span>Exports</span></a>
-      <hr class="menu-divider">
-      <a href="../DataManagement.html" id="dataMgmtLink"><i class="fas fa-database"></i><span>Data Management</span></a>
-      <div class="menu-bottom"><a href="#" id="logoutBtn"><i class="fas fa-sign-out-alt"></i><span>Logout</span></a></div>
-    </nav>
-  </aside>
 
-  <main class="main">
-    <header class="main-header">
-      <div class="header-left">
-        <button id="burgerBtn" class="burger-btn" aria-label="Toggle sidebar"><i class="fas fa-bars"></i></button>
-        <div class="header-title">
-          <h1>Quality Control <span id="projectBadge" class="project-badge">Loading...</span></h1>
-          <div class="breadcrumb">Home / Quality Control</div>
+    <div class="topbar-right">
+      <div id="projectSelectorContainer" class="project-selector hidden">
+        <button id="dropdownSelected" class="project-select">
+          <span id="selectedProjectName">Project</span><i class="fas fa-chevron-down"></i>
+        </button>
+        <div id="dropdownMenu" class="dropdown-menu">
+          <input id="projectSearch" placeholder="Search project...">
+          <div id="dropdownItems"></div>
         </div>
       </div>
+      <button id="refreshTableBtn" class="sync-btn"><i class="fas fa-rotate"></i><span>Refresh</span></button>
       <div class="user-info">
-        <div id="projectSelectorContainer" class="project-selector-container hidden">
-          <label><i class="fas fa-folder-open"></i> Project:</label>
-          <div class="custom-dropdown">
-            <button id="dropdownSelected" class="dropdown-selected" type="button">
-              <span id="selectedProjectName">Loading...</span><i class="fas fa-chevron-down"></i>
-            </button>
-            <div id="dropdownMenu" class="dropdown-menu">
-              <div class="dropdown-search"><input id="projectSearch" type="text" placeholder="Search projects..."></div>
-              <div id="dropdownItems"></div>
-            </div>
-          </div>
-        </div>
-        <div id="userAvatar" class="user-avatar">U</div>
-        <div class="user-details"><div id="userName" class="user-name">User</div><div id="userRole" class="user-role">Role</div></div>
-        <button id="refreshBtn" class="sync-btn" type="button"><i class="fas fa-sync-alt"></i> Refresh</button>
+        <div id="userAvatar" class="avatar">U</div>
+        <div><strong id="userName">User</strong><small id="userRole">ROLE</small></div>
       </div>
-    </header>
+    </div>
+  </header>
 
-    <section class="qc-page">
-      <div class="page-intro">
-        <div>
-          <div class="eyebrow"><i class="fas fa-shield-alt"></i> GIS QUALITY CONTROL</div>
-          <h2>Farm Quality Review</h2>
-          <p>Assess mapping quality, spatial integrity and compliance before a farm reaches final validation.</p>
-        </div>
-        <div class="intro-actions">
-          <button id="qcResetTop" class="btn-secondary" type="button"><i class="fas fa-undo"></i> Reset</button>
-          <button id="qcRefreshTop" class="btn-primary" type="button"><i class="fas fa-sync-alt"></i> Refresh Data</button>
-        </div>
+  <section class="page">
+    <div class="page-heading">
+      <div>
+        <h2>Quality Control</h2>
+        <p>Review GIS quality results before farms move to final validation.</p>
       </div>
-
-      <div class="stats-grid">
-        <article class="stat-card"><div class="stat-icon"><i class="fas fa-layer-group"></i></div><div><h4>Total Farms</h4><strong id="qcTotal">0</strong></div></article>
-        <article class="stat-card success"><div class="stat-icon"><i class="fas fa-check-circle"></i></div><div><h4>Passed</h4><strong id="qcPassed">0</strong></div></article>
-        <article class="stat-card warning"><div class="stat-icon"><i class="fas fa-clock"></i></div><div><h4>Review</h4><strong id="qcReview">0</strong></div></article>
-        <article class="stat-card danger"><div class="stat-icon"><i class="fas fa-exclamation-triangle"></i></div><div><h4>Critical</h4><strong id="qcCritical">0</strong></div></article>
-        <article class="stat-card score"><div class="stat-icon"><i class="fas fa-chart-line"></i></div><div><h4>Average Score</h4><strong id="qcAvgScore">—</strong></div></article>
+      <div class="heading-actions">
+        <button id="qcClearFilters" class="secondary-btn"><i class="fas fa-filter-circle-xmark"></i> Clear</button>
+        <button id="qcApplyFilters" class="primary-btn"><i class="fas fa-filter"></i> Apply Filters</button>
       </div>
+    </div>
 
-      <section class="filters-card">
-        <div class="filters-header">
-          <div><h3><i class="fas fa-filter"></i> Review Queue Filters</h3><p>Find farms requiring quality attention.</p></div>
-          <button id="advancedToggle" class="advanced-link" type="button"><i class="fas fa-sliders-h"></i> Advanced</button>
-        </div>
-        <div class="filters-grid">
-          <div class="filter-field search-field"><label for="qcSearch">Search</label><div class="input-icon"><i class="fas fa-search"></i><input id="qcSearch" type="search" placeholder="Farmer, ID, cooperative..."></div></div>
-          <div class="filter-field"><label for="qcStatus">Quality Status</label><select id="qcStatus"><option value="all">All Statuses</option><option value="passed">Passed</option><option value="review_required">Review Required</option><option value="issues_detected">Issues Detected</option><option value="not_checked">Not Checked</option></select></div>
-          <div class="filter-field"><label for="qcSeverity">Severity</label><select id="qcSeverity"><option value="all">All Severities</option><option value="critical">Critical</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select></div>
-          <div class="filter-field"><label for="qcIssueType">Issue Type</label><select id="qcIssueType"><option value="all">All Issue Types</option><option value="self_intersection">Self-Intersection</option><option value="protected_area_conflict">Protected Area Conflict</option><option value="overlap_detected">Farm Overlap</option><option value="spike_detected">Geometry Spike</option><option value="duplicate_detected">Duplicate</option></select></div>
-          <div class="filter-actions"><button id="qcApply" class="btn-primary" type="button"><i class="fas fa-search"></i> Apply</button><button id="qcClear" class="btn-secondary" type="button">Clear</button></div>
-        </div>
-        <div id="qcAdvanced" class="advanced-panel hidden">
-          <div class="filter-field"><label for="qcMinScore">Minimum Quality Score</label><input id="qcMinScore" type="number" min="0" max="100" placeholder="e.g. 80"></div>
-          <div class="filter-help"><i class="fas fa-info-circle"></i> Critical issues remain blocking regardless of score.</div>
-        </div>
-      </section>
+    <div class="filter-card">
+      <div class="filter-grid">
+        <div class="field wide"><label>Search</label><div class="input-icon"><i class="fas fa-search"></i><input id="qcSearch" placeholder="Farmer, Farmer ID, cooperative..."></div></div>
+        <div class="field"><label>Quality Status</label><select id="qcStatus"><option value="all">All statuses</option><option value="passed">Passed</option><option value="issues_detected">Issues detected</option><option value="review_required">Review required</option><option value="not_checked">Not checked</option></select></div>
+        <div class="field"><label>Issue Severity</label><select id="qcSeverity"><option value="all">All severities</option><option value="critical">Critical</option><option value="major">Major</option><option value="warning">Warning</option></select></div>
+        <div class="field"><label>Issue Type</label><select id="qcIssueType"><option value="all">All issue types</option><option value="self_intersection">Self-intersection</option><option value="protected_area_conflict">Protected area conflict</option><option value="overlap_detected">Farm overlap</option><option value="spike_detected">Geometry spike</option></select></div>
+      </div>
+    </div>
 
-      <section class="queue-card">
-        <div class="queue-header">
-          <div><h3><i class="fas fa-clipboard-check"></i> Quality Review Queue</h3><p>Prioritized farms for GIS and compliance review.</p></div>
-          <div class="queue-meta"><span>Showing <strong id="qcShowing">0</strong></span><button id="qcRefreshIcon" class="btn-icon" type="button" title="Refresh"><i class="fas fa-redo-alt"></i></button></div>
-        </div>
+    <div class="stats-row">
+      <div class="stat-card"><span>Total farms</span><strong id="qcTotal">0</strong></div>
+      <div class="stat-card"><span>Passed</span><strong id="qcPassed">0</strong></div>
+      <div class="stat-card"><span>Review required</span><strong id="qcReview">0</strong></div>
+      <div class="stat-card alert"><span>Critical issues</span><strong id="qcCritical">0</strong></div>
+      <div class="stat-card"><span>Average score</span><strong id="qcAvgScore">—</strong></div>
+    </div>
 
-        <div class="table-wrapper">
-          <table class="quality-table">
-            <thead>
-              <tr>
-                <th data-sort="farmer">Farmer <i class="fas fa-sort"></i></th>
-                <th>Cooperative</th>
-                <th>Supplier</th>
-                <th data-sort="score">Quality Score <i class="fas fa-sort"></i></th>
-                <th>Status</th>
-                <th>Issues</th>
-                <th>Workflow</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody id="qualityQueueBody"><tr><td colspan="8" class="loading-cell"><i class="fas fa-spinner fa-spin"></i><p>Loading quality queue...</p></td></tr></tbody>
-          </table>
-        </div>
+    <div class="table-card">
+      <div class="table-header">
+        <div><h3>Farm Quality Review</h3><p>GIS checks, alerts and validation decisions.</p></div>
+        <button id="qcRefreshIcon" class="icon-btn" title="Refresh"><i class="fas fa-rotate"></i></button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th data-sort="farmer">Farmer <i class="fas fa-sort"></i></th>
+              <th>Cooperative</th><th>Area</th>
+              <th data-sort="score">Score <i class="fas fa-sort"></i></th>
+              <th>Status</th><th>Issues</th><th>Workflow</th><th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="qualityQueueBody"><tr><td colspan="8" class="loading-cell"><i class="fas fa-spinner fa-spin"></i> Loading...</td></tr></tbody>
+        </table>
+      </div>
+      <div class="table-footer">
+        <div>Showing <span id="qcShowing">0</span> of <span id="qcTotalFooter">0</span></div>
+        <div class="pagination"><button id="qcPrev" class="pagination-btn"><i class="fas fa-chevron-left"></i></button><span id="qcPageInfo">Page 1 of 1</span><button id="qcNext" class="pagination-btn"><i class="fas fa-chevron-right"></i></button></div>
+      </div>
+    </div>
+  </section>
+</main>
 
-        <div class="table-footer">
-          <div>Showing <span id="qcShowingFooter">0</span> of <span id="qcTotalFooter">0</span> farms</div>
-          <div class="pagination"><button id="qcPrev" class="pagination-btn" type="button"><i class="fas fa-chevron-left"></i></button><span id="qcPageInfo">Page 1 of 1</span><button id="qcNext" class="pagination-btn" type="button"><i class="fas fa-chevron-right"></i></button></div>
-        </div>
-      </section>
-    </section>
-  </main>
-</div>
-
-<div id="loadingOverlay" class="loading-overlay hidden"><div class="loading-box"><i class="fas fa-spinner fa-spin"></i><span>Loading...</span></div></div>
-<div id="toastContainer" class="toast-container"></div>
+<div id="loadingOverlay" class="loading-spinner hidden"><i class="fas fa-spinner fa-spin"></i><span>Loading...</span></div>
+<div id="toastContainer"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
