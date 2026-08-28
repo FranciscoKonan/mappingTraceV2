@@ -1035,3 +1035,18 @@ body {
 .history-title h3{margin:0}
 @media(max-width:1000px){.advanced-grid{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:650px){.advanced-grid,.performance-highlights{grid-template-columns:1fr}.performance-highlights>div{border-right:0;border-bottom:1px solid #edf2f7}.advanced-toggle-row,.history-title{align-items:flex-start;flex-direction:column}}
+
+/* =========================================================
+   EXPORT CENTER V4 — NAVIGATION / WORKFLOW UX FIXES
+   ========================================================= */
+.filter-label-row { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:8px; }
+.filter-label-row label { margin-bottom:0; }
+.filter-select-all { margin-top:0; padding:3px 7px; font-size:11px; font-weight:600; white-space:nowrap; }
+.filter-select-all.filter-clear-all { color:#b91c1c; }
+.workflow-list { max-height:230px; }
+.btn-primary:disabled { opacity:1; cursor:not-allowed; background:#94a3b8; color:#fff; box-shadow:none; transform:none; }
+.btn-primary:disabled:hover { background:#94a3b8; box-shadow:none; transform:none; }
+.export-actions { align-items:center; padding-top:4px; }
+.export-actions .btn-primary { min-width:180px; justify-content:center; }
+@media (min-width:769px) { .burger-btn { display:flex !important; } }
+@media (max-width:768px) { .export-actions .btn-primary { width:100%; } }
