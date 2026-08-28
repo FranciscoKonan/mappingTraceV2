@@ -9,7 +9,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     
-    <link rel="stylesheet" href="quality-alerts.css">
+    <link rel="stylesheet" href="quality-alerts-reviewed.css">
     <link rel="icon" type="image/x-icon" href="../assets/favicon.ico">
 </head>
 <body>
@@ -2529,6 +2529,145 @@
     );
 
 })();
+
+    /* =====================================================
+       ALERT → GIS QUALITY REVIEW BRIDGE
+       Keeps the existing Quality Alerts dashboard intact,
+       but adds a direct Review Quality action to every alert.
+       ===================================================== */
+    (function () {
+
+        function farmIdFromAlertId(alertId) {
+            const id = String(alertId || '');
+
+            if (id.startsWith('self_intersection_')) {
+                return id.substring('self_intersection_'.length);
+            }
+
+            if (id.startsWith('invalid_geom_')) {
+                return id.substring('invalid_geom_'.length);
+            }
+
+            if (id.startsWith('duplicate_')) {
+                return id.substring('duplicate_'.length);
+            }
+
+            if (id.startsWith('protected_overlap_')) {
+                const rest = id.substring('protected_overlap_'.length);
+                const parts = rest.split('_');
+                return parts[0] || null;
+            }
+
+            if (id.startsWith('overlap_')) {
+                const rest = id.substring('overlap_'.length);
+                const parts = rest.split('_');
+                return parts[0] || null;
+            }
+
+            return null;
+        }
+
+        window.openQualityFromAlertId = async function (alertId) {
+
+            const farmId = farmIdFromAlertId(alertId);
+
+            if (!farmId) {
+                showNotification('Could not identify the farm for this alert.', 'error');
+                return;
+            }
+
+            /* Prefer already loaded farm data. */
+            let farm = null;
+
+            try {
+                if (typeof allFarms !== 'undefined' && Array.isArray(allFarms)) {
+                    farm = allFarms.find(f => String(f.id) === String(farmId));
+                }
+            } catch (_) {}
+
+            /* Fallback to Supabase if the farm isn't in memory. */
+            if (!farm) {
+                try {
+                    const { data, error } = await supabaseClient
+                        .from('farms')
+                        .select('*')
+                        .eq('id', farmId)
+                        .maybeSingle();
+
+                    if (error) throw error;
+                    farm = data;
+                } catch (error) {
+                    console.error('Unable to load farm for quality review:', error);
+                    showNotification('Unable to load farm: ' + error.message, 'error');
+                    return;
+                }
+            }
+
+            if (!farm) {
+                showNotification('Farm not found.', 'error');
+                return;
+            }
+
+            openGISQualityReview(farm.id);
+        };
+
+        function addReviewButtons() {
+            document.querySelectorAll('.alert-actions').forEach(actions => {
+
+                if (actions.querySelector('.review-quality-btn')) return;
+
+                const alertItem = actions.closest('.alert-item');
+                if (!alertItem) return;
+
+                const mapButton = actions.querySelector('.view-map');
+                if (!mapButton) return;
+
+                const match = mapButton.getAttribute('onclick')?.match(
+                    /viewAlertOnMap\(['"]([^'"]+)['"]\)/
+                );
+
+                if (!match) return;
+
+                const alertId = match[1];
+                const button = document.createElement('button');
+
+                button.type = 'button';
+                button.className = 'action-btn review-quality-btn';
+                button.innerHTML = '<i class="fas fa-shield-alt"></i> Review Quality';
+                button.addEventListener('click', function (event) {
+                    event.stopPropagation();
+                    window.openQualityFromAlertId(alertId);
+                });
+
+                actions.appendChild(button);
+            });
+        }
+
+        const observer = new MutationObserver(addReviewButtons);
+
+        function startQualityBridge() {
+            addReviewButtons();
+
+            const protectedList = document.getElementById('protectedAlertsList');
+            const polygonList = document.getElementById('polygonAlertsList');
+
+            if (protectedList) {
+                observer.observe(protectedList, { childList: true, subtree: true });
+            }
+
+            if (polygonList) {
+                observer.observe(polygonList, { childList: true, subtree: true });
+            }
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', startQualityBridge);
+        } else {
+            startQualityBridge();
+        }
+
+    })();
+
     </script>
 </body>
 </html>
