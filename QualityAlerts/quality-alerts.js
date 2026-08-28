@@ -1832,6 +1832,35 @@ renderFarmHeader();
             document.addEventListener('DOMContentLoaded', startQualityBridge);
         } else {
             startQualityBridge();
+            
         }
+
+            function switchTab(tabName) {
+        document.querySelectorAll('.qc-tab').forEach(tab => {
+            tab.classList.remove('active');
+        });
+
+        document.querySelectorAll('.qc-tab-content').forEach(content => {
+            content.classList.remove('active');
+        });
+
+        const selectedTab = document.querySelector(
+            `.qc-tab[data-tab="${tabName}"]`
+        );
+
+        const selectedContent = document.getElementById(
+            `qc-tab-${tabName}`
+        );
+
+        if (selectedTab) {
+            selectedTab.classList.add('active');
+        }
+
+        if (selectedContent) {
+            selectedContent.classList.add('active');
+        }
+    }
+
+    window.switchTab = switchTab;
 
     })();
