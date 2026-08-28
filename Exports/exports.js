@@ -1,7 +1,29 @@
-/* =========================================================
-   MappingTrace — Export Center
-   Fitted to the current exports.html / exports.css
-   ========================================================= */
+/* ============================================================
+   MAPPINGTRACE — EXPORT CENTER V3
+   ============================================================
+   Features:
+   - Supabase authentication
+   - Project selection
+   - Role / export permission control
+   - Advanced filtering
+   - Workflow "Select All"
+   - Workflow indeterminate state
+   - Enumerator performance
+   - Cooperative performance
+   - Export scope summary
+   - Excel export
+   - GeoJSON export
+   - KMZ export
+   - Progress report
+   - Rejected audit export
+   - Export history
+   - Preview
+   ============================================================ */
+
+
+/* ============================================================
+   1. CONFIGURATION
+   ============================================================ */
 
 const SUPABASE_URL =
     'https://crvnohvudurqfukjpisv.supabase.co';
@@ -9,41 +31,93 @@ const SUPABASE_URL =
 const SUPABASE_ANON_KEY =
     'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNydm5vaHZ1ZHVycWZ1a2pwaXN2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg0NTUxNzMsImV4cCI6MjA5NDAzMTE3M30.Qp8E57yAN4LnO4A-yirf-Z3QufGZw9OKjBfcQxG7fo8';
 
+
+/* ============================================================
+   2. GLOBAL STATE
+   ============================================================ */
+
 let db = null;
 
 let currentUser = null;
+
 let currentProject = null;
+
 let currentMembership = null;
 
 let projectMemberships = [];
+
 let members = [];
 
 let farms = [];
+
 let filteredFarms = [];
 
 let selectedFormat = 'excel';
 
-const WORKFLOW = {
-    submitted: 'Submitted',
-    enumerator_review: 'Enumerator Review',
-    field_officer_review: 'Field Officer Review',
-    gis_compliance_review: 'GIS / Compliance',
-    final_validation: 'Final Validation',
-    correction_required: 'Correction Required',
-    validated: 'Validated',
-    rejected: 'Rejected'
-};
 
-const MANAGEMENT_ROLES = [
-    'owner',
-    'manager',
-    'super_manager'
+const WORKFLOW_STATES = [
+
+    'submitted',
+
+    'enumerator_review',
+
+    'field_officer_review',
+
+    'gis_compliance_review',
+
+    'final_validation',
+
+    'correction_required',
+
+    'validated',
+
+    'rejected'
+
 ];
 
 
-/* =========================================================
-   INITIALIZATION
-   ========================================================= */
+const WORKFLOW_LABELS = {
+
+    submitted:
+        'Submitted',
+
+    enumerator_review:
+        'Enumerator Review',
+
+    field_officer_review:
+        'Field Officer Review',
+
+    gis_compliance_review:
+        'GIS / Compliance Review',
+
+    final_validation:
+        'Final Validation',
+
+    correction_required:
+        'Correction Required',
+
+    validated:
+        'Validated',
+
+    rejected:
+        'Rejected'
+};
+
+
+const MANAGEMENT_ROLES = [
+
+    'owner',
+
+    'manager',
+
+    'super_manager'
+
+];
+
+
+/* ============================================================
+   3. INITIALIZATION
+   ============================================================ */
 
 document.addEventListener(
     'DOMContentLoaded',
@@ -56,26 +130,35 @@ async function init() {
     try {
 
         if (!window.supabase) {
+
             throw new Error(
                 'Supabase library is not loaded.'
             );
         }
 
-        db = window.supabase.createClient(
-            SUPABASE_URL,
-            SUPABASE_ANON_KEY
-        );
+
+        db =
+            window.supabase.createClient(
+                SUPABASE_URL,
+                SUPABASE_ANON_KEY
+            );
+
 
         bindUI();
+
 
         const {
             data,
             error
-        } = await db.auth.getSession();
+        } =
+            await db.auth.getSession();
+
 
         if (error) {
+
             throw error;
         }
+
 
         if (!data.session) {
 
@@ -85,29 +168,42 @@ async function init() {
             return;
         }
 
+
         currentUser =
             data.session.user;
 
+
         await loadProjects();
+
 
         await selectProject();
 
+
         await loadMembers();
+
 
         await loadFarms();
 
+
+        initializeWorkflowSelectAll();
+
+
         await loadExportHistory();
+
 
         updatePermissionUI();
 
+
         applyFilters();
+
 
     } catch (error) {
 
         console.error(
-            'Export Center initialization error:',
+            'Export Center initialization failed:',
             error
         );
+
 
         notify(
             error.message ||
@@ -118,9 +214,9 @@ async function init() {
 }
 
 
-/* =========================================================
-   UI BINDING
-   ========================================================= */
+/* ============================================================
+   4. UI BINDING
+   ============================================================ */
 
 function bindUI() {
 
@@ -248,9 +344,10 @@ function bindUI() {
         .getElementById('selectAllSuppliers')
         ?.addEventListener(
             'click',
-            () => toggleAllFilter(
-                'supplier'
-            )
+            () =>
+                toggleAllFilter(
+                    'supplier'
+                )
         );
 
 
@@ -258,9 +355,10 @@ function bindUI() {
         .getElementById('selectAllCooperatives')
         ?.addEventListener(
             'click',
-            () => toggleAllFilter(
-                'cooperative'
-            )
+            () =>
+                toggleAllFilter(
+                    'cooperative'
+                )
         );
 
 
@@ -268,9 +366,10 @@ function bindUI() {
         .getElementById('selectAllEnumerators')
         ?.addEventListener(
             'click',
-            () => toggleAllFilter(
-                'enumerator'
-            )
+            () =>
+                toggleAllFilter(
+                    'enumerator'
+                )
         );
 
 
@@ -278,17 +377,22 @@ function bindUI() {
         .getElementById('selectAllFieldOfficers')
         ?.addEventListener(
             'click',
-            () => toggleAllFilter(
-                'fieldOfficer'
-            )
+            () =>
+                toggleAllFilter(
+                    'fieldOfficer'
+                )
         );
 
 
     [
         'supplierSearch',
+
         'coopSearch',
+
         'enumeratorSearch',
+
         'fieldOfficerSearch'
+
     ].forEach(
         id => {
 
@@ -304,11 +408,17 @@ function bindUI() {
 
     [
         'dateFrom',
+
         'dateTo',
+
         'dateBasis',
+
         'areaMin',
+
         'areaMax',
+
         'qualityFilter'
+
     ].forEach(
         id => {
 
@@ -331,7 +441,7 @@ function bindUI() {
 
                 checkbox.addEventListener(
                     'change',
-                    applyFilters
+                    onWorkflowCheckboxChange
                 );
             }
         );
@@ -346,12 +456,10 @@ function bindUI() {
 
                 option.addEventListener(
                     'click',
-                    () => {
-
+                    () =>
                         selectFormat(
                             option.dataset.format
-                        );
-                    }
+                        )
                 );
             }
         );
@@ -366,12 +474,10 @@ function bindUI() {
 
                 tab.addEventListener(
                     'click',
-                    () => {
-
+                    () =>
                         switchPerformanceTab(
                             tab.dataset.tab
-                        );
-                    }
+                        )
                 );
             }
         );
@@ -385,6 +491,7 @@ function bindUI() {
                 document.getElementById(
                     'customDropdown'
                 );
+
 
             if (
                 dropdown &&
@@ -406,40 +513,42 @@ function bindUI() {
 }
 
 
-/* =========================================================
-   PROJECTS
-   ========================================================= */
+/* ============================================================
+   5. PROJECTS
+   ============================================================ */
 
 async function loadProjects() {
 
     const {
         data,
         error
-    } = await db
-        .from('project_members')
-        .select(
-            `
-            project_id,
-            role,
-            status,
-            can_export,
-            projects (
-                id,
-                name
+    } =
+        await db
+            .from('project_members')
+            .select(
+                `
+                project_id,
+                role,
+                status,
+                can_export,
+                projects (
+                    id,
+                    name
+                )
+                `
             )
-            `
-        )
-        .eq(
-            'user_id',
-            currentUser.id
-        )
-        .eq(
-            'status',
-            'active'
-        );
+            .eq(
+                'user_id',
+                currentUser.id
+            )
+            .eq(
+                'status',
+                'active'
+            );
 
 
     if (error) {
+
         throw error;
     }
 
@@ -456,9 +565,6 @@ async function loadProjects() {
             'You are not an active member of any project.'
         );
     }
-
-
-    renderProjectDropdown();
 }
 
 
@@ -522,26 +628,9 @@ async function selectProject() {
     );
 
 
-    const url =
-        new URL(
-            window.location.href
-        );
-
-
-    url.searchParams.set(
-        'project',
-        currentProject.id
-    );
-
-
-    history.replaceState(
-        {},
-        '',
-        url
-    );
-
-
     updateProjectHeader();
+
+    renderProjectDropdown();
 }
 
 
@@ -561,20 +650,11 @@ function updateProjectHeader() {
     );
 
 
-    const role =
-        String(
-            currentMembership?.role ||
-            'user'
-        )
-            .replaceAll(
-                '_',
-                ' '
-            );
-
-
     setText(
         'userRole',
-        role
+        formatRole(
+            currentMembership?.role
+        )
     );
 }
 
@@ -588,6 +668,7 @@ function renderProjectDropdown() {
 
 
     if (!container) {
+
         return;
     }
 
@@ -652,6 +733,7 @@ async function changeProject(
 
 
     if (!membership) {
+
         return;
     }
 
@@ -670,23 +752,9 @@ async function changeProject(
     );
 
 
-    const url =
-        new URL(
-            window.location.href
-        );
+    updateProjectHeader();
 
-
-    url.searchParams.set(
-        'project',
-        projectId
-    );
-
-
-    history.pushState(
-        {},
-        '',
-        url
-    );
+    renderProjectDropdown();
 
 
     document
@@ -698,19 +766,17 @@ async function changeProject(
         );
 
 
-    updateProjectHeader();
-
     await loadMembers();
 
     await loadFarms();
+
+    initializeWorkflowSelectAll();
 
     await loadExportHistory();
 
     updatePermissionUI();
 
     applyFilters();
-
-    renderProjectDropdown();
 }
 
 
@@ -764,37 +830,39 @@ function filterProjectDropdown(
 }
 
 
-/* =========================================================
-   USER / MEMBERS
-   ========================================================= */
+/* ============================================================
+   6. MEMBERS / PERMISSIONS
+   ============================================================ */
 
 async function loadMembers() {
 
     const {
         data,
         error
-    } = await db
-        .from('project_members')
-        .select(
-            `
-            user_id,
-            project_id,
-            role,
-            status,
-            can_export
-            `
-        )
-        .eq(
-            'project_id',
-            currentProject.id
-        )
-        .eq(
-            'status',
-            'active'
-        );
+    } =
+        await db
+            .from('project_members')
+            .select(
+                `
+                user_id,
+                project_id,
+                role,
+                status,
+                can_export
+                `
+            )
+            .eq(
+                'project_id',
+                currentProject.id
+            )
+            .eq(
+                'status',
+                'active'
+            );
 
 
     if (error) {
+
         throw error;
     }
 
@@ -803,7 +871,7 @@ async function loadMembers() {
         data || [];
 
 
-    const ids =
+    const userIds =
         members
             .map(
                 member =>
@@ -812,24 +880,25 @@ async function loadMembers() {
             .filter(Boolean);
 
 
-    if (ids.length) {
+    if (userIds.length) {
 
         const {
             data: profiles
-        } = await db
-            .from('user_profiles')
-            .select(
-                `
-                id,
-                first_name,
-                last_name,
-                email
-                `
-            )
-            .in(
-                'id',
-                ids
-            );
+        } =
+            await db
+                .from('user_profiles')
+                .select(
+                    `
+                    id,
+                    first_name,
+                    last_name,
+                    email
+                    `
+                )
+                .in(
+                    'id',
+                    userIds
+                );
 
 
         const profileMap =
@@ -877,7 +946,7 @@ async function loadMembers() {
 }
 
 
-async function updateUserDisplay() {
+function updateUserDisplay() {
 
     const profile =
         members.find(
@@ -905,34 +974,21 @@ async function updateUserDisplay() {
     );
 
 
-    const role =
-        String(
-            currentMembership?.role ||
-            'user'
-        )
-            .replaceAll(
-                '_',
-                ' '
-            );
-
-
     setText(
         'userRole',
-        role
+        formatRole(
+            currentMembership?.role
+        )
     );
-
-
-    const avatar =
-        name
-            .trim()
-            .charAt(0)
-            .toUpperCase() ||
-        'U';
 
 
     setText(
         'userAvatar',
-        avatar
+        name
+            .trim()
+            .charAt(0)
+            .toUpperCase() ||
+        'U'
     );
 }
 
@@ -951,7 +1007,8 @@ function userCanExport() {
         MANAGEMENT_ROLES.includes(
             role
         ) ||
-        currentMembership?.can_export === true
+        currentMembership?.can_export ===
+        true
     );
 }
 
@@ -982,33 +1039,6 @@ function updatePermissionUI() {
         userCanManageExportPermissions();
 
 
-    const badge =
-        document.getElementById(
-            'exportPermissionBadge'
-        );
-
-
-    if (badge) {
-
-        badge.textContent =
-            allowed
-                ? 'Export access granted'
-                : 'Export access restricted';
-
-
-        badge.classList.toggle(
-            'allowed',
-            allowed
-        );
-
-
-        badge.classList.toggle(
-            'denied',
-            !allowed
-        );
-    }
-
-
     const exportButton =
         document.getElementById(
             'exportBtn'
@@ -1037,15 +1067,42 @@ function updatePermissionUI() {
     }
 
 
-    const management =
+    const badge =
+        document.getElementById(
+            'exportPermissionBadge'
+        );
+
+
+    if (badge) {
+
+        badge.textContent =
+            allowed
+                ? 'Export access granted'
+                : 'Export access restricted';
+
+
+        badge.classList.toggle(
+            'allowed',
+            allowed
+        );
+
+
+        badge.classList.toggle(
+            'denied',
+            !allowed
+        );
+    }
+
+
+    const permissionManagement =
         document.getElementById(
             'permissionManagement'
         );
 
 
-    if (management) {
+    if (permissionManagement) {
 
-        management.classList.toggle(
+        permissionManagement.classList.toggle(
             'hidden',
             !manager
         );
@@ -1068,6 +1125,7 @@ function renderPermissionList() {
 
 
     if (!container) {
+
         return;
     }
 
@@ -1076,21 +1134,6 @@ function renderPermissionList() {
         members
             .map(
                 member => {
-
-                    const profile =
-                        member.profile;
-
-
-                    const name =
-                        [
-                            profile?.first_name,
-                            profile?.last_name
-                        ]
-                            .filter(Boolean)
-                            .join(' ') ||
-                        profile?.email ||
-                        member.user_id;
-
 
                     const role =
                         String(
@@ -1104,6 +1147,18 @@ function renderPermissionList() {
                         MANAGEMENT_ROLES.includes(
                             role
                         );
+
+
+                    const name =
+                        member.profile
+                            ? [
+                                member.profile.first_name,
+                                member.profile.last_name
+                            ]
+                                .filter(Boolean)
+                                .join(' ') ||
+                              member.profile.email
+                            : member.user_id;
 
 
                     return `
@@ -1123,7 +1178,7 @@ function renderPermissionList() {
                                     class="permission-role"
                                 >
                                     ${escapeHtml(
-                                        profile?.email ||
+                                        member.profile?.email ||
                                         ''
                                     )}
                                 </div>
@@ -1134,9 +1189,8 @@ function renderPermissionList() {
                                 class="permission-role"
                             >
                                 ${escapeHtml(
-                                    role.replaceAll(
-                                        '_',
-                                        ' '
+                                    formatRole(
+                                        role
                                     )
                                 )}
                             </div>
@@ -1145,7 +1199,7 @@ function renderPermissionList() {
                                 ${
                                     automatic
                                         ? 'Automatic'
-                                        : 'Project permission'
+                                        : 'Controlled by manager'
                                 }
                             </div>
 
@@ -1160,7 +1214,7 @@ function renderPermissionList() {
                                     }"
                                     ${
                                         automatic ||
-                                        member.can_export
+                                        member.can_export === true
                                             ? 'checked'
                                             : ''
                                     }
@@ -1210,7 +1264,7 @@ async function setExportPermission(
     ) {
 
         notify(
-            'You are not authorized to manage export permissions.',
+            'Only management roles can change export permissions.',
             'error'
         );
 
@@ -1222,22 +1276,26 @@ async function setExportPermission(
 
         const {
             error
-        } = await db.rpc(
-            'set_project_member_export_permission',
-            {
-                p_project_id:
-                    currentProject.id,
+        } =
+            await db.rpc(
+                'set_project_member_export_permission',
+                {
 
-                p_user_id:
-                    userId,
+                    p_project_id:
+                        currentProject.id,
 
-                p_can_export:
-                    enabled
-            }
-        );
+                    p_user_id:
+                        userId,
+
+                    p_can_export:
+                        enabled
+
+                }
+            );
 
 
         if (error) {
+
             throw error;
         }
 
@@ -1256,7 +1314,10 @@ async function setExportPermission(
 
     } catch (error) {
 
-        console.error(error);
+        console.error(
+            error
+        );
+
 
         notify(
             error.message ||
@@ -1267,13 +1328,15 @@ async function setExportPermission(
 }
 
 
-/* =========================================================
-   FARMS
-   ========================================================= */
+/* ============================================================
+   7. FARMS
+   ============================================================ */
 
 async function loadFarms() {
 
-    showLoading(true);
+    showLoading(
+        true
+    );
 
 
     try {
@@ -1281,16 +1344,18 @@ async function loadFarms() {
         const {
             data,
             error
-        } = await db
-            .from('farms')
-            .select('*')
-            .eq(
-                'project_id',
-                currentProject.id
-            );
+        } =
+            await db
+                .from('farms')
+                .select('*')
+                .eq(
+                    'project_id',
+                    currentProject.id
+                );
 
 
         if (error) {
+
             throw error;
         }
 
@@ -1306,7 +1371,9 @@ async function loadFarms() {
 
     } finally {
 
-        showLoading(false);
+        showLoading(
+            false
+        );
     }
 }
 
@@ -1361,6 +1428,7 @@ function normalizeFarm(
             parseGeometry(
                 farm.geometry
             )
+
     };
 }
 
@@ -1371,7 +1439,7 @@ function normalizeWorkflow(
 
     if (
         farm.workflow_state &&
-        WORKFLOW[
+        WORKFLOW_LABELS[
             farm.workflow_state
         ]
     ) {
@@ -1402,9 +1470,239 @@ function normalizeWorkflow(
 }
 
 
-/* =========================================================
-   FILTER LISTS
-   ========================================================= */
+/* ============================================================
+   8. WORKFLOW SELECT ALL
+   ============================================================ */
+
+function initializeWorkflowSelectAll() {
+
+    const workflowContainer =
+        document.getElementById(
+            'workflowFilterList'
+        );
+
+
+    if (!workflowContainer) {
+
+        return;
+    }
+
+
+    let selectAll =
+        document.getElementById(
+            'selectAllWorkflowStages'
+        );
+
+
+    if (!selectAll) {
+
+        const wrapper =
+            document.createElement(
+                'label'
+            );
+
+
+        wrapper.className =
+            'checkbox-item workflow-select-all';
+
+
+        wrapper.innerHTML =
+            `
+            <input
+                type="checkbox"
+                id="selectAllWorkflowStages"
+            >
+
+            <span
+                class="checkbox-label"
+            >
+                <strong>
+                    Select all stages
+                </strong>
+            </span>
+
+            <span
+                id="workflowSelectionCount"
+                class="filter-count"
+            >
+                0 of ${WORKFLOW_STATES.length}
+            </span>
+            `;
+
+
+        workflowContainer
+            .insertBefore(
+                wrapper,
+                workflowContainer.firstChild
+            );
+
+
+        const divider =
+            document.createElement(
+                'div'
+            );
+
+
+        divider.className =
+            'workflow-divider';
+
+
+        wrapper.after(
+            divider
+        );
+
+
+        selectAll =
+            wrapper.querySelector(
+                '#selectAllWorkflowStages'
+            );
+
+
+        selectAll.addEventListener(
+            'change',
+            onSelectAllWorkflowStages
+        );
+    }
+
+
+    updateWorkflowSelectAllState(
+        true
+    );
+}
+
+
+function onSelectAllWorkflowStages(
+    event
+) {
+
+    const checked =
+        event.target.checked;
+
+
+    document
+        .querySelectorAll(
+            '.workflow-checkbox'
+        )
+        .forEach(
+            checkbox => {
+
+                checkbox.checked =
+                    checked;
+            }
+        );
+
+
+    updateWorkflowSelectAllState();
+
+    applyFilters();
+}
+
+
+function onWorkflowCheckboxChange() {
+
+    updateWorkflowSelectAllState();
+
+    applyFilters();
+}
+
+
+function updateWorkflowSelectAllState(
+    initialLoad = false
+) {
+
+    const selectAll =
+        document.getElementById(
+            'selectAllWorkflowStages'
+        );
+
+
+    const checkboxes =
+        [
+            ...document.querySelectorAll(
+                '.workflow-checkbox'
+            )
+        ];
+
+
+    if (
+        !selectAll ||
+        !checkboxes.length
+    ) {
+
+        return;
+    }
+
+
+    const checked =
+        checkboxes.filter(
+            checkbox =>
+                checkbox.checked
+        ).length;
+
+
+    if (
+        initialLoad &&
+        checked === 0
+    ) {
+
+        checkboxes.forEach(
+            checkbox => {
+
+                checkbox.checked =
+                    true;
+            }
+        );
+    }
+
+
+    const selectedCount =
+        checkboxes.filter(
+            checkbox =>
+                checkbox.checked
+        ).length;
+
+
+    selectAll.checked =
+        selectedCount ===
+        checkboxes.length;
+
+
+    selectAll.indeterminate =
+        selectedCount > 0 &&
+        selectedCount <
+        checkboxes.length;
+
+
+    setText(
+        'workflowSelectionCount',
+        `${selectedCount} of ${checkboxes.length}`
+    );
+
+
+    setText(
+        'workflowStageCount',
+        `${selectedCount} selected`
+    );
+}
+
+
+function getSelectedWorkflowStates() {
+
+    return [
+        ...document.querySelectorAll(
+            '.workflow-checkbox:checked'
+        )
+    ]
+        .map(
+            checkbox =>
+                checkbox.value
+        );
+}
+
+
+/* ============================================================
+   9. FILTER LISTS
+   ============================================================ */
 
 function renderFilterLists() {
 
@@ -1451,6 +1749,7 @@ function renderFilterLists() {
         )
             .map(
                 id => ({
+
                     value:
                         id,
 
@@ -1458,6 +1757,7 @@ function renderFilterLists() {
                         personName(
                             id
                         )
+
                 })
             ),
         getValue(
@@ -1479,6 +1779,7 @@ function renderFilterLists() {
         )
             .map(
                 id => ({
+
                     value:
                         id,
 
@@ -1486,6 +1787,7 @@ function renderFilterLists() {
                         personName(
                             id
                         )
+
                 })
             ),
         getValue(
@@ -1512,6 +1814,7 @@ function renderCheckboxFilter(
 
 
     if (!container) {
+
         return;
     }
 
@@ -1680,6 +1983,7 @@ function toggleAllFilter(
 
 
     if (!boxes.length) {
+
         return;
     }
 
@@ -1704,9 +2008,9 @@ function toggleAllFilter(
 }
 
 
-/* =========================================================
-   FILTERING
-   ========================================================= */
+/* ============================================================
+   10. MAIN FILTERING
+   ============================================================ */
 
 function applyFilters() {
 
@@ -1728,22 +2032,14 @@ function applyFilters() {
         );
 
 
-    const officers =
+    const fieldOfficers =
         getSelectedFilterValues(
             'fieldOfficer'
         );
 
 
     const workflowStates =
-        [
-            ...document.querySelectorAll(
-                '.workflow-checkbox:checked'
-            )
-        ]
-            .map(
-                checkbox =>
-                    checkbox.value
-            );
+        getSelectedWorkflowStates();
 
 
     const dateFrom =
@@ -1832,8 +2128,8 @@ function applyFilters() {
 
 
                 if (
-                    officers.length &&
-                    !officers.includes(
+                    fieldOfficers.length &&
+                    !fieldOfficers.includes(
                         String(
                             farm.field_officer_id
                         )
@@ -1844,8 +2140,25 @@ function applyFilters() {
                 }
 
 
+                /*
+                 IMPORTANT:
+
+                 If no workflow stages are selected,
+                 return no records.
+
+                 If Select All is selected,
+                 every stage is selected.
+                */
+
                 if (
-                    workflowStates.length &&
+                    workflowStates.length === 0
+                ) {
+
+                    return false;
+                }
+
+
+                if (
                     !workflowStates.includes(
                         farm.workflow_state
                     )
@@ -1964,51 +2277,30 @@ function applyFilters() {
     updateFormatAvailability();
 
     renderPerformance();
+
+    updateExportScope();
 }
 
 
 function resetFilters() {
 
-    document
-        .querySelectorAll(
-            `
-            .supplier-checkbox,
-            .cooperative-checkbox,
-            .enumerator-checkbox,
-            .fieldOfficer-checkbox
-            `
-        )
-        .forEach(
-            checkbox => {
-
-                checkbox.checked =
-                    false;
-            }
-        );
-
-
-    document
-        .querySelectorAll(
-            '.workflow-checkbox'
-        )
-        .forEach(
-            checkbox => {
-
-                checkbox.checked =
-                    true;
-            }
-        );
-
-
     [
         'supplierSearch',
+
         'coopSearch',
+
         'enumeratorSearch',
+
         'fieldOfficerSearch',
+
         'dateFrom',
+
         'dateTo',
+
         'areaMin',
+
         'areaMax'
+
     ]
         .forEach(
             id => {
@@ -2020,6 +2312,7 @@ function resetFilters() {
 
 
                 if (element) {
+
                     element.value =
                         '';
                 }
@@ -2053,13 +2346,62 @@ function resetFilters() {
     }
 
 
+    document
+        .querySelectorAll(
+            `
+            .supplier-checkbox,
+            .cooperative-checkbox,
+            .enumerator-checkbox,
+            .fieldOfficer-checkbox
+            `
+        )
+        .forEach(
+            checkbox => {
+
+                checkbox.checked =
+                    false;
+            }
+        );
+
+
+    document
+        .querySelectorAll(
+            '.workflow-checkbox'
+        )
+        .forEach(
+            checkbox => {
+
+                checkbox.checked =
+                    true;
+            }
+        );
+
+
+    const selectAll =
+        document.getElementById(
+            'selectAllWorkflowStages'
+        );
+
+
+    if (selectAll) {
+
+        selectAll.checked =
+            true;
+
+        selectAll.indeterminate =
+            false;
+    }
+
+
     renderFilterLists();
 
-    applyFilters();
+    updateWorkflowSelectAllState();
 
     selectFormat(
         'excel'
     );
+
+    applyFilters();
 }
 
 
@@ -2078,12 +2420,14 @@ function clearDates() {
 
 
     if (from) {
+
         from.value =
             '';
     }
 
 
     if (to) {
+
         to.value =
             '';
     }
@@ -2108,6 +2452,7 @@ function toggleAdvancedFilters() {
 
 
     if (!panel) {
+
         return;
     }
 
@@ -2128,9 +2473,9 @@ function toggleAdvancedFilters() {
 }
 
 
-/* =========================================================
-   KPIs
-   ========================================================= */
+/* ============================================================
+   11. KPIs
+   ============================================================ */
 
 function updateKPIs() {
 
@@ -2141,10 +2486,10 @@ function updateKPIs() {
     const area =
         filteredFarms.reduce(
             (
-                totalArea,
+                sum,
                 farm
             ) =>
-                totalArea +
+                sum +
                 farm.area,
             0
         );
@@ -2263,9 +2608,140 @@ function updateKPIs() {
 }
 
 
-/* =========================================================
-   PERFORMANCE
-   ========================================================= */
+/* ============================================================
+   12. EXPORT SCOPE
+   ============================================================ */
+
+function updateExportScope() {
+
+    const selected =
+        filteredFarms.length;
+
+
+    const area =
+        filteredFarms.reduce(
+            (
+                sum,
+                farm
+            ) =>
+                sum +
+                farm.area,
+            0
+        );
+
+
+    setText(
+        'scopePlots',
+        selected.toLocaleString()
+    );
+
+
+    setText(
+        'scopeArea',
+        `${area.toFixed(2)} ha`
+    );
+
+
+    const validated =
+        filteredFarms.filter(
+            farm =>
+                farm.workflow_state ===
+                'validated'
+        ).length;
+
+
+    const rejected =
+        filteredFarms.filter(
+            farm =>
+                farm.workflow_state ===
+                'rejected'
+        ).length;
+
+
+    const inProgress =
+        selected -
+        validated -
+        rejected;
+
+
+    setText(
+        'scopeValidated',
+        validated.toLocaleString()
+    );
+
+
+    setText(
+        'scopeRejected',
+        rejected.toLocaleString()
+    );
+
+
+    setText(
+        'scopeInProgress',
+        inProgress.toLocaleString()
+    );
+
+
+    renderScopeWorkflowBreakdown();
+}
+
+
+function renderScopeWorkflowBreakdown() {
+
+    const container =
+        document.getElementById(
+            'scopeWorkflowBreakdown'
+        );
+
+
+    if (!container) {
+
+        return;
+    }
+
+
+    container.innerHTML =
+        WORKFLOW_STATES
+            .map(
+                state => {
+
+                    const count =
+                        filteredFarms.filter(
+                            farm =>
+                                farm.workflow_state ===
+                                state
+                        ).length;
+
+
+                    if (!count) {
+
+                        return '';
+                    }
+
+
+                    return `
+                        <span
+                            class="scope-chip"
+                        >
+                            ${escapeHtml(
+                                WORKFLOW_LABELS[
+                                    state
+                                ]
+                            )}
+                            <strong>
+                                ${count.toLocaleString()}
+                            </strong>
+                        </span>
+                    `;
+                }
+            )
+            .join('');
+}
+
+
+/* ============================================================
+   13. PERFORMANCE
+   ============================================================ */
 
 function renderPerformance() {
 
@@ -2288,6 +2764,7 @@ function renderEnumeratorPerformance() {
 
 
     if (!body) {
+
         return;
     }
 
@@ -2318,9 +2795,6 @@ function renderEnumeratorPerformance() {
                         mapped:
                             0,
 
-                        submitted:
-                            0,
-
                         validated:
                             0,
 
@@ -2332,27 +2806,17 @@ function renderEnumeratorPerformance() {
 
                         pending:
                             0
+
                     }
                 );
             }
 
 
             const row =
-                map.get(
-                    key
-                );
+                map.get(key);
 
 
             row.mapped++;
-
-
-            if (
-                farm.workflow_state ===
-                'submitted'
-            ) {
-
-                row.submitted++;
-            }
 
 
             if (
@@ -2440,6 +2904,14 @@ function renderEnumeratorPerformance() {
                             : 0;
 
 
+                    const correctionRate =
+                        row.mapped
+                            ? row.correction /
+                              row.mapped *
+                              100
+                            : 0;
+
+
                     return `
                         <tr>
 
@@ -2451,10 +2923,6 @@ function renderEnumeratorPerformance() {
 
                             <td>
                                 ${row.mapped}
-                            </td>
-
-                            <td>
-                                ${row.submitted}
                             </td>
 
                             <td>
@@ -2481,6 +2949,12 @@ function renderEnumeratorPerformance() {
                                 ${rate.toFixed(1)}%
                             </td>
 
+                            <td>
+                                ${correctionRate.toFixed(
+                                    1
+                                )}%
+                            </td>
+
                         </tr>
                     `;
                 }
@@ -2498,6 +2972,7 @@ function renderCooperativePerformance() {
 
 
     if (!body) {
+
         return;
     }
 
@@ -2540,15 +3015,14 @@ function renderCooperativePerformance() {
 
                         pending:
                             0
+
                     }
                 );
             }
 
 
             const row =
-                map.get(
-                    key
-                );
+                map.get(key);
 
 
             row.farms++;
@@ -2609,8 +3083,8 @@ function renderCooperativePerformance() {
                     a,
                     b
                 ) =>
-                    b.validated -
-                    a.validated
+                    b.farms -
+                    a.farms
             );
 
 
@@ -2702,21 +3176,15 @@ function renderWorkflowPerformance() {
 
 
     if (!body) {
+
         return;
     }
 
 
     body.innerHTML =
-        Object.entries(
-            WORKFLOW
-        )
+        WORKFLOW_STATES
             .map(
-                (
-                    [
-                        state,
-                        label
-                    ]
-                ) => {
+                state => {
 
                     const rows =
                         filteredFarms.filter(
@@ -2729,10 +3197,10 @@ function renderWorkflowPerformance() {
                     const area =
                         rows.reduce(
                             (
-                                totalArea,
+                                sum,
                                 farm
                             ) =>
-                                totalArea +
+                                sum +
                                 farm.area,
                             0
                         );
@@ -2743,12 +3211,14 @@ function renderWorkflowPerformance() {
 
                             <td>
                                 ${escapeHtml(
-                                    label
+                                    WORKFLOW_LABELS[
+                                        state
+                                    ]
                                 )}
                             </td>
 
                             <td>
-                                ${rows.length}
+                                ${rows.length.toLocaleString()}
                             </td>
 
                             <td>
@@ -2893,15 +3363,14 @@ function buildEnumeratorStats() {
 
                         correction:
                             0
+
                     }
                 );
             }
 
 
             const row =
-                map.get(
-                    key
-                );
+                map.get(key);
 
 
             row.mapped++;
@@ -2948,6 +3417,7 @@ function buildEnumeratorStats() {
                           row.mapped *
                           100
                         : 0
+
             })
         );
 }
@@ -2973,42 +3443,44 @@ function switchPerformanceTab(
         );
 
 
-    const enumerators =
-        document.getElementById(
-            'enumeratorPerformance'
-        );
+    [
+        'enumeratorPerformance',
+
+        'cooperativePerformance',
+
+        'workflowPerformance'
+
+    ].forEach(
+        id => {
+
+            document
+                .getElementById(id)
+                ?.classList.add(
+                    'hidden'
+                );
+        }
+    );
 
 
-    const cooperatives =
-        document.getElementById(
-            'cooperativePerformance'
-        );
+    const target =
+        {
+            enumerators:
+                'enumeratorPerformance',
+
+            cooperatives:
+                'cooperativePerformance',
+
+            workflow:
+                'workflowPerformance'
+        }[
+            tab
+        ];
 
 
-    const workflow =
-        document.getElementById(
-            'workflowPerformance'
-        );
-
-
-    enumerators
-        ?.classList.toggle(
-            'hidden',
-            tab !== 'enumerators'
-        );
-
-
-    cooperatives
-        ?.classList.toggle(
-            'hidden',
-            tab !== 'cooperatives'
-        );
-
-
-    workflow
-        ?.classList.toggle(
-            'hidden',
-            tab !== 'workflow'
+    document
+        .getElementById(target)
+        ?.classList.remove(
+            'hidden'
         );
 }
 
@@ -3018,11 +3490,13 @@ function rateClass(
 ) {
 
     if (rate >= 80) {
+
         return 'rate-good';
     }
 
 
     if (rate >= 60) {
+
         return 'rate-warning';
     }
 
@@ -3031,26 +3505,27 @@ function rateClass(
 }
 
 
-/* =========================================================
-   EXPORT FORMAT
-   ========================================================= */
+/* ============================================================
+   14. FORMAT SELECTION
+   ============================================================ */
 
 function selectFormat(
     format
 ) {
 
     if (
-        (
-            format ===
-            'geojson' ||
-            format ===
+        [
+            'geojson',
             'kmz'
-        ) &&
+        ]
+            .includes(
+                format
+            ) &&
         !isGeoExportAllowed()
     ) {
 
         notify(
-            'GeoJSON and KMZ are available only when all selected records are Validated or Rejected.',
+            'GeoJSON and KMZ require only Validated or Rejected plots.',
             'warning'
         );
 
@@ -3081,18 +3556,23 @@ function selectFormat(
 
 function isGeoExportAllowed() {
 
-    return (
-        filteredFarms.length > 0 &&
-        filteredFarms.every(
-            farm =>
-                [
-                    'validated',
-                    'rejected'
-                ]
-                    .includes(
-                        farm.workflow_state
-                    )
-        )
+    if (
+        !filteredFarms.length
+    ) {
+
+        return false;
+    }
+
+
+    return filteredFarms.every(
+        farm =>
+            [
+                'validated',
+                'rejected'
+            ]
+                .includes(
+                    farm.workflow_state
+                )
     );
 }
 
@@ -3130,49 +3610,56 @@ function updateFormatAvailability() {
                 option.title =
                     restricted &&
                     !geoAllowed
-                        ? 'Available only for Validated and Rejected records'
+                        ? 'Only Validated and Rejected records can be exported as geospatial data.'
                         : '';
             }
         );
 
 
-    const help =
-        document.getElementById(
-            'formatHelp'
-        );
-
-
-    if (help) {
-
-        help.textContent =
-            geoAllowed
-
-                ? 'Validated and Rejected plots can be exported as Excel, GeoJSON, KMZ or Progress Report.'
-
-                : 'Excel and Progress Report are available for all workflow stages. GeoJSON/KMZ require only Validated or Rejected plots.';
-    }
-
-
     if (
-        (
-            selectedFormat ===
-            'geojson' ||
-            selectedFormat ===
+        [
+            'geojson',
             'kmz'
-        ) &&
+        ]
+            .includes(
+                selectedFormat
+            ) &&
         !geoAllowed
     ) {
 
-        selectFormat(
-            'excel'
-        );
+        selectedFormat =
+            'excel';
+
+
+        document
+            .querySelectorAll(
+                '.format-option'
+            )
+            .forEach(
+                option => {
+
+                    option.classList.toggle(
+                        'selected',
+                        option.dataset.format ===
+                        'excel'
+                    );
+                }
+            );
     }
+
+
+    setText(
+        'formatHelp',
+        geoAllowed
+            ? 'Geospatial exports are available because all selected plots are Validated or Rejected.'
+            : 'Excel and Progress Report are available for all workflow stages. GeoJSON and KMZ require Validated or Rejected plots only.'
+    );
 }
 
 
-/* =========================================================
-   MAIN EXPORT
-   ========================================================= */
+/* ============================================================
+   15. MAIN EXPORT
+   ============================================================ */
 
 async function generateExport() {
 
@@ -3200,7 +3687,9 @@ async function generateExport() {
 
     try {
 
-        showLoading(true);
+        showLoading(
+            true
+        );
 
 
         switch (
@@ -3224,7 +3713,7 @@ async function generateExport() {
                 ) {
 
                     throw new Error(
-                        'GeoJSON requires Validated or Rejected records only.'
+                        'GeoJSON is available only for Validated and Rejected records.'
                     );
                 }
 
@@ -3243,7 +3732,7 @@ async function generateExport() {
                 ) {
 
                     throw new Error(
-                        'KMZ requires Validated or Rejected records only.'
+                        'KMZ is available only for Validated and Rejected records.'
                     );
                 }
 
@@ -3286,10 +3775,11 @@ async function generateExport() {
             'success'
         );
 
+
     } catch (error) {
 
         console.error(
-            'Export error:',
+            'Export failed:',
             error
         );
 
@@ -3300,16 +3790,19 @@ async function generateExport() {
             'error'
         );
 
+
     } finally {
 
-        showLoading(false);
+        showLoading(
+            false
+        );
     }
 }
 
 
-/* =========================================================
-   EXCEL
-   ========================================================= */
+/* ============================================================
+   16. EXCEL EXPORT
+   ============================================================ */
 
 function exportExcel(
     rows,
@@ -3324,19 +3817,11 @@ function exportExcel(
     }
 
 
-    if (!window.saveAs) {
-
-        throw new Error(
-            'FileSaver library is not loaded.'
-        );
-    }
-
-
     const workbook =
         XLSX.utils.book_new();
 
 
-    const farmSheet =
+    const farmsSheet =
         XLSX.utils.json_to_sheet(
             rows.map(
                 exportRow
@@ -3346,34 +3831,46 @@ function exportExcel(
 
     XLSX.utils.book_append_sheet(
         workbook,
-        farmSheet,
+        farmsSheet,
         'Farms'
     );
 
 
-    XLSX.utils.book_append_sheet(
-        workbook,
+    const enumeratorSheet =
         XLSX.utils.json_to_sheet(
             enumeratorStatsForExport()
-        ),
+        );
+
+
+    XLSX.utils.book_append_sheet(
+        workbook,
+        enumeratorSheet,
         'Enumerators'
     );
 
 
-    XLSX.utils.book_append_sheet(
-        workbook,
+    const cooperativeSheet =
         XLSX.utils.json_to_sheet(
             cooperativeStatsForExport()
-        ),
+        );
+
+
+    XLSX.utils.book_append_sheet(
+        workbook,
+        cooperativeSheet,
         'Cooperatives'
     );
 
 
-    XLSX.utils.book_append_sheet(
-        workbook,
+    const workflowSheet =
         XLSX.utils.json_to_sheet(
             workflowStatsForExport()
-        ),
+        );
+
+
+    XLSX.utils.book_append_sheet(
+        workbook,
+        workflowSheet,
         'Workflow'
     );
 
@@ -3403,6 +3900,18 @@ function exportProgressReport(
         rows.length;
 
 
+    const area =
+        rows.reduce(
+            (
+                sum,
+                farm
+            ) =>
+                sum +
+                farm.area,
+            0
+        );
+
+
     const validated =
         rows.filter(
             farm =>
@@ -3419,16 +3928,10 @@ function exportProgressReport(
         ).length;
 
 
-    const area =
-        rows.reduce(
-            (
-                totalArea,
-                farm
-            ) =>
-                totalArea +
-                farm.area,
-            0
-        );
+    const inProgress =
+        total -
+        validated -
+        rejected;
 
 
     const workbook =
@@ -3442,8 +3945,7 @@ function exportProgressReport(
                 'Project',
 
             Value:
-                currentProject.name ||
-                ''
+                currentProject.name
         },
 
         {
@@ -3457,7 +3959,7 @@ function exportProgressReport(
 
         {
             Metric:
-                'Selected farms',
+                'Selected plots',
 
             Value:
                 total
@@ -3468,7 +3970,11 @@ function exportProgressReport(
                 'Selected area (ha)',
 
             Value:
-                area.toFixed(2)
+                Number(
+                    area.toFixed(
+                        2
+                    )
+                )
         },
 
         {
@@ -3492,9 +3998,7 @@ function exportProgressReport(
                 'In progress',
 
             Value:
-                total -
-                validated -
-                rejected
+                inProgress
         },
 
         {
@@ -3510,6 +4014,7 @@ function exportProgressReport(
                     ).toFixed(1)}%`
                     : '0.0%'
         }
+
     ];
 
 
@@ -3569,9 +4074,9 @@ function exportProgressReport(
 }
 
 
-/* =========================================================
-   REJECTED AUDIT
-   ========================================================= */
+/* ============================================================
+   17. REJECTED AUDIT EXPORT
+   ============================================================ */
 
 async function exportRejectedAudit() {
 
@@ -3607,7 +4112,9 @@ async function exportRejectedAudit() {
 
     try {
 
-        showLoading(true);
+        showLoading(
+            true
+        );
 
 
         exportExcel(
@@ -3626,9 +4133,10 @@ async function exportRejectedAudit() {
 
 
         notify(
-            `Rejected audit exported: ${rejected.length.toLocaleString()} plots.`,
+            `${rejected.length.toLocaleString()} rejected plots exported for audit.`,
             'success'
         );
+
 
     } catch (error) {
 
@@ -3638,16 +4146,19 @@ async function exportRejectedAudit() {
             'error'
         );
 
+
     } finally {
 
-        showLoading(false);
+        showLoading(
+            false
+        );
     }
 }
 
 
-/* =========================================================
-   GEOJSON
-   ========================================================= */
+/* ============================================================
+   18. GEOJSON
+   ============================================================ */
 
 function exportGeoJSON(
     rows
@@ -3682,6 +4193,7 @@ function exportGeoJSON(
                         stripZ(
                             farm.geometry
                         )
+
                 })
             );
 
@@ -3701,6 +4213,7 @@ function exportGeoJSON(
 
         features:
             features
+
     };
 
 
@@ -3729,9 +4242,9 @@ function exportGeoJSON(
 }
 
 
-/* =========================================================
-   KMZ
-   ========================================================= */
+/* ============================================================
+   19. KMZ
+   ============================================================ */
 
 async function exportKMZ(
     rows
@@ -3780,11 +4293,16 @@ async function exportKMZ(
         `<?xml version="1.0" encoding="UTF-8"?>
 <kml xmlns="http://www.opengis.net/kml/2.2">
 <Document>
-<name>${escapeXml(
+
+<name>
+${escapeXml(
     currentProject.name ||
     'MappingTrace'
-)}</name>
+)}
+</name>
+
 ${placemarks}
+
 </Document>
 </kml>`;
 
@@ -3842,38 +4360,53 @@ ${escapeXml(
 </name>
 
 <description><![CDATA[
-Farmer: ${escapeXml(
+
+Farmer:
+${escapeXml(
     farm.farmer_name ||
     ''
-)}<br>
-Cooperative: ${escapeXml(
+)}
+
+Cooperative:
+${escapeXml(
     farm.cooperative ||
     ''
-)}<br>
-Enumerator: ${escapeXml(
+)}
+
+Enumerator:
+${escapeXml(
     personName(
         farm.enumerator_id
     )
-)}<br>
-Field Officer: ${escapeXml(
+)}
+
+Field Officer:
+${escapeXml(
     personName(
         farm.field_officer_id
     )
-)}<br>
-Area: ${farm.area.toFixed(
+)}
+
+Area:
+${farm.area.toFixed(
     2
-)} ha<br>
-Workflow: ${escapeXml(
-    WORKFLOW[
+)} ha
+
+Workflow:
+${escapeXml(
+    WORKFLOW_LABELS[
         farm.workflow_state
     ] ||
     farm.workflow_state ||
     ''
-)}<br>
-Rejection reason: ${escapeXml(
+)}
+
+Rejection reason:
+${escapeXml(
     farm.rejection_reason ||
     ''
 )}
+
 ]]></description>
 
 ${geometryToKML(
@@ -3890,6 +4423,7 @@ function geometryToKML(
 ) {
 
     if (!geometry) {
+
         return '';
     }
 
@@ -3912,6 +4446,7 @@ function geometryToKML(
 
         return `
 <MultiGeometry>
+
 ${
     geometry.coordinates
         .map(
@@ -3922,6 +4457,7 @@ ${
         )
         .join('')
 }
+
 </MultiGeometry>
 `;
     }
@@ -3934,11 +4470,13 @@ ${
 
         return `
 <Point>
+
 <coordinates>
 ${geometry.coordinates[0]},
 ${geometry.coordinates[1]},
 0
 </coordinates>
+
 </Point>
 `;
     }
@@ -3976,16 +4514,22 @@ function polygonToKML(
             .map(
                 ring => `
 <innerBoundaryIs>
+
 <LinearRing>
+
 <coordinates>
+
 ${ring
     .map(
         point =>
             `${point[0]},${point[1]},0`
     )
     .join(' ')}
+
 </coordinates>
+
 </LinearRing>
+
 </innerBoundaryIs>
 `
             )
@@ -3996,11 +4540,15 @@ ${ring
 <Polygon>
 
 <outerBoundaryIs>
+
 <LinearRing>
+
 <coordinates>
 ${outer}
 </coordinates>
+
 </LinearRing>
+
 </outerBoundaryIs>
 
 ${holes}
@@ -4010,9 +4558,9 @@ ${holes}
 }
 
 
-/* =========================================================
-   EXPORT ROW
-   ========================================================= */
+/* ============================================================
+   20. EXPORT DATA ROW
+   ============================================================ */
 
 function exportRow(
     farm
@@ -4044,7 +4592,7 @@ function exportRow(
             farm.area,
 
         'Workflow State':
-            WORKFLOW[
+            WORKFLOW_LABELS[
                 farm.workflow_state
             ] ||
             farm.workflow_state ||
@@ -4072,15 +4620,6 @@ function exportRow(
             farm.correction_reason ||
             '',
 
-        'Rejected By':
-            personName(
-                farm.rejected_by
-            ),
-
-        'Rejected At':
-            farm.rejected_at ||
-            '',
-
         'Validated By':
             personName(
                 farm.final_validated_by
@@ -4097,6 +4636,7 @@ function exportRow(
         'Updated At':
             farm.updated_at ||
             ''
+
     };
 }
 
@@ -4128,6 +4668,7 @@ function enumeratorStatsForExport() {
                     `${row.correctionRate.toFixed(
                         1
                     )}%`
+
             })
         );
 }
@@ -4173,15 +4714,14 @@ function cooperativeStatsForExport() {
 
                         Pending:
                             0
+
                     }
                 );
             }
 
 
             const row =
-                map.get(
-                    key
-                );
+                map.get(key);
 
 
             row.Farms++;
@@ -4247,9 +4787,10 @@ function cooperativeStatsForExport() {
                     Number(
                         row[
                             'Area (ha)'
-                        ].toFixed(
-                            2
-                        )
+                        ]
+                            .toFixed(
+                                2
+                            )
                     ),
 
                 'Validation Rate':
@@ -4258,8 +4799,11 @@ function cooperativeStatsForExport() {
                             row.Validated /
                             row.Farms *
                             100
-                        ).toFixed(1)
+                        ).toFixed(
+                            1
+                        )
                         : '0.0'}%`
+
             })
         );
 }
@@ -4267,16 +4811,9 @@ function cooperativeStatsForExport() {
 
 function workflowStatsForExport() {
 
-    return Object.entries(
-        WORKFLOW
-    )
+    return WORKFLOW_STATES
         .map(
-            (
-                [
-                    state,
-                    label
-                ]
-            ) => {
+            state => {
 
                 const rows =
                     filteredFarms.filter(
@@ -4286,39 +4823,44 @@ function workflowStatsForExport() {
                     );
 
 
+                const area =
+                    rows.reduce(
+                        (
+                            sum,
+                            farm
+                        ) =>
+                            sum +
+                            farm.area,
+                        0
+                    );
+
+
                 return {
 
                     'Workflow Stage':
-                        label,
+                        WORKFLOW_LABELS[
+                            state
+                        ],
 
                     Farms:
                         rows.length,
 
                     'Area (ha)':
                         Number(
-                            rows
-                                .reduce(
-                                    (
-                                        totalArea,
-                                        farm
-                                    ) =>
-                                        totalArea +
-                                        farm.area,
-                                    0
-                                )
-                                .toFixed(
-                                    2
-                                )
+                            area.toFixed(
+                                2
+                            )
                         )
+
                 };
             }
         );
 }
 
 
-/* =========================================================
-   PREVIEW
-   ========================================================= */
+/* ============================================================
+   21. PREVIEW
+   ============================================================ */
 
 function previewExport() {
 
@@ -4402,7 +4944,7 @@ function previewExport() {
         filteredFarms
             .slice(
                 0,
-                10
+                20
             )
             .map(
                 farm => `
@@ -4443,7 +4985,7 @@ function previewExport() {
 
                         <td>
                             ${escapeHtml(
-                                WORKFLOW[
+                                WORKFLOW_LABELS[
                                     farm.workflow_state
                                 ] ||
                                 farm.workflow_state
@@ -4509,9 +5051,9 @@ window.hidePreview =
     hidePreview;
 
 
-/* =========================================================
-   EXPORT HISTORY
-   ========================================================= */
+/* ============================================================
+   22. EXPORT HISTORY
+   ============================================================ */
 
 async function recordExport(
     format,
@@ -4522,26 +5064,28 @@ async function recordExport(
 
         const {
             error
-        } = await db
-            .from(
-                'export_history'
-            )
-            .insert(
-                {
+        } =
+            await db
+                .from(
+                    'export_history'
+                )
+                .insert(
+                    {
 
-                    project_id:
-                        currentProject.id,
+                        project_id:
+                            currentProject.id,
 
-                    user_id:
-                        currentUser.id,
+                        user_id:
+                            currentUser.id,
 
-                    format:
-                        format,
+                        format:
+                            format,
 
-                    record_count:
-                        count
-                }
-            );
+                        record_count:
+                            count
+
+                    }
+                );
 
 
         if (error) {
@@ -4584,35 +5128,37 @@ async function loadExportHistory() {
         const {
             data,
             error
-        } = await db
-            .from(
-                'export_history'
-            )
-            .select(
-                `
-                created_at,
-                format,
-                record_count,
-                user_id
-                `
-            )
-            .eq(
-                'project_id',
-                currentProject.id
-            )
-            .order(
-                'created_at',
-                {
-                    ascending:
-                        false
-                }
-            )
-            .limit(
-                15
-            );
+        } =
+            await db
+                .from(
+                    'export_history'
+                )
+                .select(
+                    `
+                    created_at,
+                    format,
+                    record_count,
+                    user_id
+                    `
+                )
+                .eq(
+                    'project_id',
+                    currentProject.id
+                )
+                .order(
+                    'created_at',
+                    {
+                        ascending:
+                            false
+                    }
+                )
+                .limit(
+                    20
+                );
 
 
         if (error) {
+
             throw error;
         }
 
@@ -4722,9 +5268,9 @@ async function loadExportHistory() {
 }
 
 
-/* =========================================================
-   SIDEBAR
-   ========================================================= */
+/* ============================================================
+   23. SIDEBAR
+   ============================================================ */
 
 function toggleSidebar() {
 
@@ -4780,20 +5326,24 @@ function closeMobileSidebar() {
 }
 
 
-/* =========================================================
-   REFRESH / LOGOUT
-   ========================================================= */
+/* ============================================================
+   24. REFRESH / LOGOUT
+   ============================================================ */
 
 async function refreshAll() {
 
     try {
 
-        showLoading(true);
+        showLoading(
+            true
+        );
 
 
         await loadMembers();
 
         await loadFarms();
+
+        initializeWorkflowSelectAll();
 
         await loadExportHistory();
 
@@ -4803,9 +5353,10 @@ async function refreshAll() {
 
 
         notify(
-            'Export data refreshed.',
+            'Export Center refreshed.',
             'success'
         );
+
 
     } catch (error) {
 
@@ -4820,9 +5371,12 @@ async function refreshAll() {
             'error'
         );
 
+
     } finally {
 
-        showLoading(false);
+        showLoading(
+            false
+        );
     }
 }
 
@@ -4841,9 +5395,9 @@ async function logout() {
 }
 
 
-/* =========================================================
-   HELPERS
-   ========================================================= */
+/* ============================================================
+   25. HELPERS
+   ============================================================ */
 
 function getValue(
     id
@@ -5020,7 +5574,7 @@ function stripZ(
     }
 
 
-    function cleanCoordinates(
+    function clean(
         coordinates
     ) {
 
@@ -5047,7 +5601,7 @@ function stripZ(
 
 
         return coordinates.map(
-            cleanCoordinates
+            clean
         );
     }
 
@@ -5057,10 +5611,51 @@ function stripZ(
         ...geometry,
 
         coordinates:
-            cleanCoordinates(
+            clean(
                 geometry.coordinates
             )
+
     };
+}
+
+
+function formatRole(
+    role
+) {
+
+    return String(
+        role ||
+        'user'
+    )
+        .replaceAll(
+            '_',
+            ' '
+        )
+        .replace(
+            /\b\w/g,
+            character =>
+                character.toUpperCase()
+        );
+}
+
+
+function formatLabel(
+    value
+) {
+
+    return String(
+        value ||
+        ''
+    )
+        .replaceAll(
+            '_',
+            ' '
+        )
+        .replace(
+            /\b\w/g,
+            character =>
+                character.toUpperCase()
+        );
 }
 
 
@@ -5094,26 +5689,6 @@ function dateStamp() {
         .slice(
             0,
             10
-        );
-}
-
-
-function formatLabel(
-    value
-) {
-
-    return String(
-        value ||
-        ''
-    )
-        .replaceAll(
-            '_',
-            ' '
-        )
-        .replace(
-            /\b\w/g,
-            character =>
-                character.toUpperCase()
         );
 }
 
@@ -5214,10 +5789,13 @@ function notify(
 ) {
 
     document
-        .querySelector(
+        .querySelectorAll(
             '.mt-notification'
         )
-        ?.remove();
+        .forEach(
+            element =>
+                element.remove()
+        );
 
 
     const notification =
@@ -5250,11 +5828,14 @@ function notify(
             zIndex:
                 '99999',
 
+            maxWidth:
+                '420px',
+
             padding:
-                '12px 16px',
+                '13px 17px',
 
             borderRadius:
-                '9px',
+                '10px',
 
             background:
                 type ===
@@ -5281,13 +5862,17 @@ function notify(
                             : '#075985',
 
             boxShadow:
-                '0 4px 14px rgba(0,0,0,.12)',
+                '0 5px 20px rgba(0,0,0,.14)',
 
             fontSize:
                 '13px',
 
             fontWeight:
-                '600'
+                '600',
+
+            lineHeight:
+                '1.45'
+
         }
     );
 
@@ -5300,6 +5885,6 @@ function notify(
     setTimeout(
         () =>
             notification.remove(),
-        4000
+        4500
     );
 }
