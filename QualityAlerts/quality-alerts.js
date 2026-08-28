@@ -1,234 +1,1837 @@
-(() => {
-"use strict";
+/* =========================================================
+   MappingTrace — GIS QUALITY REVIEW MODULE
+   Version: 1.0
+   Uses:
+     - run_full_quality_check()
+     - farm_quality
+     - farm_quality_issues
+     - quality_decision()
+   ========================================================= */
 
-const SUPABASE_URL="https://crvnohvudurqfukjpisv.supabase.co";
-const SUPABASE_ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJjcnZub2h2dXVkcnFmdWtqcGlzdiIsInJvbGUiOiJhbm9uIiwiaWF0IjoxNzc4NDU1MTczLCJleHAiOjIwOTQwMzExNzN9.Qp8E57yAN4LnO4A-yirf-Z3QufGZw9OKjBfcQxG7fo8";
+(function () {
 
-let db,currentUser,currentProject,allProjects=[];
-let farms=[],filtered=[],quality=new Map(),issues=new Map();
-let page=1,sortCol="farmer",sortDir="asc",map=null;
+    console.log('🧭 GIS Quality Review module loading...');
 
-const $=id=>document.getElementById(id);
-const esc=v=>String(v??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]));
-const statusLabel=s=>({passed:"Passed",issues_detected:"Issues detected",review_required:"Review required",not_checked:"Not checked"}[s]||String(s||"Pending").replaceAll("_"," "));
-const issueLabel=s=>({self_intersection:"Self-intersection",protected_area_conflict:"Protected area conflict",overlap_detected:"Farm overlap",spike_detected:"Geometry spike",duplicate_detected:"Duplicate geometry"}[s]||String(s||"Quality issue").replaceAll("_"," "));
+    /* =====================================================
+       CONFIGURATION
+       ===================================================== */
 
-document.addEventListener("DOMContentLoaded",init);
+    const GIS_QUALITY_ROLES = [
+        'gis',
+        'gis_specialist',
+        'gis_lead',
+        'validator',
+        'manager',
+        'owner'
+    ];
 
-async function init(){
- db=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
- bindShell();
- const {data:{session}}=await db.auth.getSession();
- if(!session){location.href="../login.html";return}
- currentUser=session.user;
- await loadUserProjects();
-}
+    const READ_ONLY_ROLES = [
+        'super_manager',
+        'viewer'
+    ];
 
-function bindShell(){
- $("sidebarToggle")?.addEventListener("click",()=>{$("sidebar").classList.toggle("collapsed")});
- $("burgerBtn")?.addEventListener("click",()=>{$("sidebar").classList.toggle("mobile-open");$("sidebarOverlay").classList.toggle("active")});
- $("sidebarOverlay")?.addEventListener("click",()=>{$("sidebar").classList.remove("mobile-open");$("sidebarOverlay").classList.remove("active")});
- $("logoutBtn")?.addEventListener("click",async e=>{e.preventDefault();await db.auth.signOut();location.href="../login.html"});
- $("refreshTableBtn")?.addEventListener("click",refreshData);
- $("qcRefreshIcon")?.addEventListener("click",refreshData);
- $("qcApplyFilters")?.addEventListener("click",()=>applyFilters(true));
- $("qcClearFilters")?.addEventListener("click",clearFilters);
- $("qcSearch")?.addEventListener("keydown",e=>{if(e.key==="Enter")applyFilters(true)});
- ["qcStatus","qcSeverity","qcIssueType"].forEach(id=>$(id)?.addEventListener("change",()=>applyFilters(true)));
- $("qcPrev")?.addEventListener("click",()=>{if(page>1){page--;renderTable()}});
- $("qcNext")?.addEventListener("click",()=>{if(page<Math.ceil(filtered.length/10)){page++;renderTable()}});
- document.querySelectorAll("th[data-sort]").forEach(th=>th.addEventListener("click",()=>sortBy(th.dataset.sort)));
-}
+    let qualityReviewFarm = null;
+    let qualityReviewResult = null;
+    let qualityReviewMap = null;
+    let qualityIssueLayers = [];
 
-async function loadUserProjects(){
- showLoading(true);
- const {data:profile}=await db.from("user_profiles").select("first_name,email").eq("id",currentUser.id).maybeSingle();
- const name=profile?.first_name||currentUser.email?.split("@")[0]||"User";
- $("userName").textContent=name;$("userAvatar").textContent=name[0].toUpperCase();
+    /* =====================================================
+       ROLE
+       ===================================================== */
 
- const {data,error}=await db.from("project_members").select("project_id,role,projects(*)").eq("user_id",currentUser.id).eq("status","active");
- if(error){toast("Unable to load project membership: "+error.message,"error");showLoading(false);return}
- allProjects=data||[];
- if(!allProjects.length){toast("No active project membership found.","warning");showLoading(false);return}
- $("userRole").textContent=(allProjects[0].role||"").replaceAll("_"," ").toUpperCase();
+    function getCurrentQualityRole() {
 
- const requested=new URLSearchParams(location.search).get("project");
- const last=localStorage.getItem(`lastProject_${currentUser.id}`);
- const member=allProjects.find(x=>x.projects?.id===requested)||allProjects.find(x=>x.projects?.id===last)||allProjects[0];
- currentProject=member.projects;
- $("projectBadge").textContent=currentProject.name;
- $("selectedProjectName").textContent="📁 "+currentProject.name;
- updateNav();
+        const role =
+            window.currentProjectRole ||
+            document.getElementById('userRole')?.textContent ||
+            '';
 
- if(allProjects.some(x=>x.role==="owner")&&allProjects.length>1) setupProjectSelector();
- localStorage.setItem(`lastProject_${currentUser.id}`,currentProject.id);
- const u=new URL(location.href);u.searchParams.set("project",currentProject.id);history.replaceState({}, "", u);
+        return String(role)
+            .toLowerCase()
+            .trim()
+            .replace(/\s+/g, '_');
+    }
 
- await refreshData();
- showLoading(false);
-}
 
-function updateNav(){
- const q=`?project=${encodeURIComponent(currentProject.id)}`;
- document.querySelector('[data-page="dashboard"]')?.setAttribute("href","../Dashboard.html"+q);
- document.querySelector('[data-page="live-mapping"]')?.setAttribute("href","../LiveMapping/live-mapping.html"+q);
- document.querySelector('[data-page="submissions"]')?.setAttribute("href","../Submissions/submissions.html"+q);
- document.querySelector('[data-page="quality-alerts"]')?.setAttribute("href","quality-alerts.html"+q);
- document.querySelector('[data-page="exports"]')?.setAttribute("href","../Exports/exports.html"+q);
- $("dataMgmtLink")?.setAttribute("href","../DataManagement.html"+q);
-}
+    function canReviewQuality() {
 
-function setupProjectSelector(){
- $("projectSelectorContainer").classList.remove("hidden");
- $("dropdownItems").innerHTML=allProjects.map(m=>`<div class="dropdown-item" data-id="${esc(m.projects.id)}">📁 ${esc(m.projects.name)}</div>`).join("");
- $("dropdownSelected").addEventListener("click",e=>{e.stopPropagation();$("dropdownMenu").classList.toggle("show")});
- $("projectSearch").addEventListener("input",e=>document.querySelectorAll(".dropdown-item").forEach(x=>x.style.display=x.textContent.toLowerCase().includes(e.target.value.toLowerCase())?"":"none"));
- document.querySelectorAll(".dropdown-item").forEach(item=>item.addEventListener("click",async()=>{const m=allProjects.find(x=>x.projects.id===item.dataset.id);if(!m)return;currentProject=m.projects;$("projectBadge").textContent=currentProject.name;$("selectedProjectName").textContent="📁 "+currentProject.name;$("dropdownMenu").classList.remove("show");localStorage.setItem(`lastProject_${currentUser.id}`,currentProject.id);updateNav();await refreshData()}));
- document.addEventListener("click",()=>$("dropdownMenu").classList.remove("show"));
-}
+        return GIS_QUALITY_ROLES.includes(
+            getCurrentQualityRole()
+        );
 
-async function refreshData(){
- if(!currentProject?.id)return;
- showLoading(true);
- const {data,error}=await db.from("farms").select("*").eq("project_id",currentProject.id).order("created_at",{ascending:false});
- if(error){toast("Error loading farms: "+error.message,"error");showLoading(false);return}
- farms=data||[];quality.clear();issues.clear();
- const ids=farms.map(f=>f.id);
- if(ids.length){
-   const q=await db.from("farm_quality").select("*").in("farm_id",ids);
-   (q.data||[]).forEach(x=>quality.set(x.farm_id,x));
-   for(let i=0;i<ids.length;i+=200){
-     const r=await db.from("farm_quality_issues").select("*").in("farm_id",ids.slice(i,i+200));
-     (r.data||[]).forEach(x=>{if(!issues.has(x.farm_id))issues.set(x.farm_id,[]);issues.get(x.farm_id).push(x)});
-   }
- }
- applyFilters(true);showLoading(false);
-}
+    }
 
-function applyFilters(reset){
- const s=$("qcSearch").value.trim().toLowerCase(),st=$("qcStatus").value,se=$("qcSeverity").value,ty=$("qcIssueType").value;
- filtered=farms.map(f=>row(f)).filter(r=>{
-   if(s&&!`${r.farmer_name} ${r.farmer_id} ${r.cooperative} ${r.id}`.toLowerCase().includes(s))return false;
-   if(st!=="all"&&r.status!==st)return false;
-   if(se!=="all"&&!r.issues.some(i=>String(i.severity).toLowerCase()===se))return false;
-   if(ty!=="all"&&!r.issues.some(i=>i.issue_type===ty))return false;
-   return true;
- });
- filtered.sort((a,b)=>compare(a,b));
- if(reset)page=1;
- updateStats();renderTable();
-}
 
-function row(f){
- const q=quality.get(f.id)||{},is=issues.get(f.id)||[],score=Number.isFinite(Number(q.overall_score))?Number(q.overall_score):null;
- const critical=is.filter(x=>String(x.severity).toLowerCase()==="critical").length;
- return {...f,score,status:q.quality_status||"not_checked",issues:is,critical,priority:critical*100000+(100-(score??0))*100+is.length};
-}
-function compare(a,b){
- let x=sortCol==="score"?a.score??-1:String(a.farmer_name||"").toLowerCase(),y=sortCol==="score"?b.score??-1:String(b.farmer_name||"").toLowerCase();
- return (x===y?0:x<y?-1:1)*(sortDir==="asc"?1:-1);
-}
-function sortBy(c){if(sortCol===c)sortDir=sortDir==="asc"?"desc":"asc";else{sortCol=c;sortDir="asc"}applyFilters(false)}
+    function isSuperManager() {
 
-function updateStats(){
- $("qcTotal").textContent=filtered.length;
- $("qcPassed").textContent=filtered.filter(x=>x.status==="passed").length;
- $("qcReview").textContent=filtered.filter(x=>["review_required","not_checked"].includes(x.status)).length;
- $("qcCritical").textContent=filtered.filter(x=>x.critical>0).length;
- const a=filtered.map(x=>x.score).filter(Number.isFinite);$("qcAvgScore").textContent=a.length?(a.reduce((x,y)=>x+y,0)/a.length).toFixed(1):"—";
- $("navAlertCount").textContent=filtered.filter(x=>x.critical>0).length;
-}
+        return getCurrentQualityRole() === 'super_manager';
 
-function renderTable(){
- const body=$("qualityQueueBody"),start=(page-1)*10,rows=filtered.slice(start,start+10);
- if(!rows.length){body.innerHTML=`<tr><td colspan="8" class="loading-cell"><i class="fas fa-inbox"></i> No farms match the current filters.</td></tr>`}
- else body.innerHTML=rows.map(r=>{
-   const sc=r.status==="passed"?"passed":r.status==="issues_detected"?"failed":r.status==="review_required"?"review":"pending";
-   const area=Number(r.area_ha??r.area??0);
-   return `<tr>
-    <td><div class="qc-farmer"><strong>${esc(r.farmer_name||"Unknown")}</strong><span>${esc(r.farmer_id||r.id)}</span></div></td>
-    <td>${esc(r.cooperative||"Unassigned")}</td>
-    <td>${area?area.toFixed(2):"—"} ha</td>
-    <td class="score">${r.score==null?"—":Math.round(r.score)} / 100</td>
-    <td><span class="status-badge ${sc}">${esc(statusLabel(r.status))}</span></td>
-    <td>${r.issues.length?`<span class="issue-chip">${r.issues.length} issue${r.issues.length>1?"s":""}</span>`:`<span style="color:#8792a2">None</span>`}</td>
-    <td>${esc(String(r.workflow_state||r.status||"pending").replaceAll("_"," "))}</td>
-    <td><div class="action-group"><button class="row-action primary" onclick="openQualityReview('${r.id}')">Review</button><button class="row-action" onclick="viewFarmMap('${r.id}')" title="Map"><i class="fas fa-map"></i></button></div></td>
-   </tr>`}).join("");
- $("qcShowing").textContent=filtered.length?`${start+1}–${Math.min(start+10,filtered.length)}`:"0";
- $("qcTotalFooter").textContent=filtered.length;
- const pages=Math.max(1,Math.ceil(filtered.length/10));$("qcPageInfo").textContent=`Page ${page} of ${pages}`;$("qcPrev").disabled=page<=1;$("qcNext").disabled=page>=pages;
-}
+    }
 
-async function openQualityReview(id){
- const farm=farms.find(x=>x.id===id);if(!farm)return;
- const overlay=document.createElement("div");overlay.className="qc-modal-overlay";overlay.id="activeQcModal";
- overlay.innerHTML=`<div class="qc-modal"><div class="qc-modal-header"><div class="modal-title"><div><h2>Farm Quality Review</h2><p>${esc(farm.farmer_name||"Unknown")} · ${esc(farm.farmer_id||farm.id)}</p></div></div><button class="modal-close" onclick="closeQcModal()">×</button></div><div class="qc-modal-body" id="reviewBody"><div class="loading-cell"><i class="fas fa-spinner fa-spin"></i> Running quality checks...</div></div><div class="qc-modal-footer" id="reviewFooter"></div></div>`;
- document.body.appendChild(overlay);
- const {data,error}=await db.rpc("run_full_quality_check",{p_farm_id:id});
- if(error){$("reviewBody").innerHTML=`<div class="loading-cell" style="color:#b42318"><i class="fas fa-triangle-exclamation"></i> ${esc(error.message)}</div>`;return}
- await reloadIssues(id);
- const result=data||{},q=result.score_details||quality.get(id)||{},is=issues.get(id)||[];
- const score=Number(result.overall_score??q.overall_score),critical=is.some(x=>String(x.severity).toLowerCase()==="critical");
- $("reviewBody").innerHTML=`
- <div class="review-summary">
-  <div class="score-box"><span class="label">Overall Quality Score</span><div class="big-score">${Number.isFinite(score)?Math.round(score):"—"}<small style="font-size:14px;color:#8993a3"> / 100</small></div><span class="status-badge ${result.quality_status==="passed"?"passed":critical?"failed":"review"}">${esc(statusLabel(result.quality_status))}</span></div>
-  <div class="checks-box">${["geometry","mapping","spatial","attribute","traceability"].map(k=>checkRow(k,q[k+"_score"])).join("")}</div>
- </div>
- <div class="review-grid">
-  <div>
-   <div class="farm-info-box"><h3>Farm Information</h3><div class="info-grid">${info("Farmer",farm.farmer_name)}${info("Farmer ID",farm.farmer_id||farm.id)}${info("Area",(farm.area_ha??farm.area)!=null?`${Number(farm.area_ha??farm.area).toFixed(2)} ha`:"—")}${info("Workflow",String(farm.workflow_state||farm.status||"pending").replaceAll("_"," "))}</div></div>
-   <div class="issues-box" style="margin-top:14px"><h3>Quality Issues (${is.length})</h3>${is.length?is.map((x,i)=>`<div class="issue-card ${x.severity==="warning"?"warning":""}"><div class="issue-title">${esc(x.title||issueLabel(x.issue_type))}</div><div class="issue-description">${esc(x.description||"Quality issue detected.")}</div>${x.latitude!=null&&x.longitude!=null?`<button class="locate-btn" onclick="locateIssue(${Number(x.latitude)},${Number(x.longitude)})"><i class="fas fa-location-arrow"></i> Locate on map</button>`:""}</div>`).join(""):`<div style="font-size:11px;color:#718096"><i class="fas fa-circle-check" style="color:#2f7d59"></i> No quality issues detected.</div>`}</div>
-  </div>
-  <div class="map-box"><div id="reviewMap" class="review-map"></div></div>
- </div>`;
- $("reviewFooter").innerHTML=`<div class="decision-note">${critical?"Critical issue detected — Validate is blocked.":"Review the evidence before making a decision."}</div><div class="decision-actions"><button class="decision-btn correction" onclick="qualityDecision('${id}','correction_required')">Request Correction</button><button class="decision-btn reject" onclick="qualityDecision('${id}','rejected')">Reject</button><button class="decision-btn validate" ${critical?"disabled":""} onclick="qualityDecision('${id}','validated')">✓ Validate</button></div>`;
- renderMap(farm,is);
-}
 
-function checkRow(k,v){const n=Number(v);return `<div class="check-row"><span>${k==="attribute"?"Attributes":k[0].toUpperCase()+k.slice(1)}</span><div class="bar"><span style="width:${Number.isFinite(n)?Math.max(0,Math.min(100,n)):0}%"></span></div><strong>${Number.isFinite(n)?Math.round(n):"—"}</strong></div>`}
-function info(a,b){return `<div><span>${esc(a)}</span><strong>${esc(b||"—")}</strong></div>`}
-async function reloadIssues(id){const r=await db.from("farm_quality_issues").select("*").eq("farm_id",id);if(!r.error)issues.set(id,r.data||[])}
-function parseGeo(g){if(!g)return null;if(typeof g==="string"){try{g=JSON.parse(g)}catch{return null}}return g?.type&&g?.coordinates?g:null}
+    /* =====================================================
+       SAFE HTML
+       ===================================================== */
 
-function renderMap(farm,is){
- setTimeout(()=>{
-  const el=$("reviewMap");if(!el||!window.L)return;
-  map=L.map(el).setView([7.5,-5.5],7);
-  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"© OpenStreetMap contributors"}).addTo(map);
-  const layers=[];
-  const fg=parseGeo(farm.geometry);if(fg){const l=L.geoJSON(fg,{style:{color:"#245f45",weight:3,fillOpacity:.14}}).addTo(map);layers.push(l)}
-  is.forEach(x=>{let g=parseGeo(x.issue_geometry);if(!g&&x.latitude!=null&&x.longitude!=null)g={type:"Point",coordinates:[Number(x.longitude),Number(x.latitude)]};if(g){const l=L.geoJSON(g,{pointToLayer:(f,ll)=>L.circleMarker(ll,{radius:7,color:"#dc2626",fillOpacity:.9}),style:{color:"#dc2626",weight:3}}).addTo(map);layers.push(l)}});
-  if(layers.length){let b=layers[0].getBounds();layers.slice(1).forEach(x=>{const z=x.getBounds();if(z.isValid())b=b.extend(z)});if(b.isValid())map.fitBounds(b,{padding:[25,25]})}
-  map.invalidateSize();
- },50);
-}
-function locateIssue(lat,lng){if(map){map.setView([lat,lng],17,{animate:true});L.circleMarker([lat,lng],{radius:9,color:"#dc2626",fillOpacity:.15}).addTo(map)}}
-function viewFarmMap(id){const f=farms.find(x=>x.id===id);if(!f)return;openQualityReview(id)}
-function closeQcModal(){if(map){map.remove();map=null}$("activeQcModal")?.remove()}
+    function safe(value) {
 
-async function qualityDecision(id,decision){
- const text=decision==="validated"?"Validate this farm?":decision==="rejected"?"Reject this farm?":"Request correction for this farm?";
- if(!confirm(text))return;
- let reason=null;
- if(decision!=="validated"){reason=prompt(decision==="rejected"?"Rejection reason:":"Correction reason:");if(!reason?.trim())return}
- try{
-  const {error}=await db.rpc("quality_decision",{p_farm_id:id,p_decision:decision,p_reason:reason?.trim()||null});
-  if(error)throw error;
-  toast(decision==="validated"?"Farm validated.":decision==="rejected"?"Farm rejected.":"Correction requested.","success");
-  closeQcModal();await refreshData();
- }catch(e){toast("Decision failed: "+e.message,"error")}
-}
+        if (
+            value === null ||
+            value === undefined
+        ) {
+            return '';
+        }
 
-function clearFilters(){$("qcSearch").value="";$("qcStatus").value="all";$("qcSeverity").value="all";$("qcIssueType").value="all";applyFilters(true)}
-function showLoading(x){$("loadingOverlay")?.classList.toggle("hidden",!x)}
-function toast(msg,type="success"){const x=document.createElement("div");x.className="toast "+type;x.textContent=msg;$("toastContainer").appendChild(x);setTimeout(()=>x.remove(),4000)}
+        return String(value)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
 
-window.openQualityReview=openQualityReview;
-window.closeQcModal=closeQcModal;
-window.viewFarmMap=viewFarmMap;
-window.locateIssue=locateIssue;
-window.qualityDecision=qualityDecision;
-window.qcClearFilters=clearFilters;
-window.refreshData=refreshData;
+    }
+
+
+    function number(value, decimals = 2) {
+
+        const n = Number(value);
+
+        if (!Number.isFinite(n)) {
+            return '—';
+        }
+
+        return n.toFixed(decimals);
+
+    }
+
+
+    /* =====================================================
+       QUALITY STATUS
+       ===================================================== */
+
+    function qualityStatusClass(status) {
+
+        switch (
+            String(status || '').toLowerCase()
+        ) {
+
+            case 'passed':
+                return 'passed';
+
+            case 'review_required':
+                return 'review';
+
+            case 'issues_detected':
+                return 'failed';
+
+            default:
+                return 'pending';
+
+        }
+
+    }
+
+
+    function severityClass(severity) {
+
+        switch (
+            String(severity || '').toLowerCase()
+        ) {
+
+            case 'critical':
+                return 'critical';
+
+            case 'major':
+                return 'major';
+
+            case 'warning':
+                return 'warning';
+
+            default:
+                return 'info';
+
+        }
+
+    }
+
+
+    function severityIcon(severity) {
+
+        switch (
+            String(severity || '').toLowerCase()
+        ) {
+
+            case 'critical':
+                return '🔴';
+
+            case 'major':
+                return '🟠';
+
+            case 'warning':
+                return '🟡';
+
+            default:
+                return '🔵';
+
+        }
+
+    }
+
+
+    /* =====================================================
+       OPEN QUALITY REVIEW
+       ===================================================== */
+
+    window.openGISQualityReview = async function (farmId) {
+
+        const farm =
+            (window.farmsData || []).find(
+                f => f.id === farmId
+            );
+
+        if (!farm) {
+
+            showNotification(
+                'Farm not found.',
+                'error'
+            );
+
+            return;
+
+        }
+
+        qualityReviewFarm = farm;
+
+        createQualityModal();
+
+        await runQualityCheck(farmId);
+
+    };
+
+
+    /* =====================================================
+       CREATE MODAL
+       ===================================================== */
+
+    function createQualityModal() {
+
+        document
+            .getElementById('gisQualityModal')
+            ?.remove();
+
+        const modal =
+            document.createElement('div');
+
+        modal.id =
+            'gisQualityModal';
+
+        modal.innerHTML = `
+
+            <div class="gis-quality-backdrop"
+                 onclick="closeGISQualityReview(event)">
+
+                <div class="gis-quality-panel"
+                     onclick="event.stopPropagation()">
+
+                    <div class="gis-quality-header">
+
+                        <div>
+
+                            <div class="gis-quality-kicker">
+                                GIS QUALITY CONTROL
+                            </div>
+
+                            <h2>
+                                <i class="fas fa-shield-alt"></i>
+                                Quality Review
+                            </h2>
+
+                            <div
+                                class="gis-quality-farm-name"
+                                id="gisQualityFarmName">
+                                Loading...
+                            </div>
+
+                        </div>
+
+                        <button
+                            class="gis-quality-close"
+                            onclick="closeGISQualityReview()">
+
+                            <i class="fas fa-times"></i>
+
+                        </button>
+
+                    </div>
+
+
+                    <div class="gis-quality-body">
+
+                        <div class="gis-quality-grid">
+
+
+                            <!-- FARM INFORMATION -->
+
+                            <div class="gis-quality-card">
+
+                                <div class="gis-quality-card-title">
+                                    <i class="fas fa-clipboard"></i>
+                                    Farm Information
+                                </div>
+
+                                <div
+                                    id="gisQualityFarmInfo">
+                                    Loading...
+                                </div>
+
+                            </div>
+
+
+                            <!-- SCORE -->
+
+                            <div class="gis-quality-card score-card">
+
+                                <div class="gis-quality-card-title">
+                                    <i class="fas fa-chart-line"></i>
+                                    Quality Score
+                                </div>
+
+                                <div
+                                    id="gisQualityScore"
+                                    class="quality-score-large">
+                                    —
+                                </div>
+
+                                <div
+                                    id="gisQualityStatus"
+                                    class="quality-status-badge">
+                                    Checking...
+                                </div>
+
+                            </div>
+
+
+                        </div>
+
+
+                        <!-- COMPONENT SCORES -->
+
+                        <div class="gis-quality-card">
+
+                            <div class="gis-quality-card-title">
+                                <i class="fas fa-layer-group"></i>
+                                Quality Components
+                            </div>
+
+                            <div
+                                id="gisQualityComponents"
+                                class="quality-components">
+                            </div>
+
+                        </div>
+
+
+                        <!-- MAP -->
+
+                        <div class="gis-quality-card">
+
+                            <div class="gis-quality-card-title">
+
+                                <span>
+                                    <i class="fas fa-map-marked-alt"></i>
+                                    GIS Review Map
+                                </span>
+
+                                <button
+                                    class="quality-refresh-btn"
+                                    onclick="runCurrentGISQualityCheck()">
+
+                                    <i class="fas fa-sync-alt"></i>
+                                    Run Check
+
+                                </button>
+
+                            </div>
+
+                            <div
+                                id="gisQualityMap"
+                                class="gis-quality-map">
+                            </div>
+
+                        </div>
+
+
+                        <!-- ISSUES -->
+
+                        <div class="gis-quality-card">
+
+                            <div class="gis-quality-card-title">
+
+                                <span>
+                                    <i class="fas fa-exclamation-triangle"></i>
+                                    Detected Issues
+                                </span>
+
+                                <span
+                                    id="gisQualityIssueCount"
+                                    class="issue-count">
+                                    0
+                                </span>
+
+                            </div>
+
+                            <div
+                                id="gisQualityIssues"
+                                class="gis-quality-issues">
+                            </div>
+
+                        </div>
+
+
+                    </div>
+
+
+                    <!-- ACTIONS -->
+
+                    <div
+                        id="gisQualityActions"
+                        class="gis-quality-actions">
+                    </div>
+
+                </div>
+
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+renderFarmHeader();
+
+    }
+
+
+    /* =====================================================
+       FARM HEADER
+       ===================================================== */
+
+    function renderFarmHeader() {
+
+        if (!qualityReviewFarm) {
+            return;
+        }
+
+        const farm =
+            qualityReviewFarm;
+
+        const name =
+            farm.farmer_name ||
+            'Unknown Farmer';
+
+        const info =
+            document.getElementById(
+                'gisQualityFarmInfo'
+            );
+
+        const title =
+            document.getElementById(
+                'gisQualityFarmName'
+            );
+
+        if (title) {
+
+            title.textContent =
+                name;
+
+        }
+
+        if (info) {
+
+            info.innerHTML = `
+
+                <div class="quality-info-row">
+                    <span>Farmer</span>
+                    <strong>${safe(name)}</strong>
+                </div>
+
+                <div class="quality-info-row">
+                    <span>Farmer ID</span>
+                    <strong>${safe(farm.farmer_id || '—')}</strong>
+                </div>
+
+                <div class="quality-info-row">
+                    <span>Cooperative</span>
+                    <strong>${safe(farm.cooperative || '—')}</strong>
+                </div>
+
+                <div class="quality-info-row">
+                    <span>Area</span>
+                    <strong>${number(farm.area)} ha</strong>
+                </div>
+
+                <div class="quality-info-row">
+                    <span>Workflow</span>
+                    <strong>${safe(
+                        workflowLabelForQuality(
+                            farm.workflow_state
+                        )
+                    )}</strong>
+                </div>
+
+            `;
+
+        }
+
+    }
+
+
+    function workflowLabelForQuality(state) {
+
+        const labels = {
+
+            submitted:
+                'Submitted',
+
+            enumerator_review:
+                'Enumerator Review',
+
+            field_officer_review:
+                'Field Officer Review',
+
+            gis_compliance_review:
+                'GIS / Compliance',
+
+            final_validation:
+                'Final Validation',
+
+            correction_required:
+                'Correction Required',
+
+            validated:
+                'Validated',
+
+            rejected:
+                'Rejected'
+
+        };
+
+        return labels[state] ||
+            state ||
+            'Unknown';
+
+    }
+
+
+    /* =====================================================
+       RUN FULL QUALITY CHECK
+       ===================================================== */
+
+    async function runQualityCheck(farmId) {
+
+        const issueBox =
+            document.getElementById(
+                'gisQualityIssues'
+            );
+
+        if (issueBox) {
+
+            issueBox.innerHTML = `
+
+                <div class="quality-loading">
+                    <i class="fas fa-spinner fa-spin"></i>
+                    Running GIS quality checks...
+                </div>
+
+            `;
+
+        }
+
+        try {
+
+            const {
+                data,
+                error
+            } = await supabaseClient.rpc(
+                'run_full_quality_check',
+                {
+                    p_farm_id: farmId
+                }
+            );
+
+            if (error) {
+                throw error;
+            }
+
+            qualityReviewResult =
+                data;
+
+            renderQualityResult(data);
+
+            await loadQualityIssues(farmId);
+
+        } catch (error) {
+
+            console.error(
+                'GIS Quality Check Error:',
+                error
+            );
+
+            if (issueBox) {
+
+                issueBox.innerHTML = `
+
+                    <div class="quality-error">
+
+                        <i class="fas fa-exclamation-circle"></i>
+
+                        <strong>
+                            Quality check failed
+                        </strong>
+
+                        <span>
+                            ${safe(error.message)}
+                        </span>
+
+                    </div>
+
+                `;
+
+            }
+
+            showNotification(
+                'Quality check failed: ' +
+                error.message,
+                'error'
+            );
+
+        }
+
+    }
+
+
+    window.runCurrentGISQualityCheck =
+        function () {
+
+            if (
+                !qualityReviewFarm
+            ) {
+                return;
+            }
+
+            runQualityCheck(
+                qualityReviewFarm.id
+            );
+
+        };
+
+
+    /* =====================================================
+       RENDER SCORE
+       ===================================================== */
+
+    function renderQualityResult(result) {
+
+        const score =
+            Number(
+                result?.overall_score
+            );
+
+        const status =
+            result?.quality_status ||
+            'pending';
+
+        const scoreBox =
+            document.getElementById(
+                'gisQualityScore'
+            );
+
+        const statusBox =
+            document.getElementById(
+                'gisQualityStatus'
+            );
+
+        if (scoreBox) {
+
+            scoreBox.textContent =
+                Number.isFinite(score)
+                    ? score.toFixed(0)
+                    : '—';
+
+        }
+
+        if (statusBox) {
+
+            statusBox.className =
+                `quality-status-badge ${
+                    qualityStatusClass(status)
+                }`;
+
+            statusBox.textContent =
+                status === 'passed'
+                    ? 'PASSED'
+                    : status === 'review_required'
+                        ? 'REVIEW REQUIRED'
+                        : status === 'issues_detected'
+                            ? 'ISSUES DETECTED'
+                            : status.toUpperCase();
+
+        }
+
+
+        const scoreDetails =
+            result?.score_details || {};
+
+        const components =
+            document.getElementById(
+                'gisQualityComponents'
+            );
+
+        if (!components) {
+            return;
+        }
+
+        const rows = [
+
+            [
+                'Geometry',
+                scoreDetails.geometry_score
+            ],
+
+            [
+                'Mapping',
+                scoreDetails.mapping_score
+            ],
+
+            [
+                'Spatial',
+                scoreDetails.spatial_score
+            ],
+
+            [
+                'Attributes',
+                scoreDetails.attribute_score
+            ],
+
+            [
+                'Traceability',
+                scoreDetails.traceability_score
+            ]
+
+        ];
+
+        components.innerHTML =
+            rows.map(
+                ([label, value]) => {
+
+                    const n =
+                        Number(value);
+
+                    return `
+
+                        <div class="quality-component">
+
+                            <div class="quality-component-top">
+
+                                <span>
+                                    ${safe(label)}
+                                </span>
+
+                                <strong>
+                                    ${
+                                        Number.isFinite(n)
+                                            ? n.toFixed(0)
+                                            : '—'
+                                    }
+                                </strong>
+
+                            </div>
+
+                            <div class="quality-progress">
+
+                                <div
+                                    class="quality-progress-bar"
+                                    style="width:${
+                                        Math.max(
+                                            0,
+                                            Math.min(
+                                                100,
+                                                Number.isFinite(n)
+                                                    ? n
+                                                    : 0
+                                            )
+                                        )
+                                    }%">
+                                </div>
+
+                            </div>
+
+                        </div>
+
+                    `;
+
+                }
+            ).join('');
+
+    }
+
+
+    /* =====================================================
+       LOAD ISSUES
+       ===================================================== */
+
+    async function loadQualityIssues(
+        farmId
+    ) {
+
+        const {
+            data,
+            error
+        } = await supabaseClient
+            .from('farm_quality_issues')
+            .select('*')
+            .eq('farm_id', farmId)
+            .order(
+                'severity',
+                {
+                    ascending: true
+                }
+            );
+
+        if (error) {
+
+            console.error(
+                'Issue loading error:',
+                error
+            );
+
+            return;
+
+        }
+
+        const issues =
+            data || [];
+
+        renderQualityIssues(
+            issues
+        );
+
+        renderQualityIssueMap(
+            issues
+        );
+
+        renderQualityActions(
+            issues
+        );
+
+    }
+
+
+    /* =====================================================
+       RENDER ISSUES
+       ===================================================== */
+
+    function renderQualityIssues(
+        issues
+    ) {
+
+        const container =
+            document.getElementById(
+                'gisQualityIssues'
+            );
+
+        const count =
+            document.getElementById(
+                'gisQualityIssueCount'
+            );
+
+        if (count) {
+
+            count.textContent =
+                issues.length;
+
+        }
+
+        if (!container) {
+            return;
+        }
+
+        if (!issues.length) {
+
+            container.innerHTML = `
+
+                <div class="quality-no-issues">
+
+                    <i class="fas fa-check-circle"></i>
+
+                    <div>
+
+                        <strong>
+                            No open quality issues detected
+                        </strong>
+
+                        <span>
+                            Geometry and spatial checks passed.
+                        </span>
+
+                    </div>
+
+                </div>
+
+            `;
+
+            return;
+
+        }
+
+        container.innerHTML =
+            issues.map(
+                (issue, index) => {
+
+                    const severity =
+                        severityClass(
+                            issue.severity
+                        );
+
+                    return `
+
+                        <div
+                            class="quality-issue ${severity}"
+                            data-issue-index="${index}">
+
+                            <div class="quality-issue-main">
+
+                                <div class="quality-issue-icon">
+
+                                    ${severityIcon(
+                                        issue.severity
+                                    )}
+
+                                </div>
+
+                                <div>
+
+                                    <div
+                                        class="quality-issue-title">
+
+                                        ${safe(
+                                            issue.title ||
+                                            issue.issue_type ||
+                                            'Quality Issue'
+                                        )}
+
+                                    </div>
+
+                                    <div
+                                        class="quality-issue-description">
+
+                                        ${safe(
+                                            issue.description ||
+                                            ''
+                                        )}
+
+                                    </div>
+
+                                </div>
+
+                            </div>
+
+                            <div class="quality-issue-meta">
+
+                                <span>
+                                    ${safe(
+                                        issue.severity ||
+                                        'warning'
+                                    )}
+                                </span>
+
+                                ${
+                                    issue.latitude &&
+                                    issue.longitude
+                                        ? `
+                                            <button
+                                                onclick="locateGISQualityIssue(${index})"
+                                                class="locate-issue-btn">
+
+                                                <i class="fas fa-crosshairs"></i>
+                                                Locate
+
+                                            </button>
+                                          `
+                                        : ''
+                                }
+
+                            </div>
+
+                        </div>
+
+                    `;
+
+                }
+            ).join('');
+
+        window._gisQualityIssues =
+            issues;
+
+    }
+
+
+    /* =====================================================
+       ISSUE MAP
+       ===================================================== */
+
+    function renderQualityIssueMap(
+        issues
+    ) {
+
+        const container =
+            document.getElementById(
+                'gisQualityMap'
+            );
+
+        if (!container) {
+            return;
+        }
+
+        if (
+            typeof L === 'undefined'
+        ) {
+
+            container.innerHTML =
+                '<div class="quality-error">Leaflet is not loaded.</div>';
+
+            return;
+
+        }
+
+        if (qualityReviewMap) {
+
+            qualityReviewMap.remove();
+
+            qualityReviewMap =
+                null;
+
+        }
+
+        qualityIssueLayers = [];
+
+        qualityReviewMap =
+            L.map(
+                container,
+                {
+                    zoomControl: true
+                }
+            );
+
+        L.tileLayer(
+            'https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
+            {
+                maxZoom: 22,
+                subdomains: [
+                    'mt0',
+                    'mt1',
+                    'mt2',
+                    'mt3'
+                ]
+            }
+        ).addTo(
+            qualityReviewMap
+        );
+
+        const bounds =
+            L.latLngBounds();
+
+
+        /* Farm boundary */
+
+        if (
+            qualityReviewFarm?.geometry
+        ) {
+
+            try {
+
+                const farmLayer =
+                    L.geoJSON(
+                        {
+                            type: 'Feature',
+                            geometry:
+                                qualityReviewFarm.geometry,
+                            properties: {}
+                        },
+                        {
+                            style: {
+                                color: '#2563eb',
+                                weight: 3,
+                                fillOpacity: 0.08
+                            }
+                        }
+                    ).addTo(
+                        qualityReviewMap
+                    );
+
+                if (
+                    farmLayer.getBounds().isValid()
+                ) {
+
+                    bounds.extend(
+                        farmLayer.getBounds()
+                    );
+
+                }
+
+            } catch (error) {
+
+                console.warn(
+                    'Farm geometry could not be displayed',
+                    error
+                );
+
+            }
+
+        }
+
+
+        /* Issue points */
+
+        issues.forEach(
+            (issue, index) => {
+
+                const lat =
+                    Number(
+                        issue.latitude
+                    );
+
+                const lng =
+                    Number(
+                        issue.longitude
+                    );
+
+                if (
+                    !Number.isFinite(lat) ||
+                    !Number.isFinite(lng)
+                ) {
+                    return;
+                }
+
+                const color =
+                    String(
+                        issue.severity
+                    ).toLowerCase() === 'critical'
+                        ? '#dc2626'
+                        : String(
+                            issue.severity
+                        ).toLowerCase() === 'major'
+                            ? '#f97316'
+                            : '#eab308';
+
+                const marker =
+                    L.circleMarker(
+                        [lat, lng],
+                        {
+                            radius: 8,
+                            color: color,
+                            fillColor: color,
+                            fillOpacity: 0.9,
+                            weight: 2
+                        }
+                    )
+                    .addTo(
+                        qualityReviewMap
+                    );
+
+                marker.bindPopup(`
+
+                    <strong>
+                        ${safe(
+                            issue.title ||
+                            issue.issue_type
+                        )}
+                    </strong>
+
+                    <br>
+
+                    ${safe(
+                        issue.description ||
+                        ''
+                    )}
+
+                    <br><br>
+
+                    <strong>
+                        ${lat.toFixed(6)},
+                        ${lng.toFixed(6)}
+                    </strong>
+
+                `);
+
+                marker._qualityIssueIndex =
+                    index;
+
+                qualityIssueLayers.push(
+                    marker
+                );
+
+                bounds.extend(
+                    [lat, lng]
+                );
+
+            }
+        );
+
+
+        if (
+            bounds.isValid()
+        ) {
+
+            qualityReviewMap.fitBounds(
+                bounds,
+                {
+                    padding: [
+                        40,
+                        40
+                    ]
+                }
+            );
+
+        } else {
+
+            qualityReviewMap.setView(
+                [7.54, -5.55],
+                7
+            );
+
+        }
+
+        setTimeout(
+            () => qualityReviewMap.invalidateSize(),
+            200
+        );
+
+    }
+
+
+    /* =====================================================
+       LOCATE ISSUE
+       ===================================================== */
+
+    window.locateGISQualityIssue =
+        function (index) {
+
+            const issue =
+                (
+                    window._gisQualityIssues ||
+                    []
+                )[index];
+
+            if (
+                !issue ||
+                !qualityReviewMap
+            ) {
+                return;
+            }
+
+            const lat =
+                Number(
+                    issue.latitude
+                );
+
+            const lng =
+                Number(
+                    issue.longitude
+                );
+
+            if (
+                !Number.isFinite(lat) ||
+                !Number.isFinite(lng)
+            ) {
+                return;
+            }
+
+            qualityReviewMap.setView(
+                [lat, lng],
+                18,
+                {
+                    animate: true
+                }
+            );
+
+            const marker =
+                qualityIssueLayers.find(
+                    m =>
+                        m._qualityIssueIndex ===
+                        index
+                );
+
+            if (marker) {
+
+                marker.openPopup();
+
+            }
+
+        };
+
+
+    /* =====================================================
+       ACTION BUTTONS
+       ===================================================== */
+
+    function renderQualityActions(
+        issues
+    ) {
+
+        const container =
+            document.getElementById(
+                'gisQualityActions'
+            );
+
+        if (!container) {
+            return;
+        }
+
+        const role =
+            getCurrentQualityRole();
+
+        const critical =
+            issues.some(
+                i =>
+                    String(
+                        i.severity
+                    ).toLowerCase() ===
+                    'critical'
+            );
+
+        const workflow =
+            qualityReviewFarm?.workflow_state;
+
+        /*
+         * Super Manager is READ ONLY.
+         */
+
+        if (
+            isSuperManager() ||
+            READ_ONLY_ROLES.includes(role)
+        ) {
+
+            container.innerHTML = `
+
+                <div class="quality-readonly">
+
+                    <i class="fas fa-eye"></i>
+
+                    Read-only quality view
+
+                </div>
+
+            `;
+
+            return;
+
+        }
+
+
+        /*
+         * Only GIS / Validator / Manager
+         * can make quality decisions.
+         */
+
+        if (
+            !GIS_QUALITY_ROLES.includes(role)
+        ) {
+
+            container.innerHTML = `
+
+                <div class="quality-readonly">
+
+                    <i class="fas fa-lock"></i>
+
+                    You do not have permission
+                    to make GIS quality decisions.
+
+                </div>
+
+            `;
+
+            return;
+
+        }
+
+
+        /*
+         * If critical issue exists:
+         * validation is blocked.
+         */
+
+        const validateDisabled =
+            critical ||
+            ![
+                'gis_compliance_review',
+                'final_validation'
+            ].includes(
+                workflow
+            );
+
+
+        container.innerHTML = `
+
+            <div class="quality-action-info">
+
+                ${
+                    critical
+                        ? `
+                            <span class="blocked">
+                                <i class="fas fa-ban"></i>
+                                Validation blocked:
+                                critical issue detected
+                            </span>
+                          `
+                        : `
+                            <span class="allowed">
+                                <i class="fas fa-check-circle"></i>
+                                No critical quality issue detected
+                            </span>
+                          `
+                }
+
+            </div>
+
+
+            <div class="quality-action-buttons">
+
+                <button
+                    class="quality-btn correction"
+                    onclick="requestGISQualityCorrection()">
+
+                    <i class="fas fa-redo"></i>
+
+                    Request Correction
+
+                </button>
+
+
+                <button
+                    class="quality-btn reject"
+                    onclick="makeGISQualityDecision('rejected')">
+
+                    <i class="fas fa-times"></i>
+
+                    Reject
+
+                </button>
+
+
+                <button
+                    class="quality-btn validate"
+                    ${
+                        validateDisabled
+                            ? 'disabled title="Validation blocked"'
+                            : ''
+                    }
+                    onclick="makeGISQualityDecision('validated')">
+
+                    <i class="fas fa-check-circle"></i>
+
+                    Validate
+
+                </button>
+
+            </div>
+
+        `;
+
+    }
+
+
+    /* =====================================================
+       REQUEST CORRECTION
+       ===================================================== */
+
+    window.requestGISQualityCorrection =
+        async function () {
+
+            if (!qualityReviewFarm) {
+                return;
+            }
+
+            const reason =
+                prompt(
+                    'Enter the correction reason:'
+                );
+
+            if (
+                !reason ||
+                !reason.trim()
+            ) {
+                return;
+            }
+
+            await executeQualityDecision(
+                'correction_required',
+                reason.trim()
+            );
+
+        };
+
+
+    /* =====================================================
+       QUALITY DECISION
+       ===================================================== */
+
+    window.makeGISQualityDecision =
+        async function (decision) {
+
+            if (!qualityReviewFarm) {
+                return;
+            }
+
+            const issues =
+                window._gisQualityIssues ||
+                [];
+
+            const critical =
+                issues.some(
+                    i =>
+                        String(
+                            i.severity
+                        ).toLowerCase() ===
+                        'critical'
+                );
+
+            if (
+                decision === 'validated' &&
+                critical
+            ) {
+
+                showNotification(
+                    'Validation blocked: critical quality issue detected.',
+                    'error'
+                );
+
+                return;
+
+            }
+
+            let reason = '';
+
+            if (
+                decision === 'rejected'
+            ) {
+
+                reason =
+                    prompt(
+                        'Enter rejection reason:'
+                    );
+
+                if (
+                    !reason ||
+                    !reason.trim()
+                ) {
+                    return;
+                }
+
+            }
+
+            if (
+                !confirm(
+                    decision === 'validated'
+                        ? 'Validate this farm?'
+                        : 'Reject this farm?'
+                )
+            ) {
+                return;
+            }
+
+            await executeQualityDecision(
+                decision,
+                reason.trim()
+            );
+
+        };
+
+
+    /* =====================================================
+       EXECUTE DECISION
+       ===================================================== */
+
+    async function executeQualityDecision(
+        decision,
+        reason
+    ) {
+
+        try {
+
+            showLoading(true);
+
+            const {
+                data,
+                error
+            } =
+                await supabaseClient.rpc(
+                    'quality_decision',
+                    {
+                        p_farm_id:
+                            qualityReviewFarm.id,
+
+                        p_decision:
+                            decision,
+
+                        p_reason:
+                            reason || null
+                    }
+                );
+
+            if (error) {
+                throw error;
+            }
+
+            console.log(
+                'Quality decision:',
+                data
+            );
+
+            showNotification(
+                decision === 'validated'
+                    ? 'Farm quality validated successfully.'
+                    : decision === 'rejected'
+                        ? 'Farm rejected successfully.'
+                        : 'Correction requested successfully.',
+                'success'
+            );
+
+            closeGISQualityReview();
+
+            if (
+                typeof loadProjectData ===
+                'function' &&
+                window.currentProject
+            ) {
+
+                await loadProjectData(
+                    window.currentProject.id
+                );
+
+            } else if (
+                typeof loadSubmissions ===
+                'function' &&
+                window.currentProject
+            ) {
+
+                await loadSubmissions(
+                    window.currentProject.id
+                );
+
+            }
+
+        } catch (error) {
+
+            console.error(
+                'Quality decision error:',
+                error
+            );
+
+            showNotification(
+                'Quality decision failed: ' +
+                error.message,
+                'error'
+            );
+
+        } finally {
+
+            showLoading(false);
+
+        }
+
+    }
+
+
+    /* =====================================================
+       CLOSE
+       ===================================================== */
+
+    window.closeGISQualityReview =
+        function () {
+
+            const modal =
+                document.getElementById(
+                    'gisQualityModal'
+                );
+
+            if (qualityReviewMap) {
+
+                qualityReviewMap.remove();
+
+                qualityReviewMap =
+                    null;
+
+            }
+
+            if (modal) {
+                modal.remove();
+            }
+
+            qualityReviewFarm =
+                null;
+
+            qualityReviewResult =
+                null;
+
+        };
+
+
+    /* =====================================================
+       UPGRADE EXISTING VIEW FARM BUTTON
+       ===================================================== */
+
+    window.viewFarm =
+        function (farmId) {
+
+            openGISQualityReview(
+                farmId
+            );
+
+        };
+
+
+    /* =====================================================
+       INITIALIZATION SAFETY
+       ===================================================== */
+
+    console.log(
+        '✅ GIS Quality Review module ready'
+    );
+
 })();
+
+    /* =====================================================
+       ALERT → GIS QUALITY REVIEW BRIDGE
+       Keeps the existing Quality Alerts dashboard intact,
+       but adds a direct Review Quality action to every alert.
+       ===================================================== */
+    (function () {
+
+        function farmIdFromAlertId(alertId) {
+            const id = String(alertId || '');
+
+            if (id.startsWith('self_intersection_')) {
+                return id.substring('self_intersection_'.length);
+            }
+
+            if (id.startsWith('invalid_geom_')) {
+                return id.substring('invalid_geom_'.length);
+            }
+
+            if (id.startsWith('duplicate_')) {
+                return id.substring('duplicate_'.length);
+            }
+
+            if (id.startsWith('protected_overlap_')) {
+                const rest = id.substring('protected_overlap_'.length);
+                const parts = rest.split('_');
+                return parts[0] || null;
+            }
+
+            if (id.startsWith('overlap_')) {
+                const rest = id.substring('overlap_'.length);
+                const parts = rest.split('_');
+                return parts[0] || null;
+            }
+
+            return null;
+        }
+
+        window.openQualityFromAlertId = async function (alertId) {
+
+            const farmId = farmIdFromAlertId(alertId);
+
+            if (!farmId) {
+                showNotification('Could not identify the farm for this alert.', 'error');
+                return;
+            }
+
+            /* Prefer already loaded farm data. */
+            let farm = null;
+
+            try {
+                if (typeof allFarms !== 'undefined' && Array.isArray(allFarms)) {
+                    farm = allFarms.find(f => String(f.id) === String(farmId));
+                }
+            } catch (_) {}
+
+            /* Fallback to Supabase if the farm isn't in memory. */
+            if (!farm) {
+                try {
+                    const { data, error } = await supabaseClient
+                        .from('farms')
+                        .select('*')
+                        .eq('id', farmId)
+                        .maybeSingle();
+
+                    if (error) throw error;
+                    farm = data;
+                } catch (error) {
+                    console.error('Unable to load farm for quality review:', error);
+                    showNotification('Unable to load farm: ' + error.message, 'error');
+                    return;
+                }
+            }
+
+            if (!farm) {
+                showNotification('Farm not found.', 'error');
+                return;
+            }
+
+            openGISQualityReview(farm.id);
+        };
+
+        function addReviewButtons() {
+            document.querySelectorAll('.alert-actions').forEach(actions => {
+
+                if (actions.querySelector('.review-quality-btn')) return;
+
+                const alertItem = actions.closest('.alert-item');
+                if (!alertItem) return;
+
+                const mapButton = actions.querySelector('.view-map');
+                if (!mapButton) return;
+
+                const match = mapButton.getAttribute('onclick')?.match(
+                    /viewAlertOnMap\(['"]([^'"]+)['"]\)/
+                );
+
+                if (!match) return;
+
+                const alertId = match[1];
+                const button = document.createElement('button');
+
+                button.type = 'button';
+                button.className = 'action-btn review-quality-btn';
+                button.innerHTML = '<i class="fas fa-shield-alt"></i> Review Quality';
+                button.addEventListener('click', function (event) {
+                    event.stopPropagation();
+                    window.openQualityFromAlertId(alertId);
+                });
+
+                actions.appendChild(button);
+            });
+        }
+
+        const observer = new MutationObserver(addReviewButtons);
+
+        function startQualityBridge() {
+            addReviewButtons();
+
+            const protectedList = document.getElementById('protectedAlertsList');
+            const polygonList = document.getElementById('polygonAlertsList');
+
+            if (protectedList) {
+                observer.observe(protectedList, { childList: true, subtree: true });
+            }
+
+            if (polygonList) {
+                observer.observe(polygonList, { childList: true, subtree: true });
+            }
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', startQualityBridge);
+        } else {
+            startQualityBridge();
+        }
+
+    })();
