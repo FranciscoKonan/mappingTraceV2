@@ -1161,3 +1161,43 @@ body {
     .sync-btn { font-size: 9px; padding: 3px 8px; }
     .stats-grid { grid-template-columns: 1fr; }
 }
+
+/* =========================================================
+   GIS QUALITY REVIEW MODULE — INTEGRATED STYLES
+   ========================================================= */
+#gisQualityModal{position:fixed;inset:0;z-index:20000}
+.gis-quality-backdrop{position:absolute;inset:0;background:rgba(15,23,42,.72);display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(3px)}
+.gis-quality-panel{width:min(1180px,96vw);max-height:94vh;background:#f8fafc;border-radius:18px;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 25px 80px rgba(0,0,0,.3)}
+.gis-quality-header{background:#fff;padding:20px 24px;border-bottom:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:flex-start;gap:20px}
+.gis-quality-kicker{color:#2c6e49;font-size:10px;font-weight:800;letter-spacing:1.2px;margin-bottom:4px}
+.gis-quality-header h2{margin:0;font-size:21px;color:#0f172a}
+.gis-quality-header h2 i{color:#2c6e49;margin-right:7px}
+.gis-quality-farm-name{margin-top:5px;color:#64748b;font-size:13px}
+.gis-quality-close{width:38px;height:38px;border:none;border-radius:9px;background:#f1f5f9;color:#475569;cursor:pointer;font-size:16px}
+.gis-quality-close:hover{background:#fee2e2;color:#dc2626}
+.gis-quality-body{overflow-y:auto;padding:20px}
+.gis-quality-grid{display:grid;grid-template-columns:1fr 280px;gap:16px;margin-bottom:16px}
+.gis-quality-card{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:16px;margin-bottom:16px}
+.gis-quality-card-title{display:flex;justify-content:space-between;align-items:center;font-size:13px;font-weight:700;color:#334155;margin-bottom:14px}
+.gis-quality-card-title i{color:#2c6e49;margin-right:6px}
+.quality-info-row{display:flex;justify-content:space-between;gap:20px;padding:7px 0;border-bottom:1px solid #f1f5f9;font-size:12px}
+.quality-info-row span{color:#64748b}.quality-info-row strong{color:#1e293b;text-align:right}
+.score-card{text-align:center}.quality-score-large{font-size:58px;line-height:1;font-weight:800;color:#166534;margin:14px 0 10px}
+.quality-status-badge{display:inline-block;padding:6px 14px;border-radius:20px;font-size:11px;font-weight:800}
+.quality-status-badge.passed{background:#dcfce7;color:#166534}.quality-status-badge.review{background:#fef3c7;color:#92400e}.quality-status-badge.failed{background:#fee2e2;color:#991b1b}.quality-status-badge.pending{background:#e2e8f0;color:#475569}
+.quality-components{display:grid;grid-template-columns:repeat(5,1fr);gap:14px}.quality-component-top{display:flex;justify-content:space-between;font-size:11px;margin-bottom:7px}.quality-component-top span{color:#64748b}.quality-component-top strong{color:#1e293b}
+.quality-progress{height:7px;border-radius:10px;background:#e2e8f0;overflow:hidden}.quality-progress-bar{height:100%;background:#2c6e49;border-radius:inherit}
+.gis-quality-map{width:100%;height:390px;border-radius:10px;overflow:hidden;background:#e2e8f0}
+.quality-refresh-btn{border:1px solid #dbe3ea;background:#fff;color:#2c6e49;padding:6px 10px;border-radius:7px;cursor:pointer;font-size:11px}.quality-refresh-btn:hover{background:#f0fdf4}
+.issue-count{min-width:25px;text-align:center;padding:3px 8px;background:#e2e8f0;border-radius:20px;font-size:11px}
+.gis-quality-issues{display:flex;flex-direction:column;gap:9px}.quality-issue{display:flex;justify-content:space-between;gap:14px;padding:12px;border-radius:9px;border-left:4px solid #94a3b8;background:#f8fafc}.quality-issue.critical{border-left-color:#dc2626;background:#fef2f2}.quality-issue.major{border-left-color:#f97316;background:#fff7ed}.quality-issue.warning{border-left-color:#eab308;background:#fefce8}
+.quality-issue-main{display:flex;gap:10px}.quality-issue-icon{font-size:15px}.quality-issue-title{font-size:12px;font-weight:700;color:#1e293b;margin-bottom:3px}.quality-issue-description{font-size:11px;color:#64748b;line-height:1.45}
+.quality-issue-meta{display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0}.quality-issue-meta>span{font-size:10px;font-weight:700;text-transform:uppercase;color:#64748b}
+.locate-issue-btn{border:1px solid #cbd5e1;background:#fff;color:#2563eb;border-radius:6px;padding:5px 8px;cursor:pointer;font-size:10px}.locate-issue-btn:hover{background:#eff6ff}
+.quality-no-issues{display:flex;align-items:center;gap:12px;padding:20px;background:#f0fdf4;border-radius:9px;color:#166534}.quality-no-issues i{font-size:26px}.quality-no-issues strong{display:block;font-size:12px}.quality-no-issues span{display:block;margin-top:3px;font-size:11px;color:#64748b}
+.quality-loading,.quality-error{padding:25px;text-align:center;color:#64748b;font-size:12px}.quality-error{color:#991b1b;background:#fef2f2;border-radius:8px}.quality-error span{display:block;margin-top:6px}
+.gis-quality-actions{background:#fff;border-top:1px solid #e2e8f0;padding:14px 20px;display:flex;align-items:center;justify-content:space-between;gap:15px}.quality-action-info{font-size:11px}.quality-action-info .blocked{color:#991b1b;font-weight:700}.quality-action-info .allowed{color:#166534;font-weight:700}.quality-action-buttons{display:flex;gap:8px}
+.quality-btn{border:none;border-radius:8px;padding:9px 14px;color:#fff;cursor:pointer;font-size:11px;font-weight:700}.quality-btn:disabled{opacity:.45;cursor:not-allowed}.quality-btn.correction{background:#f59e0b}.quality-btn.reject{background:#dc2626}.quality-btn.validate{background:#16a34a}
+.quality-readonly{width:100%;text-align:center;padding:6px;color:#64748b;font-size:11px}
+@media(max-width:800px){.gis-quality-grid{grid-template-columns:1fr}.quality-components{grid-template-columns:1fr 1fr}.gis-quality-actions{flex-direction:column;align-items:stretch}.quality-action-buttons{justify-content:stretch}.quality-btn{flex:1}}
+@media(max-width:520px){.gis-quality-backdrop{padding:0}.gis-quality-panel{width:100%;height:100%;max-height:100vh;border-radius:0}.gis-quality-body{padding:10px}.quality-components{grid-template-columns:1fr}.quality-issue{flex-direction:column}.quality-issue-meta{align-items:flex-start}}
