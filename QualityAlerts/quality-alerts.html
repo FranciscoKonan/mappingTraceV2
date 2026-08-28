@@ -113,7 +113,6 @@
 
             <!-- SUBMISSIONS CONTENT -->
             <div class="alerts-container">
-            <div class="alerts-container">
                 <!-- Stats Cards -->
                 <div class="stats-grid">
                     <div class="stat-card critical">
@@ -307,6 +306,44 @@
 
     <div id="loadingOverlay" class="loading-spinner">
         <i class="fas fa-spinner fa-spin"></i><span>Loading...</span>
+    </div>
+
+
+    <div class="qc-review-modal hidden" id="qcReviewModal">
+      <div class="qc-review-dialog">
+        <div class="qc-review-header">
+          <div>
+            <div class="qc-review-kicker">GIS QUALITY REVIEW</div>
+            <h2 id="qcReviewTitle">Farm Quality Review</h2>
+            <p id="qcReviewSubtitle"></p>
+          </div>
+          <button class="qc-close" onclick="closeQualityReview()"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="qc-review-body">
+          <div class="qc-review-summary">
+            <div class="qc-score-card"><span>Overall Quality Score</span><strong id="qcReviewScore">—</strong><em id="qcReviewStatus">Pending</em></div>
+            <div class="qc-check-card">
+              <h3>Quality Components</h3>
+              <div id="qcComponents"></div>
+            </div>
+          </div>
+          <div class="qc-review-grid">
+            <div>
+              <div class="qc-info-card"><h3>Farm Information</h3><div id="qcFarmInfo" class="qc-info-grid"></div></div>
+              <div class="qc-issues-card"><h3>Quality Issues <span id="qcIssueCount"></span></h3><div id="qcReviewIssues"></div></div>
+            </div>
+            <div class="qc-map-card"><div id="qcReviewMap"></div></div>
+          </div>
+        </div>
+        <div class="qc-review-footer">
+          <span id="qcDecisionNote">Review the evidence before making a decision.</span>
+          <div class="qc-decision-actions">
+            <button class="qc-btn correction" onclick="qualityDecision('correction_required')"><i class="fas fa-pen"></i> Request Correction</button>
+            <button class="qc-btn reject" onclick="qualityDecision('rejected')"><i class="fas fa-times"></i> Reject</button>
+            <button id="qcValidateBtn" class="qc-btn validate" onclick="qualityDecision('validated')"><i class="fas fa-check"></i> Validate</button>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Scripts -->
