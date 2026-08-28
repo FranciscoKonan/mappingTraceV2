@@ -1,29 +1,8 @@
-/* ============================================================
-   MAPPINGTRACE — EXPORT CENTER V3
-   ============================================================
-   Features:
-   - Supabase authentication
-   - Project selection
-   - Role / export permission control
-   - Advanced filtering
-   - Workflow "Select All"
-   - Workflow indeterminate state
-   - Enumerator performance
-   - Cooperative performance
-   - Export scope summary
-   - Excel export
-   - GeoJSON export
-   - KMZ export
-   - Progress report
-   - Rejected audit export
-   - Export history
-   - Preview
-   ============================================================ */
-
-
-/* ============================================================
-   1. CONFIGURATION
-   ============================================================ */
+```javascript
+// ============================================================
+// MappingTrace — Export Center
+// Rebuilt on existing Export Center design
+// ============================================================
 
 const SUPABASE_URL =
     'https://crvnohvudurqfukjpisv.supabase.co';
@@ -31,136 +10,128 @@ const SUPABASE_URL =
 const SUPABASE_ANON_KEY =
     'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNydm5vaHZ1ZHVycWZ1a2pwaXN2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg0NTUxNzMsImV4cCI6MjA5NDAzMTE3M30.Qp8E57yAN4LnO4A-yirf-Z3QufGZw9OKjBfcQxG7fo8';
 
-
-/* ============================================================
-   2. GLOBAL STATE
-   ============================================================ */
-
-let db = null;
+let supabaseClient = null;
 
 let currentUser = null;
-
 let currentProject = null;
-
 let currentMembership = null;
 
-let projectMemberships = [];
-
-let members = [];
-
-let farms = [];
-
+let allUserProjects = [];
+let allFarms = [];
 let filteredFarms = [];
 
-let selectedFormat = 'excel';
+let memberDirectory = new Map();
 
+let allSuppliers = [];
+let allCooperatives = [];
+let allEnumerators = [];
+let allFieldOfficers = [];
 
-const WORKFLOW_STATES = [
+let exportFormat = 'excel';
 
-    'submitted',
+let canExportPermission = false;
+let canManageExportPermissions = false;
 
-    'enumerator_review',
+let currentPerformanceTab = 'enumerators';
 
-    'field_officer_review',
+let selectedSuppliers = new Set();
+let selectedCooperatives = new Set();
+let selectedEnumerators = new Set();
+let selectedFieldOfficers = new Set();
 
-    'gis_compliance_review',
-
-    'final_validation',
-
-    'correction_required',
-
-    'validated',
-
-    'rejected'
-
+const MANAGEMENT_ROLES = [
+    'owner',
+    'manager',
+    'super_manager'
 ];
 
+const FINAL_GEO_STATES = new Set([
+    'validated',
+    'rejected'
+]);
 
-const WORKFLOW_LABELS = {
+const WORKFLOW_STAGES = [
+    'submitted',
+    'enumerator_review',
+    'field_officer_review',
+    'gis_compliance_review',
+    'final_validation',
+    'correction_required',
+    'validated',
+    'rejected'
+];
 
-    submitted:
-        'Submitted',
-
-    enumerator_review:
-        'Enumerator Review',
-
-    field_officer_review:
-        'Field Officer Review',
-
-    gis_compliance_review:
-        'GIS / Compliance Review',
-
-    final_validation:
-        'Final Validation',
-
-    correction_required:
-        'Correction Required',
-
-    validated:
-        'Validated',
-
-    rejected:
-        'Rejected'
+const workflowLabel = {
+    submitted: 'Submitted',
+    enumerator_review: 'Enumerator Review',
+    field_officer_review: 'Field Officer Review',
+    gis_compliance_review: 'GIS / Compliance',
+    final_validation: 'Final Validation',
+    correction_required: 'Correction Required',
+    validated: 'Validated',
+    rejected: 'Rejected'
 };
 
 
-const MANAGEMENT_ROLES = [
+// ============================================================
+// INITIALIZATION
+// ============================================================
 
-    'owner',
-
-    'manager',
-
-    'super_manager'
-
-];
-
-
-/* ============================================================
-   3. INITIALIZATION
-   ============================================================ */
-
-document.addEventListener(
-    'DOMContentLoaded',
-    init
-);
-
-
-async function init() {
+document.addEventListener('DOMContentLoaded', async () => {
 
     try {
 
-        if (!window.supabase) {
-
-            throw new Error(
-                'Supabase library is not loaded.'
-            );
-        }
-
-
-        db =
+        supabaseClient =
             window.supabase.createClient(
                 SUPABASE_URL,
                 SUPABASE_ANON_KEY
             );
 
+        setupNavigation();
+        setupEventListeners();
 
-        bindUI();
+        await initializeExportCenter();
 
+    } catch (error) {
+
+        console.error(
+            'Export Center initialization error:',
+            error
+        );
+
+        showNotification(
+            error.message ||
+            'Unable to initialize Export Center.',
+            'error'
+        );
+    }
+
+});
+
+
+// ============================================================
+// INITIALIZE
+// ============================================================
+
+async function initializeExportCenter() {
+
+    showLoading(true);
+
+    try {
 
         const {
-            data,
+            data: {
+                session
+            },
             error
         } =
-            await db.auth.getSession();
-
+            await supabaseClient.auth.getSession();
 
         if (error) {
-
             throw error;
         }
 
-
-        if (!data.session) {
+        if (!session) {
 
             window.location.href =
                 '../login.html';
@@ -168,354 +139,119 @@ async function init() {
             return;
         }
 
-
         currentUser =
-            data.session.user;
+            session.user;
 
+        await loadUserProfile();
 
         await loadProjects();
 
+        await loadCurrentProject();
 
-        await selectProject();
+        if (!currentProject) {
 
+            throw new Error(
+                'No project selected.'
+            );
+        }
 
-        await loadMembers();
+        await loadProjectMembers(
+            currentProject.id
+        );
 
-
-        await loadFarms();
-
-
-        initializeWorkflowSelectAll();
-
-
-        await loadExportHistory();
-
+        await loadFarms(
+            currentProject.id
+        );
 
         updatePermissionUI();
 
-
-        applyFilters();
-
+        await loadExportHistory();
 
     } catch (error) {
 
-        console.error(
-            'Export Center initialization failed:',
-            error
-        );
+        console.error(error);
 
-
-        notify(
+        showNotification(
             error.message ||
-            'Unable to initialize Export Center.',
+            'Failed to initialize Export Center.',
             'error'
         );
+
+    } finally {
+
+        showLoading(false);
+
     }
+
 }
 
 
-/* ============================================================
-   4. UI BINDING
-   ============================================================ */
+// ============================================================
+// USER PROFILE
+// ============================================================
 
-function bindUI() {
+async function loadUserProfile() {
 
-    document
-        .getElementById('refreshBtn')
-        ?.addEventListener(
-            'click',
-            refreshAll
+    const {
+        data,
+        error
+    } =
+        await supabaseClient
+            .from('user_profiles')
+            .select(
+                'id,first_name,last_name,email'
+            )
+            .eq(
+                'id',
+                currentUser.id
+            )
+            .maybeSingle();
+
+    if (error) {
+        console.warn(
+            'Could not load user profile:',
+            error.message
         );
+    }
 
+    const firstName =
+        data?.first_name ||
+        '';
 
-    document
-        .getElementById('logoutBtn')
-        ?.addEventListener(
-            'click',
-            logout
-        );
+    const lastName =
+        data?.last_name ||
+        '';
 
+    const fullName =
+        `${firstName} ${lastName}`
+            .trim();
 
-    document
-        .getElementById('burgerBtn')
-        ?.addEventListener(
-            'click',
-            toggleMobileSidebar
-        );
+    const displayName =
+        fullName ||
+        currentUser.email
+            .split('@')[0];
 
-
-    document
-        .getElementById('sidebarOverlay')
-        ?.addEventListener(
-            'click',
-            closeMobileSidebar
-        );
-
-
-    document
-        .getElementById('sidebarToggle')
-        ?.addEventListener(
-            'click',
-            toggleSidebar
-        );
-
-
-    document
-        .getElementById('dropdownSelected')
-        ?.addEventListener(
-            'click',
-            toggleProjectDropdown
-        );
-
-
-    document
-        .getElementById('projectSearch')
-        ?.addEventListener(
-            'input',
-            filterProjectDropdown
-        );
-
-
-    document
-        .getElementById('advancedToggleBtn')
-        ?.addEventListener(
-            'click',
-            toggleAdvancedFilters
-        );
-
-
-    document
-        .getElementById('applyFiltersBtn')
-        ?.addEventListener(
-            'click',
-            applyFilters
-        );
-
-
-    document
-        .getElementById('resetBtn')
-        ?.addEventListener(
-            'click',
-            resetFilters
-        );
-
-
-    document
-        .getElementById('previewBtn')
-        ?.addEventListener(
-            'click',
-            previewExport
-        );
-
-
-    document
-        .getElementById('exportBtn')
-        ?.addEventListener(
-            'click',
-            generateExport
-        );
-
-
-    document
-        .getElementById('rejectedAuditBtn')
-        ?.addEventListener(
-            'click',
-            exportRejectedAudit
-        );
-
-
-    document
-        .getElementById('refreshHistoryBtn')
-        ?.addEventListener(
-            'click',
-            loadExportHistory
-        );
-
-
-    document
-        .getElementById('clearDates')
-        ?.addEventListener(
-            'click',
-            clearDates
-        );
-
-
-    document
-        .getElementById('selectAllSuppliers')
-        ?.addEventListener(
-            'click',
-            () =>
-                toggleAllFilter(
-                    'supplier'
-                )
-        );
-
-
-    document
-        .getElementById('selectAllCooperatives')
-        ?.addEventListener(
-            'click',
-            () =>
-                toggleAllFilter(
-                    'cooperative'
-                )
-        );
-
-
-    document
-        .getElementById('selectAllEnumerators')
-        ?.addEventListener(
-            'click',
-            () =>
-                toggleAllFilter(
-                    'enumerator'
-                )
-        );
-
-
-    document
-        .getElementById('selectAllFieldOfficers')
-        ?.addEventListener(
-            'click',
-            () =>
-                toggleAllFilter(
-                    'fieldOfficer'
-                )
-        );
-
-
-    [
-        'supplierSearch',
-
-        'coopSearch',
-
-        'enumeratorSearch',
-
-        'fieldOfficerSearch'
-
-    ].forEach(
-        id => {
-
-            document
-                .getElementById(id)
-                ?.addEventListener(
-                    'input',
-                    renderFilterLists
-                );
-        }
+    setText(
+        'userName',
+        displayName
     );
 
-
-    [
-        'dateFrom',
-
-        'dateTo',
-
-        'dateBasis',
-
-        'areaMin',
-
-        'areaMax',
-
-        'qualityFilter'
-
-    ].forEach(
-        id => {
-
-            document
-                .getElementById(id)
-                ?.addEventListener(
-                    'change',
-                    applyFilters
-                );
-        }
+    setText(
+        'userAvatar',
+        (
+            firstName ||
+            displayName
+        )
+            .charAt(0)
+            .toUpperCase()
     );
 
-
-    document
-        .querySelectorAll(
-            '.workflow-checkbox'
-        )
-        .forEach(
-            checkbox => {
-
-                checkbox.addEventListener(
-                    'change',
-                    onWorkflowCheckboxChange
-                );
-            }
-        );
-
-
-    document
-        .querySelectorAll(
-            '.format-option'
-        )
-        .forEach(
-            option => {
-
-                option.addEventListener(
-                    'click',
-                    () =>
-                        selectFormat(
-                            option.dataset.format
-                        )
-                );
-            }
-        );
-
-
-    document
-        .querySelectorAll(
-            '.performance-tab'
-        )
-        .forEach(
-            tab => {
-
-                tab.addEventListener(
-                    'click',
-                    () =>
-                        switchPerformanceTab(
-                            tab.dataset.tab
-                        )
-                );
-            }
-        );
-
-
-    document.addEventListener(
-        'click',
-        event => {
-
-            const dropdown =
-                document.getElementById(
-                    'customDropdown'
-                );
-
-
-            if (
-                dropdown &&
-                !dropdown.contains(
-                    event.target
-                )
-            ) {
-
-                document
-                    .getElementById(
-                        'dropdownMenu'
-                    )
-                    ?.classList.remove(
-                        'show'
-                    );
-            }
-        }
-    );
 }
 
 
-/* ============================================================
-   5. PROJECTS
-   ============================================================ */
+// ============================================================
+// PROJECTS
+// ============================================================
 
 async function loadProjects() {
 
@@ -523,20 +259,15 @@ async function loadProjects() {
         data,
         error
     } =
-        await db
+        await supabaseClient
             .from('project_members')
-            .select(
-                `
+            .select(`
                 project_id,
                 role,
                 status,
                 can_export,
-                projects (
-                    id,
-                    name
-                )
-                `
-            )
+                projects (*)
+            `)
             .eq(
                 'user_id',
                 currentUser.id
@@ -546,162 +277,66 @@ async function loadProjects() {
                 'active'
             );
 
-
     if (error) {
-
         throw error;
     }
 
-
-    projectMemberships =
-        data || [];
-
-
-    if (
-        !projectMemberships.length
-    ) {
+    if (!data?.length) {
 
         throw new Error(
             'You are not an active member of any project.'
         );
     }
+
+    allUserProjects =
+        data;
+
+    populateProjectSelector();
+
 }
 
 
-async function selectProject() {
+// ============================================================
+// PROJECT SELECTOR
+// ============================================================
 
-    const params =
-        new URLSearchParams(
-            window.location.search
-        );
+function populateProjectSelector() {
 
-
-    const requestedProject =
-        params.get(
-            'project'
-        );
-
-
-    let membership =
-        projectMemberships.find(
-            item =>
-                item.project_id ===
-                requestedProject
-        );
-
-
-    if (!membership) {
-
-        const saved =
-            localStorage.getItem(
-                `mappingtrace_project_${currentUser.id}`
-            );
-
-
-        membership =
-            projectMemberships.find(
-                item =>
-                    item.project_id ===
-                    saved
-            );
-    }
-
-
-    if (!membership) {
-
-        membership =
-            projectMemberships[0];
-    }
-
-
-    currentMembership =
-        membership;
-
-
-    currentProject =
-        membership.projects;
-
-
-    localStorage.setItem(
-        `mappingtrace_project_${currentUser.id}`,
-        currentProject.id
-    );
-
-
-    updateProjectHeader();
-
-    renderProjectDropdown();
-}
-
-
-function updateProjectHeader() {
-
-    setText(
-        'projectBadge',
-        currentProject?.name ||
-        'Project'
-    );
-
-
-    setText(
-        'selectedProjectName',
-        currentProject?.name ||
-        'Project'
-    );
-
-
-    setText(
-        'userRole',
-        formatRole(
-            currentMembership?.role
-        )
-    );
-}
-
-
-function renderProjectDropdown() {
-
-    const container =
+    const items =
         document.getElementById(
             'dropdownItems'
         );
 
-
-    if (!container) {
-
+    if (!items) {
         return;
     }
 
-
-    container.innerHTML =
-        projectMemberships
+    items.innerHTML =
+        allUserProjects
             .map(
-                membership =>
-                    `
-                    <div
-                        class="dropdown-item ${
-                            membership.project_id ===
-                            currentProject?.id
-                                ? 'selected'
-                                : ''
-                        }"
-                        data-project-id="${
-                            escapeHtml(
+                membership => {
+
+                    const project =
+                        membership.projects;
+
+                    return `
+                        <div
+                            class="dropdown-item"
+                            data-project-id="${escapeHtml(
                                 membership.project_id
-                            )
-                        }"
-                    >
-                        ${escapeHtml(
-                            membership.projects?.name ||
-                            membership.project_id
-                        )}
-                    </div>
-                    `
+                            )}"
+                        >
+                            ${escapeHtml(
+                                project?.name ||
+                                membership.project_id
+                            )}
+                        </div>
+                    `;
+                }
             )
             .join('');
 
-
-    container
+    items
         .querySelectorAll(
             '.dropdown-item'
         )
@@ -710,634 +345,328 @@ function renderProjectDropdown() {
 
                 item.addEventListener(
                     'click',
-                    () =>
-                        changeProject(
+                    async () => {
+
+                        await changeProject(
                             item.dataset.projectId
-                        )
+                        );
+
+                        closeProjectDropdown();
+
+                    }
                 );
+
             }
         );
+
 }
 
+
+// ============================================================
+// CURRENT PROJECT
+// ============================================================
+
+async function loadCurrentProject() {
+
+    const params =
+        new URLSearchParams(
+            window.location.search
+        );
+
+    const requestedId =
+        params.get(
+            'project'
+        );
+
+    let membership =
+        allUserProjects.find(
+            item =>
+                item.project_id ===
+                requestedId
+        );
+
+    if (!membership) {
+
+        const saved =
+            localStorage.getItem(
+                `lastProject_${currentUser.id}`
+            );
+
+        membership =
+            allUserProjects.find(
+                item =>
+                    item.project_id ===
+                    saved
+            );
+    }
+
+    if (!membership) {
+
+        membership =
+            allUserProjects[0];
+    }
+
+    if (!membership) {
+        return;
+    }
+
+    currentMembership =
+        membership;
+
+    currentProject =
+        membership.projects;
+
+    localStorage.setItem(
+        `lastProject_${currentUser.id}`,
+        currentProject.id
+    );
+
+    const url =
+        new URL(
+            window.location.href
+        );
+
+    url.searchParams.set(
+        'project',
+        currentProject.id
+    );
+
+    history.replaceState(
+        {},
+        '',
+        url
+    );
+
+    updateProjectUI();
+
+}
+
+
+// ============================================================
+// CHANGE PROJECT
+// ============================================================
 
 async function changeProject(
     projectId
 ) {
 
     const membership =
-        projectMemberships.find(
+        allUserProjects.find(
             item =>
                 item.project_id ===
                 projectId
         );
 
-
     if (!membership) {
-
         return;
     }
-
 
     currentMembership =
         membership;
 
-
     currentProject =
         membership.projects;
 
-
     localStorage.setItem(
-        `mappingtrace_project_${currentUser.id}`,
+        `lastProject_${currentUser.id}`,
         projectId
     );
 
-
-    updateProjectHeader();
-
-    renderProjectDropdown();
-
-
-    document
-        .getElementById(
-            'dropdownMenu'
-        )
-        ?.classList.remove(
-            'show'
+    const url =
+        new URL(
+            window.location.href
         );
 
+    url.searchParams.set(
+        'project',
+        projectId
+    );
 
-    await loadMembers();
+    history.pushState(
+        {},
+        '',
+        url
+    );
 
-    await loadFarms();
+    updateProjectUI();
 
-    initializeWorkflowSelectAll();
+    await loadProjectMembers(
+        projectId
+    );
+
+    await loadFarms(
+        projectId
+    );
 
     await loadExportHistory();
 
     updatePermissionUI();
 
-    applyFilters();
 }
 
 
-function toggleProjectDropdown(
-    event
-) {
+// ============================================================
+// PROJECT UI
+// ============================================================
 
-    event?.stopPropagation();
+function updateProjectUI() {
 
+    setText(
+        'projectBadge',
+        currentProject?.name ||
+        'PROJECT'
+    );
 
-    document
-        .getElementById(
-            'dropdownMenu'
-        )
-        ?.classList.toggle(
-            'show'
-        );
-}
+    setText(
+        'selectedProjectName',
+        currentProject?.name ||
+        'Selected Project'
+    );
 
-
-function filterProjectDropdown(
-    event
-) {
-
-    const query =
+    const role =
         String(
-            event.target.value ||
+            currentMembership?.role ||
             ''
         )
-            .toLowerCase()
-            .trim();
+            .replaceAll(
+                '_',
+                ' '
+            );
 
+    setText(
+        'userRole',
+        role
+            ? capitalize(role)
+            : 'Member'
+    );
 
-    document
-        .querySelectorAll(
-            '#dropdownItems .dropdown-item'
-        )
-        .forEach(
-            item => {
-
-                item.style.display =
-                    item.textContent
-                        .toLowerCase()
-                        .includes(
-                            query
-                        )
-                        ? ''
-                        : 'none';
-            }
-        );
 }
 
 
-/* ============================================================
-   6. MEMBERS / PERMISSIONS
-   ============================================================ */
+// ============================================================
+// PROJECT MEMBERS
+// ============================================================
 
-async function loadMembers() {
+async function loadProjectMembers(
+    projectId
+) {
 
     const {
         data,
         error
     } =
-        await db
+        await supabaseClient
             .from('project_members')
-            .select(
-                `
+            .select(`
                 user_id,
                 project_id,
                 role,
                 status,
                 can_export
-                `
-            )
+            `)
             .eq(
                 'project_id',
-                currentProject.id
+                projectId
             )
             .eq(
                 'status',
                 'active'
             );
 
-
     if (error) {
-
         throw error;
     }
 
+    memberDirectory =
+        new Map();
 
-    members =
-        data || [];
+    for (
+        const member of
+        data || []
+    ) {
 
+        memberDirectory.set(
+            member.user_id,
+            member
+        );
+
+    }
 
     const userIds =
-        members
-            .map(
-                member =>
-                    member.user_id
-            )
-            .filter(Boolean);
-
+        [
+            ...memberDirectory.keys()
+        ];
 
     if (userIds.length) {
 
         const {
             data: profiles
         } =
-            await db
+            await supabaseClient
                 .from('user_profiles')
                 .select(
-                    `
-                    id,
-                    first_name,
-                    last_name,
-                    email
-                    `
+                    'id,first_name,last_name,email'
                 )
                 .in(
                     'id',
                     userIds
                 );
 
+        for (
+            const profile of
+            profiles || []
+        ) {
 
-        const profileMap =
-            new Map(
-                (profiles || [])
-                    .map(
-                        profile =>
-                            [
-                                profile.id,
-                                profile
-                            ]
-                    )
-            );
+            const member =
+                memberDirectory.get(
+                    profile.id
+                );
 
-
-        members.forEach(
-            member => {
+            if (member) {
 
                 member.profile =
-                    profileMap.get(
-                        member.user_id
-                    ) ||
-                    null;
+                    profile;
+
             }
-        );
-    }
 
-
-    const ownMembership =
-        members.find(
-            member =>
-                member.user_id ===
-                currentUser.id
-        );
-
-
-    if (ownMembership) {
-
-        currentMembership =
-            ownMembership;
-    }
-
-
-    updateUserDisplay();
-}
-
-
-function updateUserDisplay() {
-
-    const profile =
-        members.find(
-            member =>
-                member.user_id ===
-                currentUser.id
-        )?.profile;
-
-
-    const name =
-        [
-            profile?.first_name,
-            profile?.last_name
-        ]
-            .filter(Boolean)
-            .join(' ') ||
-        profile?.email ||
-        currentUser.email ||
-        'User';
-
-
-    setText(
-        'userName',
-        name
-    );
-
-
-    setText(
-        'userRole',
-        formatRole(
-            currentMembership?.role
-        )
-    );
-
-
-    setText(
-        'userAvatar',
-        name
-            .trim()
-            .charAt(0)
-            .toUpperCase() ||
-        'U'
-    );
-}
-
-
-function userCanExport() {
-
-    const role =
-        String(
-            currentMembership?.role ||
-            ''
-        )
-            .toLowerCase();
-
-
-    return (
-        MANAGEMENT_ROLES.includes(
-            role
-        ) ||
-        currentMembership?.can_export ===
-        true
-    );
-}
-
-
-function userCanManageExportPermissions() {
-
-    const role =
-        String(
-            currentMembership?.role ||
-            ''
-        )
-            .toLowerCase();
-
-
-    return MANAGEMENT_ROLES.includes(
-        role
-    );
-}
-
-
-function updatePermissionUI() {
-
-    const allowed =
-        userCanExport();
-
-
-    const manager =
-        userCanManageExportPermissions();
-
-
-    const exportButton =
-        document.getElementById(
-            'exportBtn'
-        );
-
-
-    if (exportButton) {
-
-        exportButton.disabled =
-            !allowed;
-    }
-
-
-    const rejectedButton =
-        document.getElementById(
-            'rejectedAuditBtn'
-        );
-
-
-    if (rejectedButton) {
-
-        rejectedButton.classList.toggle(
-            'hidden',
-            !allowed
-        );
-    }
-
-
-    const badge =
-        document.getElementById(
-            'exportPermissionBadge'
-        );
-
-
-    if (badge) {
-
-        badge.textContent =
-            allowed
-                ? 'Export access granted'
-                : 'Export access restricted';
-
-
-        badge.classList.toggle(
-            'allowed',
-            allowed
-        );
-
-
-        badge.classList.toggle(
-            'denied',
-            !allowed
-        );
-    }
-
-
-    const permissionManagement =
-        document.getElementById(
-            'permissionManagement'
-        );
-
-
-    if (permissionManagement) {
-
-        permissionManagement.classList.toggle(
-            'hidden',
-            !manager
-        );
-    }
-
-
-    if (manager) {
-
-        renderPermissionList();
-    }
-}
-
-
-function renderPermissionList() {
-
-    const container =
-        document.getElementById(
-            'permissionList'
-        );
-
-
-    if (!container) {
-
-        return;
-    }
-
-
-    container.innerHTML =
-        members
-            .map(
-                member => {
-
-                    const role =
-                        String(
-                            member.role ||
-                            ''
-                        )
-                            .toLowerCase();
-
-
-                    const automatic =
-                        MANAGEMENT_ROLES.includes(
-                            role
-                        );
-
-
-                    const name =
-                        member.profile
-                            ? [
-                                member.profile.first_name,
-                                member.profile.last_name
-                            ]
-                                .filter(Boolean)
-                                .join(' ') ||
-                              member.profile.email
-                            : member.user_id;
-
-
-                    return `
-                        <div
-                            class="permission-row"
-                        >
-
-                            <div>
-
-                                <strong>
-                                    ${escapeHtml(
-                                        name
-                                    )}
-                                </strong>
-
-                                <div
-                                    class="permission-role"
-                                >
-                                    ${escapeHtml(
-                                        member.profile?.email ||
-                                        ''
-                                    )}
-                                </div>
-
-                            </div>
-
-                            <div
-                                class="permission-role"
-                            >
-                                ${escapeHtml(
-                                    formatRole(
-                                        role
-                                    )
-                                )}
-                            </div>
-
-                            <div>
-                                ${
-                                    automatic
-                                        ? 'Automatic'
-                                        : 'Controlled by manager'
-                                }
-                            </div>
-
-                            <div>
-
-                                <input
-                                    type="checkbox"
-                                    data-user-id="${
-                                        escapeHtml(
-                                            member.user_id
-                                        )
-                                    }"
-                                    ${
-                                        automatic ||
-                                        member.can_export === true
-                                            ? 'checked'
-                                            : ''
-                                    }
-                                    ${
-                                        automatic
-                                            ? 'disabled'
-                                            : ''
-                                    }
-                                >
-
-                            </div>
-
-                        </div>
-                    `;
-                }
-            )
-            .join('');
-
-
-    container
-        .querySelectorAll(
-            'input[data-user-id]'
-        )
-        .forEach(
-            input => {
-
-                input.addEventListener(
-                    'change',
-                    () =>
-                        setExportPermission(
-                            input.dataset.userId,
-                            input.checked
-                        )
-                );
-            }
-        );
-}
-
-
-async function setExportPermission(
-    userId,
-    enabled
-) {
-
-    if (
-        !userCanManageExportPermissions()
-    ) {
-
-        notify(
-            'Only management roles can change export permissions.',
-            'error'
-        );
-
-        return;
-    }
-
-
-    try {
-
-        const {
-            error
-        } =
-            await db.rpc(
-                'set_project_member_export_permission',
-                {
-
-                    p_project_id:
-                        currentProject.id,
-
-                    p_user_id:
-                        userId,
-
-                    p_can_export:
-                        enabled
-
-                }
-            );
-
-
-        if (error) {
-
-            throw error;
         }
 
-
-        await loadMembers();
-
-        updatePermissionUI();
-
-
-        notify(
-            enabled
-                ? 'Export permission granted.'
-                : 'Export permission revoked.',
-            'success'
-        );
-
-    } catch (error) {
-
-        console.error(
-            error
-        );
-
-
-        notify(
-            error.message ||
-            'Could not update export permission.',
-            'error'
-        );
     }
+
+    const ownMember =
+        memberDirectory.get(
+            currentUser.id
+        );
+
+    const role =
+        String(
+            ownMember?.role ||
+            currentMembership?.role ||
+            ''
+        )
+            .toLowerCase();
+
+    canManageExportPermissions =
+        MANAGEMENT_ROLES.includes(
+            role
+        );
+
+    canExportPermission =
+        canManageExportPermissions ||
+        ownMember?.can_export === true;
+
 }
 
 
-/* ============================================================
-   7. FARMS
-   ============================================================ */
+// ============================================================
+// FARMS
+// ============================================================
 
-async function loadFarms() {
+async function loadFarms(
+    projectId
+) {
 
-    showLoading(
-        true
-    );
-
+    showLoading(true);
 
     try {
 
@@ -1345,239 +674,742 @@ async function loadFarms() {
             data,
             error
         } =
-            await db
+            await supabaseClient
                 .from('farms')
                 .select('*')
                 .eq(
                     'project_id',
-                    currentProject.id
+                    projectId
                 );
 
-
         if (error) {
-
             throw error;
         }
 
+        processFarmsData(
+            data || []
+        );
 
-        farms =
-            (data || [])
-                .map(
-                    normalizeFarm
-                );
+    } catch (error) {
 
+        console.error(
+            'Farm loading error:',
+            error
+        );
 
-        renderFilterLists();
+        throw error;
 
     } finally {
 
-        showLoading(
-            false
-        );
+        showLoading(false);
+
     }
+
 }
 
 
-function normalizeFarm(
-    farm
+// ============================================================
+// NORMALIZE FARM DATA
+// ============================================================
+
+function processFarmsData(
+    farms
 ) {
 
-    return {
+    allFarms =
+        farms.map(
+            farm => {
 
-        ...farm,
+                const workflow =
+                    normalizeWorkflow(
+                        farm
+                    );
 
-        farm_id:
-            farm.farm_code ||
-            farm.farm_id ||
-            farm.id,
+                return {
 
-        area:
-            Number(
-                farm.area
-            ) || 0,
+                    ...farm,
 
-        workflow_state:
-            normalizeWorkflow(
-                farm
-            ),
+                    farm_id:
+                        farm.farm_code ||
+                        farm.farmer_id ||
+                        farm.id,
 
-        supplier:
-            farm.supplier ||
-            farm.supplier_name ||
-            farm.company ||
-            'Unassigned',
+                    supplier:
+                        farm.supplier ||
+                        'Unassigned',
 
-        cooperative:
-            farm.cooperative ||
-            farm.cooperative_name ||
-            'Unassigned',
+                    cooperative:
+                        farm.cooperative ||
+                        'Unassigned',
 
-        enumerator_id:
-            farm.mapped_by ||
-            farm.enumerator_id ||
-            farm.created_by ||
-            farm.submitted_by ||
-            null,
+                    area:
+                        Number(
+                            farm.area
+                        ) || 0,
 
-        field_officer_id:
-            farm.field_officer_checked_by ||
-            farm.field_officer_id ||
-            null,
+                    workflow_state:
+                        workflow,
 
-        geometry:
-            parseGeometry(
-                farm.geometry
-            )
+                    enumerator_id:
+                        farm.mapped_by ||
+                        farm.enumerator_id ||
+                        farm.created_by ||
+                        farm.submitted_by ||
+                        null,
 
-    };
+                    field_officer_id:
+                        farm.field_officer_checked_by ||
+                        farm.field_officer_id ||
+                        null,
+
+                    created_at:
+                        farm.created_at ||
+                        null,
+
+                    /*
+                     * IMPORTANT:
+                     * Do NOT reference farms.updated_at.
+                     * The current database does not contain
+                     * that column.
+                     */
+
+                    validated_at:
+                        farm.final_validated_at ||
+                        farm.validated_at ||
+                        null,
+
+                    rejected_at:
+                        farm.rejected_at ||
+                        null
+
+                };
+
+            }
+        );
+
+    buildFilterLists();
+
+    resetSelectionSets();
+
+    filteredFarms =
+        [
+            ...allFarms
+        ];
+
+    renderFilterLists();
+
+    updateStats();
+
+    updateActiveFilterChips();
+
+    renderPerformance();
+
+    updateFormatAvailability();
+
 }
 
+
+// ============================================================
+// WORKFLOW NORMALIZATION
+// ============================================================
 
 function normalizeWorkflow(
     farm
 ) {
 
-    if (
-        farm.workflow_state &&
-        WORKFLOW_LABELS[
-            farm.workflow_state
-        ]
+    const candidates = [
+
+        farm.workflow_state,
+
+        farm.status,
+
+        farm.submission_status,
+
+        farm.farm_status
+
+    ];
+
+    for (
+        const value of
+        candidates
     ) {
 
-        return farm.workflow_state;
+        if (!value) {
+            continue;
+        }
+
+        const normalized =
+            String(
+                value
+            )
+                .trim()
+                .toLowerCase();
+
+        if (
+            WORKFLOW_STAGES.includes(
+                normalized
+            )
+        ) {
+
+            return normalized;
+
+        }
+
+        if (
+            normalized ===
+            'pending'
+        ) {
+
+            return 'submitted';
+
+        }
+
     }
-
-
-    if (
-        farm.status ===
-        'validated'
-    ) {
-
-        return 'validated';
-    }
-
-
-    if (
-        farm.status ===
-        'rejected'
-    ) {
-
-        return 'rejected';
-    }
-
 
     return 'submitted';
+
 }
 
 
-/* ============================================================
-   8. WORKFLOW SELECT ALL
-   ============================================================ */
+// ============================================================
+// FILTER LISTS
+// ============================================================
 
-function initializeWorkflowSelectAll() {
+function buildFilterLists() {
 
-    const workflowContainer =
-        document.getElementById(
-            'workflowFilterList'
+    allSuppliers =
+        unique(
+            allFarms.map(
+                farm =>
+                    farm.supplier
+            )
+        )
+            .sort(
+                localeSort
+            );
+
+    allCooperatives =
+        unique(
+            allFarms.map(
+                farm =>
+                    farm.cooperative
+            )
+        )
+            .sort(
+                localeSort
+            );
+
+    const enumeratorIds =
+        unique(
+            allFarms
+                .map(
+                    farm =>
+                        farm.enumerator_id
+                )
+                .filter(Boolean)
         );
 
+    const fieldOfficerIds =
+        unique(
+            allFarms
+                .map(
+                    farm =>
+                        farm.field_officer_id
+                )
+                .filter(Boolean)
+        );
 
-    if (!workflowContainer) {
+    allEnumerators =
+        enumeratorIds
+            .map(
+                id => ({
+                    id,
+                    name:
+                        personName(id)
+                })
+            )
+            .sort(
+                (a, b) =>
+                    a.name.localeCompare(
+                        b.name
+                    )
+            );
+
+    allFieldOfficers =
+        fieldOfficerIds
+            .map(
+                id => ({
+                    id,
+                    name:
+                        personName(id)
+                })
+            )
+            .sort(
+                (a, b) =>
+                    a.name.localeCompare(
+                        b.name
+                    )
+            );
+
+}
+
+
+// ============================================================
+// RESET FILTER SELECTIONS
+// ============================================================
+
+function resetSelectionSets() {
+
+    selectedSuppliers =
+        new Set(
+            allSuppliers
+        );
+
+    selectedCooperatives =
+        new Set(
+            allCooperatives
+        );
+
+    selectedEnumerators =
+        new Set(
+            allEnumerators.map(
+                item =>
+                    item.id
+            )
+        );
+
+    selectedFieldOfficers =
+        new Set(
+            allFieldOfficers.map(
+                item =>
+                    item.id
+            )
+        );
+
+}
+
+
+// ============================================================
+// RENDER FILTER LISTS
+// ============================================================
+
+function renderFilterLists() {
+
+    renderCheckboxFilter(
+        'supplierList',
+        allSuppliers.map(
+            value => ({
+                value,
+                label: value
+            })
+        ),
+        selectedSuppliers
+    );
+
+    renderCheckboxFilter(
+        'cooperativeList',
+        allCooperatives.map(
+            value => ({
+                value,
+                label: value
+            })
+        ),
+        selectedCooperatives
+    );
+
+    renderCheckboxFilter(
+        'enumeratorList',
+        allEnumerators,
+        selectedEnumerators
+    );
+
+    renderCheckboxFilter(
+        'fieldOfficerList',
+        allFieldOfficers,
+        selectedFieldOfficers
+    );
+
+    updateFilterCount();
+
+}
+
+
+// ============================================================
+// CHECKBOX FILTER
+// ============================================================
+
+function renderCheckboxFilter(
+    containerId,
+    values,
+    selectedSet
+) {
+
+    const container =
+        document.getElementById(
+            containerId
+        );
+
+    if (!container) {
+        return;
+    }
+
+    if (!values.length) {
+
+        container.innerHTML =
+            `
+            <div class="empty-filter">
+                No records available
+            </div>
+            `;
 
         return;
     }
 
+    container.innerHTML =
+        values
+            .map(
+                item => {
 
-    let selectAll =
-        document.getElementById(
-            'selectAllWorkflowStages'
+                    const value =
+                        typeof item ===
+                        'object'
+                            ? item.id ||
+                              item.value
+                            : item;
+
+                    const label =
+                        typeof item ===
+                        'object'
+                            ? item.name ||
+                              item.label
+                            : item;
+
+                    return `
+                        <label class="checkbox-item">
+                            <input
+                                type="checkbox"
+                                class="dynamic-filter-checkbox"
+                                data-filter-value="${escapeHtml(
+                                    value
+                                )}"
+                                ${selectedSet.has(value)
+                                    ? 'checked'
+                                    : ''}
+                            >
+
+                            <span class="checkbox-label">
+                                ${escapeHtml(
+                                    label
+                                )}
+                            </span>
+                        </label>
+                    `;
+                }
+            )
+            .join('');
+
+    container
+        .querySelectorAll(
+            'input[type="checkbox"]'
+        )
+        .forEach(
+            input => {
+
+                input.addEventListener(
+                    'change',
+                    () => {
+
+                        const value =
+                            input.dataset
+                                .filterValue;
+
+                        const set =
+                            getSelectionSet(
+                                containerId
+                            );
+
+                        if (
+                            input.checked
+                        ) {
+
+                            set.add(
+                                value
+                            );
+
+                        } else {
+
+                            set.delete(
+                                value
+                            );
+
+                        }
+
+                        applyFilters();
+
+                    }
+                );
+
+            }
         );
 
-
-    if (!selectAll) {
-
-        const wrapper =
-            document.createElement(
-                'label'
-            );
-
-
-        wrapper.className =
-            'checkbox-item workflow-select-all';
-
-
-        wrapper.innerHTML =
-            `
-            <input
-                type="checkbox"
-                id="selectAllWorkflowStages"
-            >
-
-            <span
-                class="checkbox-label"
-            >
-                <strong>
-                    Select all stages
-                </strong>
-            </span>
-
-            <span
-                id="workflowSelectionCount"
-                class="filter-count"
-            >
-                0 of ${WORKFLOW_STATES.length}
-            </span>
-            `;
-
-
-        workflowContainer
-            .insertBefore(
-                wrapper,
-                workflowContainer.firstChild
-            );
-
-
-        const divider =
-            document.createElement(
-                'div'
-            );
-
-
-        divider.className =
-            'workflow-divider';
-
-
-        wrapper.after(
-            divider
-        );
-
-
-        selectAll =
-            wrapper.querySelector(
-                '#selectAllWorkflowStages'
-            );
-
-
-        selectAll.addEventListener(
-            'change',
-            onSelectAllWorkflowStages
-        );
-    }
-
-
-    updateWorkflowSelectAllState(
-        true
-    );
 }
 
 
-function onSelectAllWorkflowStages(
-    event
+// ============================================================
+// FILTER SET
+// ============================================================
+
+function getSelectionSet(
+    containerId
 ) {
 
-    const checked =
-        event.target.checked;
+    if (
+        containerId ===
+        'supplierList'
+    ) {
 
+        return selectedSuppliers;
+
+    }
+
+    if (
+        containerId ===
+        'cooperativeList'
+    ) {
+
+        return selectedCooperatives;
+
+    }
+
+    if (
+        containerId ===
+        'enumeratorList'
+    ) {
+
+        return selectedEnumerators;
+
+    }
+
+    return selectedFieldOfficers;
+
+}
+
+
+// ============================================================
+// APPLY FILTERS
+// ============================================================
+
+function applyFilters() {
+
+    const workflowStates =
+        getSelectedWorkflowStages();
+
+    const dateFrom =
+        getValue(
+            'dateFrom'
+        );
+
+    const dateTo =
+        getValue(
+            'dateTo'
+        );
+
+    const areaMin =
+        parseNumber(
+            getValue(
+                'areaMin'
+            )
+        );
+
+    const areaMax =
+        parseNumber(
+            getValue(
+                'areaMax'
+            )
+        );
+
+    const dateBasis =
+        getValue(
+            'dateBasis'
+        ) ||
+        'created_at';
+
+    const quality =
+        getValue(
+            'qualityFilter'
+        ) ||
+        'all';
+
+    filteredFarms =
+        allFarms.filter(
+            farm => {
+
+                if (
+                    !selectedSuppliers.has(
+                        farm.supplier
+                    )
+                ) {
+                    return false;
+                }
+
+                if (
+                    !selectedCooperatives.has(
+                        farm.cooperative
+                    )
+                ) {
+                    return false;
+                }
+
+                if (
+                    farm.enumerator_id &&
+                    allEnumerators.length &&
+                    !selectedEnumerators.has(
+                        farm.enumerator_id
+                    )
+                ) {
+                    return false;
+                }
+
+                if (
+                    farm.field_officer_id &&
+                    allFieldOfficers.length &&
+                    !selectedFieldOfficers.has(
+                        farm.field_officer_id
+                    )
+                ) {
+                    return false;
+                }
+
+                if (
+                    !workflowStates.has(
+                        farm.workflow_state
+                    )
+                ) {
+                    return false;
+                }
+
+                if (
+                    areaMin !== null &&
+                    farm.area < areaMin
+                ) {
+                    return false;
+                }
+
+                if (
+                    areaMax !== null &&
+                    farm.area > areaMax
+                ) {
+                    return false;
+                }
+
+                if (
+                    dateFrom ||
+                    dateTo
+                ) {
+
+                    const dateValue =
+                        getFarmDate(
+                            farm,
+                            dateBasis
+                        );
+
+                    if (!dateValue) {
+                        return false;
+                    }
+
+                    const date =
+                        new Date(
+                            dateValue
+                        );
+
+                    if (
+                        dateFrom &&
+                        date <
+                        new Date(
+                            `${dateFrom}T00:00:00`
+                        )
+                    ) {
+                        return false;
+                    }
+
+                    if (
+                        dateTo &&
+                        date >
+                        new Date(
+                            `${dateTo}T23:59:59`
+                        )
+                    ) {
+                        return false;
+                    }
+
+                }
+
+                if (
+                    quality ===
+                    'missing_geometry'
+                ) {
+
+                    if (
+                        parseGeometry(
+                            farm.geometry
+                        )
+                    ) {
+                        return false;
+                    }
+
+                }
+
+                if (
+                    quality ===
+                    'rejection_reason'
+                ) {
+
+                    if (
+                        !farm.rejection_reason
+                    ) {
+                        return false;
+                    }
+
+                }
+
+                if (
+                    quality ===
+                    'correction_required'
+                ) {
+
+                    if (
+                        farm.workflow_state !==
+                            'correction_required' &&
+                        !farm.correction_reason
+                    ) {
+                        return false;
+                    }
+
+                }
+
+                return true;
+
+            }
+        );
+
+    updateStats();
+
+    updateActiveFilterChips();
+
+    renderPerformance();
+
+    updateFormatAvailability();
+
+}
+
+
+// ============================================================
+// WORKFLOW SELECT ALL / CLEAR ALL
+// ============================================================
+
+function selectAllWorkflowStages(
+    checked
+) {
 
     document
         .querySelectorAll(
@@ -1588,33 +1420,22 @@ function onSelectAllWorkflowStages(
 
                 checkbox.checked =
                     checked;
+
             }
         );
 
-
-    updateWorkflowSelectAllState();
-
     applyFilters();
+
+    updateWorkflowStageControl();
+
 }
 
 
-function onWorkflowCheckboxChange() {
+// ============================================================
+// WORKFLOW STAGE CONTROL
+// ============================================================
 
-    updateWorkflowSelectAllState();
-
-    applyFilters();
-}
-
-
-function updateWorkflowSelectAllState(
-    initialLoad = false
-) {
-
-    const selectAll =
-        document.getElementById(
-            'selectAllWorkflowStages'
-        );
-
+function updateWorkflowStageControl() {
 
     const checkboxes =
         [
@@ -1623,1137 +1444,252 @@ function updateWorkflowSelectAllState(
             )
         ];
 
-
-    if (
-        !selectAll ||
-        !checkboxes.length
-    ) {
-
-        return;
-    }
-
-
     const checked =
         checkboxes.filter(
-            checkbox =>
-                checkbox.checked
-        ).length;
-
-
-    if (
-        initialLoad &&
-        checked === 0
-    ) {
-
-        checkboxes.forEach(
-            checkbox => {
-
-                checkbox.checked =
-                    true;
-            }
+            x =>
+                x.checked
         );
-    }
-
-
-    const selectedCount =
-        checkboxes.filter(
-            checkbox =>
-                checkbox.checked
-        ).length;
-
-
-    selectAll.checked =
-        selectedCount ===
-        checkboxes.length;
-
-
-    selectAll.indeterminate =
-        selectedCount > 0 &&
-        selectedCount <
-        checkboxes.length;
-
-
-    setText(
-        'workflowSelectionCount',
-        `${selectedCount} of ${checkboxes.length}`
-    );
-
-
-    setText(
-        'workflowStageCount',
-        `${selectedCount} selected`
-    );
-}
-
-
-function getSelectedWorkflowStates() {
-
-    return [
-        ...document.querySelectorAll(
-            '.workflow-checkbox:checked'
-        )
-    ]
-        .map(
-            checkbox =>
-                checkbox.value
-        );
-}
-
-
-/* ============================================================
-   9. FILTER LISTS
-   ============================================================ */
-
-function renderFilterLists() {
-
-    renderCheckboxFilter(
-        'supplierList',
-        'supplier',
-        unique(
-            farms.map(
-                farm =>
-                    farm.supplier
-            )
-        ),
-        getValue(
-            'supplierSearch'
-        )
-    );
-
-
-    renderCheckboxFilter(
-        'cooperativeList',
-        'cooperative',
-        unique(
-            farms.map(
-                farm =>
-                    farm.cooperative
-            )
-        ),
-        getValue(
-            'coopSearch'
-        )
-    );
-
-
-    renderCheckboxFilter(
-        'enumeratorList',
-        'enumerator',
-        unique(
-            farms
-                .map(
-                    farm =>
-                        farm.enumerator_id
-                )
-                .filter(Boolean)
-        )
-            .map(
-                id => ({
-
-                    value:
-                        id,
-
-                    label:
-                        personName(
-                            id
-                        )
-
-                })
-            ),
-        getValue(
-            'enumeratorSearch'
-        )
-    );
-
-
-    renderCheckboxFilter(
-        'fieldOfficerList',
-        'fieldOfficer',
-        unique(
-            farms
-                .map(
-                    farm =>
-                        farm.field_officer_id
-                )
-                .filter(Boolean)
-        )
-            .map(
-                id => ({
-
-                    value:
-                        id,
-
-                    label:
-                        personName(
-                            id
-                        )
-
-                })
-            ),
-        getValue(
-            'fieldOfficerSearch'
-        )
-    );
-
-
-    bindDynamicFilterEvents();
-}
-
-
-function renderCheckboxFilter(
-    containerId,
-    type,
-    values,
-    search
-) {
 
     const container =
         document.getElementById(
-            containerId
+            'workflowList'
         );
-
 
     if (!container) {
-
         return;
     }
 
-
-    const selected =
-        getSelectedFilterValues(
-            type
+    let selectAll =
+        document.getElementById(
+            'workflowSelectAll'
         );
 
+    if (!selectAll) {
 
-    const query =
-        String(
-            search ||
-            ''
-        )
-            .toLowerCase()
-            .trim();
+        selectAll =
+            document.createElement(
+                'label'
+            );
 
+        selectAll.id =
+            'workflowSelectAll';
 
-    const filtered =
-        values.filter(
-            item => {
+        selectAll.className =
+            'checkbox-item workflow-select-all';
 
-                const label =
-                    typeof item ===
-                    'object'
-                        ? item.label
-                        : item;
-
-
-                return (
-                    !query ||
-                    String(
-                        label
-                    )
-                        .toLowerCase()
-                        .includes(
-                            query
-                        )
-                );
-            }
-        );
-
-
-    if (!filtered.length) {
-
-        container.innerHTML =
+        selectAll.innerHTML =
             `
-            <div
-                class="empty-filter"
+            <input
+                type="checkbox"
+                id="workflowSelectAllCheckbox"
             >
-                No matches
-            </div>
+
+            <span class="checkbox-label">
+                Select All Stages
+            </span>
             `;
 
+        container.prepend(
+            selectAll
+        );
+
+        const input =
+            selectAll.querySelector(
+                'input'
+            );
+
+        input.addEventListener(
+            'change',
+            () => {
+
+                selectAllWorkflowStages(
+                    input.checked
+                );
+
+            }
+        );
+
+    }
+
+    const selectAllInput =
+        document.getElementById(
+            'workflowSelectAllCheckbox'
+        );
+
+    if (!selectAllInput) {
         return;
     }
 
+    selectAllInput.checked =
+        checked.length ===
+        checkboxes.length;
 
-    container.innerHTML =
-        filtered
-            .map(
-                item => {
+    selectAllInput.indeterminate =
+        checked.length > 0 &&
+        checked.length <
+        checkboxes.length;
 
-                    const value =
-                        typeof item ===
-                        'object'
-                            ? item.value
-                            : item;
-
-
-                    const label =
-                        typeof item ===
-                        'object'
-                            ? item.label
-                            : item;
-
-
-                    return `
-                        <label
-                            class="checkbox-item"
-                        >
-
-                            <input
-                                type="checkbox"
-                                class="${type}-checkbox"
-                                value="${escapeHtml(
-                                    value
-                                )}"
-                                ${
-                                    selected.includes(
-                                        String(
-                                            value
-                                        )
-                                    )
-                                        ? 'checked'
-                                        : ''
-                                }
-                            >
-
-                            <span
-                                class="checkbox-label"
-                            >
-                                ${escapeHtml(
-                                    label
-                                )}
-                            </span>
-
-                        </label>
-                    `;
-                }
-            )
-            .join('');
-}
-
-
-function bindDynamicFilterEvents() {
-
-    document
-        .querySelectorAll(
-            `
-            .supplier-checkbox,
-            .cooperative-checkbox,
-            .enumerator-checkbox,
-            .fieldOfficer-checkbox
-            `
-        )
-        .forEach(
-            checkbox => {
-
-                checkbox.addEventListener(
-                    'change',
-                    applyFilters
-                );
-            }
+    const count =
+        document.getElementById(
+            'workflowStageCount'
         );
+
+    if (count) {
+
+        count.textContent =
+            `${checked.length} of ${checkboxes.length} selected`;
+
+    }
+
 }
 
 
-function getSelectedFilterValues(
-    type
-) {
+// ============================================================
+// SELECTED WORKFLOW STATES
+// ============================================================
 
-    return [
-        ...document.querySelectorAll(
-            `.${type}-checkbox:checked`
-        )
-    ]
-        .map(
-            checkbox =>
-                checkbox.value
-        );
-}
+function getSelectedWorkflowStages() {
 
-
-function toggleAllFilter(
-    type
-) {
-
-    const boxes =
+    return new Set(
         [
             ...document.querySelectorAll(
-                `.${type}-checkbox`
+                '.workflow-checkbox:checked'
             )
-        ];
-
-
-    if (!boxes.length) {
-
-        return;
-    }
-
-
-    const allChecked =
-        boxes.every(
-            checkbox =>
-                checkbox.checked
-        );
-
-
-    boxes.forEach(
-        checkbox => {
-
-            checkbox.checked =
-                !allChecked;
-        }
+        ]
+            .map(
+                checkbox =>
+                    checkbox.value
+            )
     );
 
-
-    applyFilters();
 }
 
 
-/* ============================================================
-   10. MAIN FILTERING
-   ============================================================ */
+// ============================================================
+// STATS
+// ============================================================
 
-function applyFilters() {
+function updateStats() {
 
-    const suppliers =
-        getSelectedFilterValues(
-            'supplier'
-        );
+    const farms =
+        filteredFarms;
 
-
-    const cooperatives =
-        getSelectedFilterValues(
-            'cooperative'
-        );
-
-
-    const enumerators =
-        getSelectedFilterValues(
-            'enumerator'
-        );
-
-
-    const fieldOfficers =
-        getSelectedFilterValues(
-            'fieldOfficer'
-        );
-
-
-    const workflowStates =
-        getSelectedWorkflowStates();
-
-
-    const dateFrom =
-        getValue(
-            'dateFrom'
-        );
-
-
-    const dateTo =
-        getValue(
-            'dateTo'
-        );
-
-
-    const dateBasis =
-        getValue(
-            'dateBasis'
-        ) ||
-        'created_at';
-
-
-    const areaMin =
-        parseFloat(
-            getValue(
-                'areaMin'
-            )
-        );
-
-
-    const areaMax =
-        parseFloat(
-            getValue(
-                'areaMax'
-            )
-        );
-
-
-    const quality =
-        getValue(
-            'qualityFilter'
-        ) ||
-        'all';
-
-
-    filteredFarms =
-        farms.filter(
-            farm => {
-
-                if (
-                    suppliers.length &&
-                    !suppliers.includes(
-                        String(
-                            farm.supplier
-                        )
-                    )
-                ) {
-
-                    return false;
-                }
-
-
-                if (
-                    cooperatives.length &&
-                    !cooperatives.includes(
-                        String(
-                            farm.cooperative
-                        )
-                    )
-                ) {
-
-                    return false;
-                }
-
-
-                if (
-                    enumerators.length &&
-                    !enumerators.includes(
-                        String(
-                            farm.enumerator_id
-                        )
-                    )
-                ) {
-
-                    return false;
-                }
-
-
-                if (
-                    fieldOfficers.length &&
-                    !fieldOfficers.includes(
-                        String(
-                            farm.field_officer_id
-                        )
-                    )
-                ) {
-
-                    return false;
-                }
-
-
-                /*
-                 IMPORTANT:
-
-                 If no workflow stages are selected,
-                 return no records.
-
-                 If Select All is selected,
-                 every stage is selected.
-                */
-
-                if (
-                    workflowStates.length === 0
-                ) {
-
-                    return false;
-                }
-
-
-                if (
-                    !workflowStates.includes(
-                        farm.workflow_state
-                    )
-                ) {
-
-                    return false;
-                }
-
-
-                if (
-                    !Number.isNaN(
-                        areaMin
-                    ) &&
-                    farm.area <
-                    areaMin
-                ) {
-
-                    return false;
-                }
-
-
-                if (
-                    !Number.isNaN(
-                        areaMax
-                    ) &&
-                    farm.area >
-                    areaMax
-                ) {
-
-                    return false;
-                }
-
-
-                if (
-                    quality ===
-                    'missing_geometry' &&
-                    farm.geometry
-                ) {
-
-                    return false;
-                }
-
-
-                if (
-                    quality ===
-                    'rejection_reason' &&
-                    !String(
-                        farm.rejection_reason ||
-                        ''
-                    ).trim()
-                ) {
-
-                    return false;
-                }
-
-
-                if (
-                    quality ===
-                    'correction_required' &&
-                    farm.workflow_state !==
-                    'correction_required'
-                ) {
-
-                    return false;
-                }
-
-
-                const dateValue =
-                    farm[
-                        dateBasis
-                    ] ||
-                    farm.created_at;
-
-
-                if (
-                    dateFrom &&
-                    (
-                        !dateValue ||
-                        new Date(
-                            dateValue
-                        ) <
-                        new Date(
-                            `${dateFrom}T00:00:00`
-                        )
-                    )
-                ) {
-
-                    return false;
-                }
-
-
-                if (
-                    dateTo &&
-                    (
-                        !dateValue ||
-                        new Date(
-                            dateValue
-                        ) >
-                        new Date(
-                            `${dateTo}T23:59:59`
-                        )
-                    )
-                ) {
-
-                    return false;
-                }
-
-
-                return true;
-            }
-        );
-
-
-    updateKPIs();
-
-    updateFormatAvailability();
-
-    renderPerformance();
-
-    updateExportScope();
-}
-
-
-function resetFilters() {
-
-    [
-        'supplierSearch',
-
-        'coopSearch',
-
-        'enumeratorSearch',
-
-        'fieldOfficerSearch',
-
-        'dateFrom',
-
-        'dateTo',
-
-        'areaMin',
-
-        'areaMax'
-
-    ]
-        .forEach(
-            id => {
-
-                const element =
-                    document.getElementById(
-                        id
-                    );
-
-
-                if (element) {
-
-                    element.value =
-                        '';
-                }
-            }
-        );
-
-
-    const dateBasis =
-        document.getElementById(
-            'dateBasis'
-        );
-
-
-    if (dateBasis) {
-
-        dateBasis.value =
-            'created_at';
-    }
-
-
-    const quality =
-        document.getElementById(
-            'qualityFilter'
-        );
-
-
-    if (quality) {
-
-        quality.value =
-            'all';
-    }
-
-
-    document
-        .querySelectorAll(
-            `
-            .supplier-checkbox,
-            .cooperative-checkbox,
-            .enumerator-checkbox,
-            .fieldOfficer-checkbox
-            `
-        )
-        .forEach(
-            checkbox => {
-
-                checkbox.checked =
-                    false;
-            }
-        );
-
-
-    document
-        .querySelectorAll(
-            '.workflow-checkbox'
-        )
-        .forEach(
-            checkbox => {
-
-                checkbox.checked =
-                    true;
-            }
-        );
-
-
-    const selectAll =
-        document.getElementById(
-            'selectAllWorkflowStages'
-        );
-
-
-    if (selectAll) {
-
-        selectAll.checked =
-            true;
-
-        selectAll.indeterminate =
-            false;
-    }
-
-
-    renderFilterLists();
-
-    updateWorkflowSelectAllState();
-
-    selectFormat(
-        'excel'
-    );
-
-    applyFilters();
-}
-
-
-function clearDates() {
-
-    const from =
-        document.getElementById(
-            'dateFrom'
-        );
-
-
-    const to =
-        document.getElementById(
-            'dateTo'
-        );
-
-
-    if (from) {
-
-        from.value =
-            '';
-    }
-
-
-    if (to) {
-
-        to.value =
-            '';
-    }
-
-
-    applyFilters();
-}
-
-
-function toggleAdvancedFilters() {
-
-    const panel =
-        document.getElementById(
-            'advancedFilters'
-        );
-
-
-    const button =
-        document.getElementById(
-            'advancedToggleBtn'
-        );
-
-
-    if (!panel) {
-
-        return;
-    }
-
-
-    const hidden =
-        panel.classList.toggle(
-            'hidden'
-        );
-
-
-    if (button) {
-
-        button.innerHTML =
-            hidden
-                ? '<i class="fas fa-chevron-down"></i> Show advanced filters'
-                : '<i class="fas fa-chevron-up"></i> Hide advanced filters';
-    }
-}
-
-
-/* ============================================================
-   11. KPIs
-   ============================================================ */
-
-function updateKPIs() {
-
-    const total =
-        filteredFarms.length;
-
-
-    const area =
-        filteredFarms.reduce(
-            (
-                sum,
-                farm
-            ) =>
+    const totalArea =
+        farms.reduce(
+            (sum, farm) =>
                 sum +
-                farm.area,
+                (
+                    Number(
+                        farm.area
+                    ) || 0
+                ),
             0
         );
 
-
     const validated =
-        filteredFarms.filter(
+        farms.filter(
             farm =>
                 farm.workflow_state ===
                 'validated'
         ).length;
 
-
     const rejected =
-        filteredFarms.filter(
+        farms.filter(
             farm =>
                 farm.workflow_state ===
                 'rejected'
         ).length;
 
-
     const pending =
-        total -
-        validated -
-        rejected;
-
-
-    const validationRate =
-        total
-            ? validated /
-              total *
-              100
-            : 0;
-
+        farms.filter(
+            farm =>
+                !FINAL_GEO_STATES.has(
+                    farm.workflow_state
+                )
+        ).length;
 
     setText(
         'totalFarms',
-        total.toLocaleString()
+        farms.length.toLocaleString()
     );
-
 
     setText(
         'totalArea',
-        `${area.toFixed(2)} ha`
+        `${totalArea.toFixed(2)} ha`
     );
-
 
     setText(
         'validatedCount',
         validated.toLocaleString()
     );
 
-
     setText(
         'pendingCount',
         pending.toLocaleString()
     );
-
 
     setText(
         'rejectedCount',
         rejected.toLocaleString()
     );
 
-
-    setText(
-        'validationRate',
-        `${validationRate.toFixed(1)}%`
-    );
-
-
     setText(
         'exportCount',
-        total.toLocaleString()
+        farms.length.toLocaleString()
     );
-
 
     setText(
         'exportArea',
-        `${area.toFixed(2)} ha`
+        `${totalArea.toFixed(2)} ha`
     );
-
 
     setText(
         'filteredValidated',
         validated.toLocaleString()
     );
 
-
     setText(
         'filteredRejected',
         rejected.toLocaleString()
     );
 
-
-    setText(
-        'filteredInProgress',
-        pending.toLocaleString()
-    );
-
-
-    setText(
-        'filteredValidationRate',
-        `${validationRate.toFixed(1)}%`
-    );
-
-
-    setText(
-        'selectionNote',
-        `${total.toLocaleString()} record${
-            total === 1
-                ? ''
-                : 's'
-        } selected`
-    );
 }
 
 
-/* ============================================================
-   12. EXPORT SCOPE
-   ============================================================ */
-
-function updateExportScope() {
-
-    const selected =
-        filteredFarms.length;
-
-
-    const area =
-        filteredFarms.reduce(
-            (
-                sum,
-                farm
-            ) =>
-                sum +
-                farm.area,
-            0
-        );
-
-
-    setText(
-        'scopePlots',
-        selected.toLocaleString()
-    );
-
-
-    setText(
-        'scopeArea',
-        `${area.toFixed(2)} ha`
-    );
-
-
-    const validated =
-        filteredFarms.filter(
-            farm =>
-                farm.workflow_state ===
-                'validated'
-        ).length;
-
-
-    const rejected =
-        filteredFarms.filter(
-            farm =>
-                farm.workflow_state ===
-                'rejected'
-        ).length;
-
-
-    const inProgress =
-        selected -
-        validated -
-        rejected;
-
-
-    setText(
-        'scopeValidated',
-        validated.toLocaleString()
-    );
-
-
-    setText(
-        'scopeRejected',
-        rejected.toLocaleString()
-    );
-
-
-    setText(
-        'scopeInProgress',
-        inProgress.toLocaleString()
-    );
-
-
-    renderScopeWorkflowBreakdown();
-}
-
-
-function renderScopeWorkflowBreakdown() {
-
-    const container =
-        document.getElementById(
-            'scopeWorkflowBreakdown'
-        );
-
-
-    if (!container) {
-
-        return;
-    }
-
-
-    container.innerHTML =
-        WORKFLOW_STATES
-            .map(
-                state => {
-
-                    const count =
-                        filteredFarms.filter(
-                            farm =>
-                                farm.workflow_state ===
-                                state
-                        ).length;
-
-
-                    if (!count) {
-
-                        return '';
-                    }
-
-
-                    return `
-                        <span
-                            class="scope-chip"
-                        >
-                            ${escapeHtml(
-                                WORKFLOW_LABELS[
-                                    state
-                                ]
-                            )}
-                            <strong>
-                                ${count.toLocaleString()}
-                            </strong>
-                        </span>
-                    `;
-                }
-            )
-            .join('');
-}
-
-
-/* ============================================================
-   13. PERFORMANCE
-   ============================================================ */
+// ============================================================
+// PERFORMANCE
+// ============================================================
 
 function renderPerformance() {
 
-    renderEnumeratorPerformance();
+    if (
+        currentPerformanceTab ===
+        'enumerators'
+    ) {
 
-    renderCooperativePerformance();
+        renderEnumeratorPerformance();
 
-    renderWorkflowPerformance();
+    } else if (
+        currentPerformanceTab ===
+        'cooperatives'
+    ) {
 
-    renderHighlights();
+        renderCooperativePerformance();
+
+    } else {
+
+        renderWorkflowPerformance();
+
+    }
+
+    updatePerformanceHighlights();
+
 }
 
+
+// ============================================================
+// ENUMERATOR PERFORMANCE
+// ============================================================
 
 function renderEnumeratorPerformance() {
 
@@ -2762,206 +1698,212 @@ function renderEnumeratorPerformance() {
             'enumeratorPerformanceBody'
         );
 
-
     if (!body) {
-
         return;
     }
 
-
-    const map =
+    const groups =
         new Map();
 
+    for (
+        const farm of
+        filteredFarms
+    ) {
 
-    filteredFarms.forEach(
-        farm => {
+        const id =
+            farm.enumerator_id ||
+            'unassigned';
 
-            const key =
-                farm.enumerator_id ||
-                'unassigned';
+        if (!groups.has(id)) {
 
+            groups.set(
+                id,
+                []
+            );
 
-            if (!map.has(key)) {
-
-                map.set(
-                    key,
-                    {
-
-                        name:
-                            personName(
-                                farm.enumerator_id
-                            ),
-
-                        mapped:
-                            0,
-
-                        validated:
-                            0,
-
-                        rejected:
-                            0,
-
-                        correction:
-                            0,
-
-                        pending:
-                            0
-
-                    }
-                );
-            }
-
-
-            const row =
-                map.get(key);
-
-
-            row.mapped++;
-
-
-            if (
-                farm.workflow_state ===
-                'validated'
-            ) {
-
-                row.validated++;
-            }
-
-
-            if (
-                farm.workflow_state ===
-                'rejected'
-            ) {
-
-                row.rejected++;
-            }
-
-
-            if (
-                farm.workflow_state ===
-                'correction_required'
-            ) {
-
-                row.correction++;
-            }
-
-
-            if (
-                ![
-                    'validated',
-                    'rejected'
-                ]
-                    .includes(
-                        farm.workflow_state
-                    )
-            ) {
-
-                row.pending++;
-            }
         }
-    );
 
+        groups
+            .get(id)
+            .push(
+                farm
+            );
+
+    }
 
     const rows =
         [
-            ...map.values()
+            ...groups.entries()
         ]
-            .sort(
-                (
-                    a,
-                    b
-                ) =>
-                    b.mapped -
-                    a.mapped
-            );
+            .map(
+                ([id, farms]) => {
 
+                    const mapped =
+                        farms.length;
+
+                    const submitted =
+                        farms.filter(
+                            f =>
+                                f.workflow_state ===
+                                'submitted'
+                        ).length;
+
+                    const validated =
+                        farms.filter(
+                            f =>
+                                f.workflow_state ===
+                                'validated'
+                        ).length;
+
+                    const rejected =
+                        farms.filter(
+                            f =>
+                                f.workflow_state ===
+                                'rejected'
+                        ).length;
+
+                    const correction =
+                        farms.filter(
+                            f =>
+                                f.workflow_state ===
+                                'correction_required'
+                        ).length;
+
+                    const pending =
+                        farms.filter(
+                            f =>
+                                !FINAL_GEO_STATES.has(
+                                    f.workflow_state
+                                )
+                        ).length;
+
+                    const validationRate =
+                        mapped > 0
+                            ? (
+                                validated /
+                                mapped *
+                                100
+                            )
+                            : 0;
+
+                    return {
+
+                        Enumerator:
+                            personName(id),
+
+                        'Farms Mapped':
+                            mapped,
+
+                        Submitted:
+                            submitted,
+
+                        Validated:
+                            validated,
+
+                        Rejected:
+                            rejected,
+
+                        'Correction Required':
+                            correction,
+
+                        Pending:
+                            pending,
+
+                        'Validation Rate %':
+                            Number(
+                                validationRate
+                                    .toFixed(1)
+                            )
+
+                    };
+
+                }
+            )
+            .sort(
+                (a, b) =>
+                    b['Farms Mapped'] -
+                    a['Farms Mapped']
+            );
 
     if (!rows.length) {
 
         body.innerHTML =
-            `
-            <tr>
-                <td colspan="8">
-                    No matching enumerator data.
-                </td>
-            </tr>
-            `;
+            emptyTableRow(
+                8,
+                'No enumerator data for the current filters.'
+            );
 
         return;
-    }
 
+    }
 
     body.innerHTML =
         rows
             .map(
                 row => {
 
-                    const rate =
-                        row.mapped
-                            ? row.validated /
-                              row.mapped *
-                              100
-                            : 0;
-
-
-                    const correctionRate =
-                        row.mapped
-                            ? row.correction /
-                              row.mapped *
-                              100
-                            : 0;
-
+                    const validationClass =
+                        rateClass(
+                            row[
+                                'Validation Rate %'
+                            ]
+                        );
 
                     return `
                         <tr>
 
                             <td>
-                                ${escapeHtml(
-                                    row.name
-                                )}
+                                <strong>
+                                    ${escapeHtml(
+                                        row.Enumerator
+                                    )}
+                                </strong>
                             </td>
 
                             <td>
-                                ${row.mapped}
+                                ${row['Farms Mapped']}
                             </td>
 
                             <td>
-                                ${row.validated}
+                                ${row.Submitted}
                             </td>
 
                             <td>
-                                ${row.rejected}
+                                ${row.Validated}
                             </td>
 
                             <td>
-                                ${row.correction}
+                                ${row.Rejected}
                             </td>
 
                             <td>
-                                ${row.pending}
-                            </td>
-
-                            <td
-                                class="${rateClass(
-                                    rate
-                                )}"
-                            >
-                                ${rate.toFixed(1)}%
+                                ${row['Correction Required']}
                             </td>
 
                             <td>
-                                ${correctionRate.toFixed(
-                                    1
-                                )}%
+                                ${row.Pending}
+                            </td>
+
+                            <td class="${validationClass}">
+                                ${row['Validation Rate %']}%
                             </td>
 
                         </tr>
                     `;
+
                 }
             )
             .join('');
+
+    window.currentEnumeratorRows =
+        rows;
+
 }
 
+
+// ============================================================
+// COOPERATIVE PERFORMANCE
+// ============================================================
 
 function renderCooperativePerformance() {
 
@@ -2970,202 +1912,207 @@ function renderCooperativePerformance() {
             'cooperativePerformanceBody'
         );
 
-
     if (!body) {
-
         return;
     }
 
-
-    const map =
+    const groups =
         new Map();
 
+    for (
+        const farm of
+        filteredFarms
+    ) {
 
-    filteredFarms.forEach(
-        farm => {
+        const name =
+            farm.cooperative ||
+            'Unassigned';
 
-            const key =
-                farm.cooperative ||
-                'Unassigned';
+        if (!groups.has(name)) {
 
+            groups.set(
+                name,
+                []
+            );
 
-            if (!map.has(key)) {
-
-                map.set(
-                    key,
-                    {
-
-                        name:
-                            key,
-
-                        farms:
-                            0,
-
-                        area:
-                            0,
-
-                        validated:
-                            0,
-
-                        rejected:
-                            0,
-
-                        correction:
-                            0,
-
-                        pending:
-                            0
-
-                    }
-                );
-            }
-
-
-            const row =
-                map.get(key);
-
-
-            row.farms++;
-
-            row.area +=
-                farm.area;
-
-
-            if (
-                farm.workflow_state ===
-                'validated'
-            ) {
-
-                row.validated++;
-            }
-
-
-            if (
-                farm.workflow_state ===
-                'rejected'
-            ) {
-
-                row.rejected++;
-            }
-
-
-            if (
-                farm.workflow_state ===
-                'correction_required'
-            ) {
-
-                row.correction++;
-            }
-
-
-            if (
-                ![
-                    'validated',
-                    'rejected'
-                ]
-                    .includes(
-                        farm.workflow_state
-                    )
-            ) {
-
-                row.pending++;
-            }
         }
-    );
 
+        groups
+            .get(name)
+            .push(
+                farm
+            );
+
+    }
 
     const rows =
         [
-            ...map.values()
+            ...groups.entries()
         ]
-            .sort(
-                (
-                    a,
-                    b
-                ) =>
-                    b.farms -
-                    a.farms
-            );
+            .map(
+                ([name, farms]) => {
 
+                    const total =
+                        farms.length;
+
+                    const area =
+                        farms.reduce(
+                            (sum, farm) =>
+                                sum +
+                                (
+                                    Number(
+                                        farm.area
+                                    ) || 0
+                                ),
+                            0
+                        );
+
+                    const validated =
+                        farms.filter(
+                            f =>
+                                f.workflow_state ===
+                                'validated'
+                        ).length;
+
+                    const rejected =
+                        farms.filter(
+                            f =>
+                                f.workflow_state ===
+                                'rejected'
+                        ).length;
+
+                    const correction =
+                        farms.filter(
+                            f =>
+                                f.workflow_state ===
+                                'correction_required'
+                        ).length;
+
+                    const pending =
+                        farms.filter(
+                            f =>
+                                !FINAL_GEO_STATES.has(
+                                    f.workflow_state
+                                )
+                        ).length;
+
+                    const validationRate =
+                        total > 0
+                            ? validated /
+                              total *
+                              100
+                            : 0;
+
+                    return {
+
+                        Cooperative:
+                            name,
+
+                        Farms:
+                            total,
+
+                        Area:
+                            area,
+
+                        Validated:
+                            validated,
+
+                        Rejected:
+                            rejected,
+
+                        Correction:
+                            correction,
+
+                        Pending:
+                            pending,
+
+                        ValidationRate:
+                            validationRate
+
+                    };
+
+                }
+            )
+            .sort(
+                (a, b) =>
+                    b.Farms -
+                    a.Farms
+            );
 
     if (!rows.length) {
 
         body.innerHTML =
-            `
-            <tr>
-                <td colspan="8">
-                    No matching cooperative data.
-                </td>
-            </tr>
-            `;
+            emptyTableRow(
+                8,
+                'No cooperative data for the current filters.'
+            );
 
         return;
-    }
 
+    }
 
     body.innerHTML =
         rows
             .map(
                 row => {
 
-                    const rate =
-                        row.farms
-                            ? row.validated /
-                              row.farms *
-                              100
-                            : 0;
-
-
                     return `
                         <tr>
 
                             <td>
-                                ${escapeHtml(
-                                    row.name
-                                )}
+                                <strong>
+                                    ${escapeHtml(
+                                        row.Cooperative
+                                    )}
+                                </strong>
                             </td>
 
                             <td>
-                                ${row.farms}
+                                ${row.Farms}
                             </td>
 
                             <td>
-                                ${row.area.toFixed(
-                                    2
-                                )}
+                                ${row.Area.toFixed(2)}
                             </td>
 
                             <td>
-                                ${row.validated}
+                                ${row.Validated}
                             </td>
 
                             <td>
-                                ${row.rejected}
+                                ${row.Rejected}
                             </td>
 
                             <td>
-                                ${row.correction}
+                                ${row.Correction}
                             </td>
 
                             <td>
-                                ${row.pending}
+                                ${row.Pending}
                             </td>
 
-                            <td
-                                class="${rateClass(
-                                    rate
-                                )}"
-                            >
-                                ${rate.toFixed(1)}%
+                            <td class="${rateClass(
+                                row.ValidationRate
+                            )}">
+                                ${row.ValidationRate.toFixed(1)}%
                             </td>
 
                         </tr>
                     `;
+
                 }
             )
             .join('');
+
+    window.currentCooperativeRows =
+        rows;
+
 }
 
+
+// ============================================================
+// WORKFLOW PERFORMANCE
+// ============================================================
 
 function renderWorkflowPerformance() {
 
@@ -3174,72 +2121,88 @@ function renderWorkflowPerformance() {
             'workflowPerformanceBody'
         );
 
-
     if (!body) {
-
         return;
     }
 
-
-    body.innerHTML =
-        WORKFLOW_STATES
+    const rows =
+        WORKFLOW_STAGES
             .map(
                 state => {
 
-                    const rows =
+                    const farms =
                         filteredFarms.filter(
                             farm =>
                                 farm.workflow_state ===
                                 state
                         );
 
+                    return {
 
-                    const area =
-                        rows.reduce(
-                            (
-                                sum,
-                                farm
-                            ) =>
-                                sum +
-                                farm.area,
-                            0
-                        );
+                        stage:
+                            workflowLabel[
+                                state
+                            ],
 
+                        farms:
+                            farms.length,
 
-                    return `
-                        <tr>
+                        area:
+                            farms.reduce(
+                                (sum, farm) =>
+                                    sum +
+                                    (
+                                        Number(
+                                            farm.area
+                                        ) || 0
+                                    ),
+                                0
+                            )
 
-                            <td>
-                                ${escapeHtml(
-                                    WORKFLOW_LABELS[
-                                        state
-                                    ]
-                                )}
-                            </td>
+                    };
 
-                            <td>
-                                ${rows.length.toLocaleString()}
-                            </td>
-
-                            <td>
-                                ${area.toFixed(
-                                    2
-                                )}
-                            </td>
-
-                        </tr>
-                    `;
                 }
+            );
+
+    body.innerHTML =
+        rows
+            .map(
+                row => `
+                    <tr>
+
+                        <td>
+                            <strong>
+                                ${escapeHtml(
+                                    row.stage
+                                )}
+                            </strong>
+                        </td>
+
+                        <td>
+                            ${row.farms}
+                        </td>
+
+                        <td>
+                            ${row.area.toFixed(2)}
+                        </td>
+
+                    </tr>
+                `
             )
             .join('');
+
 }
 
 
-function renderHighlights() {
+// ============================================================
+// PERFORMANCE HIGHLIGHTS
+// ============================================================
+
+function updatePerformanceHighlights() {
 
     const rows =
-        buildEnumeratorStats();
-
+        window.currentEnumeratorRows ||
+        [];
 
     if (!rows.length) {
 
@@ -3248,294 +2211,339 @@ function renderHighlights() {
             '—'
         );
 
-
         setText(
             'highestWorkload',
             '—'
         );
-
 
         setText(
             'highestCorrection',
             '—'
         );
 
-
         return;
+
     }
 
-
     const top =
-        [
-            ...rows
-        ]
+        rows
+            .slice()
             .sort(
                 (
                     a,
                     b
                 ) =>
-                    b.rate -
-                    a.rate
+                    b[
+                        'Validation Rate %'
+                    ] -
+                    a[
+                        'Validation Rate %'
+                    ]
             )[0];
-
 
     const workload =
-        [
-            ...rows
-        ]
+        rows
+            .slice()
             .sort(
                 (
                     a,
                     b
                 ) =>
-                    b.mapped -
-                    a.mapped
+                    b[
+                        'Farms Mapped'
+                    ] -
+                    a[
+                        'Farms Mapped'
+                    ]
             )[0];
-
 
     const correction =
-        [
-            ...rows
-        ]
+        rows
+            .slice()
             .sort(
                 (
                     a,
                     b
                 ) =>
-                    b.correctionRate -
-                    a.correctionRate
+                    correctionRate(b) -
+                    correctionRate(a)
             )[0];
-
 
     setText(
         'topPerformer',
-        `${top.name} · ${top.rate.toFixed(
-            1
-        )}%`
+        `${top.Enumerator} · ${
+            top[
+                'Validation Rate %'
+            ]
+        }%`
     );
-
 
     setText(
         'highestWorkload',
-        `${workload.name} · ${workload.mapped} farms`
+        `${workload.Enumerator} · ${
+            workload[
+                'Farms Mapped'
+            ]
+        } farms`
     );
-
 
     setText(
         'highestCorrection',
-        `${correction.name} · ${correction.correctionRate.toFixed(
-            1
-        )}%`
+        `${correction.Enumerator} · ${
+            correctionRate(
+                correction
+            ).toFixed(1)
+        }%`
     );
+
 }
 
 
-function buildEnumeratorStats() {
-
-    const map =
-        new Map();
-
-
-    filteredFarms.forEach(
-        farm => {
-
-            const key =
-                farm.enumerator_id ||
-                'unassigned';
-
-
-            if (!map.has(key)) {
-
-                map.set(
-                    key,
-                    {
-
-                        name:
-                            personName(
-                                farm.enumerator_id
-                            ),
-
-                        mapped:
-                            0,
-
-                        validated:
-                            0,
-
-                        correction:
-                            0
-
-                    }
-                );
-            }
-
-
-            const row =
-                map.get(key);
-
-
-            row.mapped++;
-
-
-            if (
-                farm.workflow_state ===
-                'validated'
-            ) {
-
-                row.validated++;
-            }
-
-
-            if (
-                farm.workflow_state ===
-                'correction_required'
-            ) {
-
-                row.correction++;
-            }
-        }
-    );
-
-
-    return [
-        ...map.values()
-    ]
-        .map(
-            row => ({
-
-                ...row,
-
-                rate:
-                    row.mapped
-                        ? row.validated /
-                          row.mapped *
-                          100
-                        : 0,
-
-                correctionRate:
-                    row.mapped
-                        ? row.correction /
-                          row.mapped *
-                          100
-                        : 0
-
-            })
-        );
-}
-
-
-function switchPerformanceTab(
-    tab
+function correctionRate(
+    row
 ) {
+
+    return (
+        (
+            row[
+                'Correction Required'
+            ] || 0
+        ) /
+        Math.max(
+            row[
+                'Farms Mapped'
+            ] || 0,
+            1
+        ) *
+        100
+    );
+
+}
+
+
+// ============================================================
+// FORMAT AVAILABILITY
+// ============================================================
+
+function updateFormatAvailability() {
+
+    const hasRecords =
+        filteredFarms.length >
+        0;
+
+    const finalOnly =
+        hasRecords &&
+        filteredFarms.every(
+            farm =>
+                FINAL_GEO_STATES.has(
+                    farm.workflow_state
+                )
+        );
 
     document
         .querySelectorAll(
-            '.performance-tab'
+            '.format-option'
         )
         .forEach(
-            element => {
+            option => {
 
-                element.classList.toggle(
-                    'active',
-                    element.dataset.tab ===
-                    tab
+                const format =
+                    option.dataset.format;
+
+                const permission =
+                    hasFormatPermission(
+                        format
+                    );
+
+                const geoAllowed =
+                    (
+                        format ===
+                        'geojson' ||
+                        format ===
+                        'kmz'
+                    ) &&
+                    finalOnly;
+
+                const disabled =
+                    !permission ||
+                    (
+                        (
+                            format ===
+                            'geojson' ||
+                            format ===
+                            'kmz'
+                        ) &&
+                        !geoAllowed
+                    );
+
+                option.classList.toggle(
+                    'disabled',
+                    disabled
                 );
+
+                option.setAttribute(
+                    'aria-disabled',
+                    disabled
+                );
+
+                if (
+                    !permission
+                ) {
+
+                    option.title =
+                        'You do not have permission for this export format.';
+
+                } else if (
+                    (
+                        format ===
+                        'geojson' ||
+                        format ===
+                        'kmz'
+                    ) &&
+                    !geoAllowed
+                ) {
+
+                    option.title =
+                        'GeoJSON/KMZ require only Validated and/or Rejected plots.';
+
+                } else {
+
+                    option.title =
+                        '';
+
+                }
+
             }
         );
 
+    if (
+        !hasFormatPermission(
+            exportFormat
+        ) ||
+        (
+            (
+                exportFormat ===
+                'geojson' ||
+                exportFormat ===
+                'kmz'
+            ) &&
+            !finalOnly
+        )
+    ) {
 
-    [
-        'enumeratorPerformance',
-
-        'cooperativePerformance',
-
-        'workflowPerformance'
-
-    ].forEach(
-        id => {
-
-            document
-                .getElementById(id)
-                ?.classList.add(
-                    'hidden'
-                );
-        }
-    );
-
-
-    const target =
-        {
-            enumerators:
-                'enumeratorPerformance',
-
-            cooperatives:
-                'cooperativePerformance',
-
-            workflow:
-                'workflowPerformance'
-        }[
-            tab
-        ];
-
-
-    document
-        .getElementById(target)
-        ?.classList.remove(
-            'hidden'
+        selectFormat(
+            'excel'
         );
+
+    }
+
+    const help =
+        document.getElementById(
+            'formatHelp'
+        );
+
+    if (help) {
+
+        help.textContent =
+            finalOnly
+                ? 'Validated and Rejected plots are eligible for GIS export. Other stages remain available through Excel and reporting.'
+                : 'Excel and Progress Report are available for all workflow stages. GeoJSON/KMZ require only Validated and/or Rejected plots.';
+
+    }
+
 }
 
 
-function rateClass(
-    rate
+// ============================================================
+// FORMAT PERMISSION
+// ============================================================
+
+function hasFormatPermission(
+    format
 ) {
 
-    if (rate >= 80) {
+    if (
+        canManageExportPermissions
+    ) {
 
-        return 'rate-good';
+        return true;
+
     }
 
+    if (
+        !canExportPermission
+    ) {
 
-    if (rate >= 60) {
+        return false;
 
-        return 'rate-warning';
     }
 
+    /*
+     * Existing project_members.can_export is
+     * project-level access. Until the new granular
+     * permission table exists, it grants the approved
+     * project member access to the available formats.
+     */
 
-    return 'rate-bad';
+    return true;
+
 }
 
 
-/* ============================================================
-   14. FORMAT SELECTION
-   ============================================================ */
+// ============================================================
+// SELECT FORMAT
+// ============================================================
 
 function selectFormat(
     format
 ) {
 
     if (
-        [
-            'geojson',
-            'kmz'
-        ]
-            .includes(
-                format
-            ) &&
-        !isGeoExportAllowed()
+        !hasFormatPermission(
+            format
+        )
     ) {
 
-        notify(
-            'GeoJSON and KMZ require only Validated or Rejected plots.',
+        showNotification(
+            'You do not have permission for this export format.',
             'warning'
         );
 
         return;
+
     }
 
+    const finalOnly =
+        filteredFarms.length >
+        0 &&
+        filteredFarms.every(
+            farm =>
+                FINAL_GEO_STATES.has(
+                    farm.workflow_state
+                )
+        );
 
-    selectedFormat =
+    if (
+        (
+            format ===
+            'geojson' ||
+            format ===
+            'kmz'
+        ) &&
+        !finalOnly
+    ) {
+
+        showNotification(
+            'GeoJSON/KMZ require only Validated and/or Rejected plots.',
+            'warning'
+        );
+
+        return;
+
+    }
+
+    exportFormat =
         format;
-
 
     document
         .querySelectorAll(
@@ -3549,1018 +2557,205 @@ function selectFormat(
                     option.dataset.format ===
                     format
                 );
-            }
-        );
-}
 
-
-function isGeoExportAllowed() {
-
-    if (
-        !filteredFarms.length
-    ) {
-
-        return false;
-    }
-
-
-    return filteredFarms.every(
-        farm =>
-            [
-                'validated',
-                'rejected'
-            ]
-                .includes(
-                    farm.workflow_state
-                )
-    );
-}
-
-
-function updateFormatAvailability() {
-
-    const geoAllowed =
-        isGeoExportAllowed();
-
-
-    document
-        .querySelectorAll(
-            '.format-option'
-        )
-        .forEach(
-            option => {
-
-                const restricted =
-                    [
-                        'geojson',
-                        'kmz'
-                    ]
-                        .includes(
-                            option.dataset.format
-                        );
-
-
-                option.classList.toggle(
-                    'disabled',
-                    restricted &&
-                    !geoAllowed
-                );
-
-
-                option.title =
-                    restricted &&
-                    !geoAllowed
-                        ? 'Only Validated and Rejected records can be exported as geospatial data.'
-                        : '';
             }
         );
 
-
-    if (
-        [
-            'geojson',
-            'kmz'
-        ]
-            .includes(
-                selectedFormat
-            ) &&
-        !geoAllowed
-    ) {
-
-        selectedFormat =
-            'excel';
-
-
-        document
-            .querySelectorAll(
-                '.format-option'
-            )
-            .forEach(
-                option => {
-
-                    option.classList.toggle(
-                        'selected',
-                        option.dataset.format ===
-                        'excel'
-                    );
-                }
-            );
-    }
-
-
-    setText(
-        'formatHelp',
-        geoAllowed
-            ? 'Geospatial exports are available because all selected plots are Validated or Rejected.'
-            : 'Excel and Progress Report are available for all workflow stages. GeoJSON and KMZ require Validated or Rejected plots only.'
-    );
 }
 
 
-/* ============================================================
-   15. MAIN EXPORT
-   ============================================================ */
+// ============================================================
+// EXPORT
+// ============================================================
 
-async function generateExport() {
+async function exportData() {
 
-    if (!userCanExport()) {
+    if (
+        !canExportPermission
+    ) {
 
-        notify(
+        showNotification(
             'You do not have export permission for this project.',
             'error'
         );
 
         return;
+
     }
 
+    if (
+        !filteredFarms.length
+    ) {
 
-    if (!filteredFarms.length) {
-
-        notify(
-            'No records match the current filters.',
+        showNotification(
+            'No records match the selected filters.',
             'warning'
         );
 
         return;
+
     }
 
+    const finalOnly =
+        filteredFarms.every(
+            farm =>
+                FINAL_GEO_STATES.has(
+                    farm.workflow_state
+                )
+        );
+
+    if (
+        (
+            exportFormat ===
+            'geojson' ||
+            exportFormat ===
+            'kmz'
+        ) &&
+        !finalOnly
+    ) {
+
+        showNotification(
+            'GeoJSON/KMZ require only Validated and/or Rejected plots.',
+            'warning'
+        );
+
+        return;
+
+    }
+
+    showLoading(true);
 
     try {
 
-        showLoading(
-            true
-        );
-
-
         switch (
-            selectedFormat
+            exportFormat
         ) {
 
             case 'excel':
 
-                exportExcel(
-                    filteredFarms,
-                    'MappingTrace_Export'
-                );
+                exportExcel();
 
                 break;
-
 
             case 'geojson':
 
-                if (
-                    !isGeoExportAllowed()
-                ) {
-
-                    throw new Error(
-                        'GeoJSON is available only for Validated and Rejected records.'
-                    );
-                }
-
-
-                exportGeoJSON(
-                    filteredFarms
-                );
+                exportGeoJSON();
 
                 break;
-
 
             case 'kmz':
 
-                if (
-                    !isGeoExportAllowed()
-                ) {
-
-                    throw new Error(
-                        'KMZ is available only for Validated and Rejected records.'
-                    );
-                }
-
-
-                await exportKMZ(
-                    filteredFarms
-                );
+                await exportKMZ();
 
                 break;
-
 
             case 'report':
 
-                exportProgressReport(
-                    filteredFarms
-                );
+                exportProgressReport();
 
                 break;
-
 
             default:
 
                 throw new Error(
                     'Unknown export format.'
                 );
+
         }
 
-
         await recordExport(
-            selectedFormat,
+            exportFormat,
             filteredFarms.length
         );
 
-
         await loadExportHistory();
-
-
-        notify(
-            'Export generated successfully.',
-            'success'
-        );
-
 
     } catch (error) {
 
         console.error(
-            'Export failed:',
+            'Export error:',
             error
         );
 
-
-        notify(
+        showNotification(
             error.message ||
             'Export failed.',
             'error'
         );
 
-
     } finally {
 
-        showLoading(
-            false
-        );
+        showLoading(false);
+
     }
+
 }
 
 
-/* ============================================================
-   16. EXCEL EXPORT
-   ============================================================ */
+// ============================================================
+// EXCEL
+// ============================================================
 
-function exportExcel(
-    rows,
-    filenamePrefix
-) {
+function exportExcel() {
 
-    if (!window.XLSX) {
-
-        throw new Error(
-            'XLSX library is not loaded.'
+    const rows =
+        filteredFarms.map(
+            exportRow
         );
-    }
-
 
     const workbook =
         XLSX.utils.book_new();
 
-
-    const farmsSheet =
-        XLSX.utils.json_to_sheet(
-            rows.map(
-                exportRow
-            )
-        );
-
-
     XLSX.utils.book_append_sheet(
         workbook,
-        farmsSheet,
+        XLSX.utils.json_to_sheet(
+            rows
+        ),
         'Farms'
     );
 
-
-    const enumeratorSheet =
-        XLSX.utils.json_to_sheet(
-            enumeratorStatsForExport()
-        );
-
-
-    XLSX.utils.book_append_sheet(
-        workbook,
-        enumeratorSheet,
-        'Enumerators'
-    );
-
-
-    const cooperativeSheet =
-        XLSX.utils.json_to_sheet(
-            cooperativeStatsForExport()
-        );
-
-
-    XLSX.utils.book_append_sheet(
-        workbook,
-        cooperativeSheet,
-        'Cooperatives'
-    );
-
-
-    const workflowSheet =
-        XLSX.utils.json_to_sheet(
-            workflowStatsForExport()
-        );
-
-
-    XLSX.utils.book_append_sheet(
-        workbook,
-        workflowSheet,
-        'Workflow'
-    );
-
-
-    XLSX.writeFile(
-        workbook,
-        `${filenamePrefix}_${safeName(
-            currentProject.name
-        )}_${dateStamp()}.xlsx`
-    );
-}
-
-
-function exportProgressReport(
-    rows
-) {
-
-    if (!window.XLSX) {
-
-        throw new Error(
-            'XLSX library is not loaded.'
-        );
-    }
-
-
-    const total =
-        rows.length;
-
-
-    const area =
-        rows.reduce(
-            (
-                sum,
-                farm
-            ) =>
-                sum +
-                farm.area,
-            0
-        );
-
-
-    const validated =
-        rows.filter(
-            farm =>
-                farm.workflow_state ===
-                'validated'
-        ).length;
-
-
-    const rejected =
-        rows.filter(
-            farm =>
-                farm.workflow_state ===
-                'rejected'
-        ).length;
-
-
-    const inProgress =
-        total -
-        validated -
-        rejected;
-
-
-    const workbook =
-        XLSX.utils.book_new();
-
-
-    const summary = [
-
-        {
-            Metric:
-                'Project',
-
-            Value:
-                currentProject.name
-        },
-
-        {
-            Metric:
-                'Generated',
-
-            Value:
-                new Date()
-                    .toLocaleString()
-        },
-
-        {
-            Metric:
-                'Selected plots',
-
-            Value:
-                total
-        },
-
-        {
-            Metric:
-                'Selected area (ha)',
-
-            Value:
-                Number(
-                    area.toFixed(
-                        2
-                    )
-                )
-        },
-
-        {
-            Metric:
-                'Validated',
-
-            Value:
-                validated
-        },
-
-        {
-            Metric:
-                'Rejected',
-
-            Value:
-                rejected
-        },
-
-        {
-            Metric:
-                'In progress',
-
-            Value:
-                inProgress
-        },
-
-        {
-            Metric:
-                'Validation rate',
-
-            Value:
-                total
-                    ? `${(
-                        validated /
-                        total *
-                        100
-                    ).toFixed(1)}%`
-                    : '0.0%'
-        }
-
-    ];
-
-
     XLSX.utils.book_append_sheet(
         workbook,
         XLSX.utils.json_to_sheet(
-            summary
-        ),
-        'Summary'
-    );
-
-
-    XLSX.utils.book_append_sheet(
-        workbook,
-        XLSX.utils.json_to_sheet(
-            enumeratorStatsForExport()
+            buildEnumeratorStats()
         ),
         'Enumerators'
     );
 
-
     XLSX.utils.book_append_sheet(
         workbook,
         XLSX.utils.json_to_sheet(
-            cooperativeStatsForExport()
+            buildCooperativeStats()
         ),
         'Cooperatives'
     );
 
-
     XLSX.utils.book_append_sheet(
         workbook,
         XLSX.utils.json_to_sheet(
-            workflowStatsForExport()
+            buildWorkflowStats()
         ),
         'Workflow'
     );
 
-
-    XLSX.utils.book_append_sheet(
-        workbook,
-        XLSX.utils.json_to_sheet(
-            rows.map(
-                exportRow
-            )
-        ),
-        'Selected Farms'
-    );
-
-
     XLSX.writeFile(
         workbook,
-        `MappingTrace_Progress_Report_${safeName(
-            currentProject.name
-        )}_${dateStamp()}.xlsx`
-    );
-}
-
-
-/* ============================================================
-   17. REJECTED AUDIT EXPORT
-   ============================================================ */
-
-async function exportRejectedAudit() {
-
-    if (!userCanExport()) {
-
-        notify(
-            'You do not have export permission.',
-            'error'
-        );
-
-        return;
-    }
-
-
-    const rejected =
-        filteredFarms.filter(
-            farm =>
-                farm.workflow_state ===
-                'rejected'
-        );
-
-
-    if (!rejected.length) {
-
-        notify(
-            'No rejected plots match the current filters.',
-            'warning'
-        );
-
-        return;
-    }
-
-
-    try {
-
-        showLoading(
-            true
-        );
-
-
-        exportExcel(
-            rejected,
-            'MappingTrace_Rejected_Audit'
-        );
-
-
-        await recordExport(
-            'rejected_audit',
-            rejected.length
-        );
-
-
-        await loadExportHistory();
-
-
-        notify(
-            `${rejected.length.toLocaleString()} rejected plots exported for audit.`,
-            'success'
-        );
-
-
-    } catch (error) {
-
-        notify(
-            error.message ||
-            'Rejected audit export failed.',
-            'error'
-        );
-
-
-    } finally {
-
-        showLoading(
-            false
-        );
-    }
-}
-
-
-/* ============================================================
-   18. GEOJSON
-   ============================================================ */
-
-function exportGeoJSON(
-    rows
-) {
-
-    if (!window.saveAs) {
-
-        throw new Error(
-            'FileSaver library is not loaded.'
-        );
-    }
-
-
-    const features =
-        rows
-            .filter(
-                farm =>
-                    farm.geometry
-            )
-            .map(
-                farm => ({
-
-                    type:
-                        'Feature',
-
-                    properties:
-                        exportRow(
-                            farm
-                        ),
-
-                    geometry:
-                        stripZ(
-                            farm.geometry
-                        )
-
-                })
-            );
-
-
-    if (!features.length) {
-
-        throw new Error(
-            'No valid geometry is available in the selected records.'
-        );
-    }
-
-
-    const geojson = {
-
-        type:
-            'FeatureCollection',
-
-        features:
-            features
-
-    };
-
-
-    const blob =
-        new Blob(
-            [
-                JSON.stringify(
-                    geojson,
-                    null,
-                    2
-                )
-            ],
-            {
-                type:
-                    'application/geo+json;charset=utf-8'
-            }
-        );
-
-
-    saveAs(
-        blob,
         `MappingTrace_${safeName(
             currentProject.name
-        )}_${dateStamp()}.geojson`
-    );
-}
-
-
-/* ============================================================
-   19. KMZ
-   ============================================================ */
-
-async function exportKMZ(
-    rows
-) {
-
-    if (!window.JSZip) {
-
-        throw new Error(
-            'JSZip library is not loaded.'
-        );
-    }
-
-
-    if (!window.saveAs) {
-
-        throw new Error(
-            'FileSaver library is not loaded.'
-        );
-    }
-
-
-    const placemarks =
-        rows
-            .filter(
-                farm =>
-                    farm.geometry
-            )
-            .map(
-                farm =>
-                    farmToKML(
-                        farm
-                    )
-            )
-            .join('');
-
-
-    if (!placemarks) {
-
-        throw new Error(
-            'No valid polygon geometry is available.'
-        );
-    }
-
-
-    const kml =
-        `<?xml version="1.0" encoding="UTF-8"?>
-<kml xmlns="http://www.opengis.net/kml/2.2">
-<Document>
-
-<name>
-${escapeXml(
-    currentProject.name ||
-    'MappingTrace'
-)}
-</name>
-
-${placemarks}
-
-</Document>
-</kml>`;
-
-
-    const zip =
-        new JSZip();
-
-
-    zip.file(
-        'doc.kml',
-        kml
+        )}_Export_${dateStamp()}.xlsx`
     );
 
-
-    const blob =
-        await zip.generateAsync(
-            {
-                type:
-                    'blob',
-
-                compression:
-                    'DEFLATE'
-            }
-        );
-
-
-    saveAs(
-        blob,
-        `MappingTrace_${safeName(
-            currentProject.name
-        )}_${dateStamp()}.kmz`
+    showNotification(
+        `Excel export generated for ${filteredFarms.length.toLocaleString()} records.`,
+        'success'
     );
+
 }
 
 
-function farmToKML(
-    farm
-) {
-
-    const geometry =
-        stripZ(
-            farm.geometry
-        );
-
-
-    return `
-<Placemark>
-
-<name>
-${escapeXml(
-    farm.farm_id ||
-    farm.farmer_name ||
-    'Farm'
-)}
-</name>
-
-<description><![CDATA[
-
-Farmer:
-${escapeXml(
-    farm.farmer_name ||
-    ''
-)}
-
-Cooperative:
-${escapeXml(
-    farm.cooperative ||
-    ''
-)}
-
-Enumerator:
-${escapeXml(
-    personName(
-        farm.enumerator_id
-    )
-)}
-
-Field Officer:
-${escapeXml(
-    personName(
-        farm.field_officer_id
-    )
-)}
-
-Area:
-${farm.area.toFixed(
-    2
-)} ha
-
-Workflow:
-${escapeXml(
-    WORKFLOW_LABELS[
-        farm.workflow_state
-    ] ||
-    farm.workflow_state ||
-    ''
-)}
-
-Rejection reason:
-${escapeXml(
-    farm.rejection_reason ||
-    ''
-)}
-
-]]></description>
-
-${geometryToKML(
-    geometry
-)}
-
-</Placemark>
-`;
-}
-
-
-function geometryToKML(
-    geometry
-) {
-
-    if (!geometry) {
-
-        return '';
-    }
-
-
-    if (
-        geometry.type ===
-        'Polygon'
-    ) {
-
-        return polygonToKML(
-            geometry.coordinates
-        );
-    }
-
-
-    if (
-        geometry.type ===
-        'MultiPolygon'
-    ) {
-
-        return `
-<MultiGeometry>
-
-${
-    geometry.coordinates
-        .map(
-            polygon =>
-                polygonToKML(
-                    polygon
-                )
-        )
-        .join('')
-}
-
-</MultiGeometry>
-`;
-    }
-
-
-    if (
-        geometry.type ===
-        'Point'
-    ) {
-
-        return `
-<Point>
-
-<coordinates>
-${geometry.coordinates[0]},
-${geometry.coordinates[1]},
-0
-</coordinates>
-
-</Point>
-`;
-    }
-
-
-    return '';
-}
-
-
-function polygonToKML(
-    coordinates
-) {
-
-    if (
-        !coordinates ||
-        !coordinates.length
-    ) {
-
-        return '';
-    }
-
-
-    const outer =
-        coordinates[0]
-            .map(
-                point =>
-                    `${point[0]},${point[1]},0`
-            )
-            .join(' ');
-
-
-    const holes =
-        coordinates
-            .slice(1)
-            .map(
-                ring => `
-<innerBoundaryIs>
-
-<LinearRing>
-
-<coordinates>
-
-${ring
-    .map(
-        point =>
-            `${point[0]},${point[1]},0`
-    )
-    .join(' ')}
-
-</coordinates>
-
-</LinearRing>
-
-</innerBoundaryIs>
-`
-            )
-            .join('');
-
-
-    return `
-<Polygon>
-
-<outerBoundaryIs>
-
-<LinearRing>
-
-<coordinates>
-${outer}
-</coordinates>
-
-</LinearRing>
-
-</outerBoundaryIs>
-
-${holes}
-
-</Polygon>
-`;
-}
-
-
-/* ============================================================
-   20. EXPORT DATA ROW
-   ============================================================ */
+// ============================================================
+// EXPORT ROW
+// ============================================================
 
 function exportRow(
     farm
@@ -4569,8 +2764,7 @@ function exportRow(
     return {
 
         'Farm ID':
-            farm.farm_id ||
-            '',
+            farm.farm_id,
 
         'Farmer ID':
             farm.farmer_id ||
@@ -4592,11 +2786,10 @@ function exportRow(
             farm.area,
 
         'Workflow State':
-            WORKFLOW_LABELS[
+            workflowLabel[
                 farm.workflow_state
             ] ||
-            farm.workflow_state ||
-            '',
+            farm.workflow_state,
 
         'Status':
             farm.status ||
@@ -4620,6 +2813,15 @@ function exportRow(
             farm.correction_reason ||
             '',
 
+        'Rejected By':
+            personName(
+                farm.rejected_by
+            ),
+
+        'Rejected At':
+            farm.rejected_at ||
+            '',
+
         'Validated By':
             personName(
                 farm.final_validated_by
@@ -4627,324 +2829,676 @@ function exportRow(
 
         'Validated At':
             farm.final_validated_at ||
+            farm.validated_at ||
             '',
+
+        /*
+         * Deliberately no Updated At.
+         * farms.updated_at does not exist.
+         */
 
         'Created At':
             farm.created_at ||
-            '',
-
-        'Updated At':
-            farm.updated_at ||
             ''
 
     };
+
 }
 
 
-function enumeratorStatsForExport() {
+// ============================================================
+// GEOJSON
+// ============================================================
 
-    return buildEnumeratorStats()
-        .map(
-            row => ({
+function exportGeoJSON() {
 
-                Enumerator:
-                    row.name,
-
-                Mapped:
-                    row.mapped,
-
-                Validated:
-                    row.validated,
-
-                Correction:
-                    row.correction,
-
-                'Validation Rate':
-                    `${row.rate.toFixed(
-                        1
-                    )}%`,
-
-                'Correction Rate':
-                    `${row.correctionRate.toFixed(
-                        1
-                    )}%`
-
-            })
-        );
-}
-
-
-function cooperativeStatsForExport() {
-
-    const map =
-        new Map();
-
-
-    filteredFarms.forEach(
-        farm => {
-
-            const key =
-                farm.cooperative ||
-                'Unassigned';
-
-
-            if (!map.has(key)) {
-
-                map.set(
-                    key,
-                    {
-
-                        Cooperative:
-                            key,
-
-                        Farms:
-                            0,
-
-                        'Area (ha)':
-                            0,
-
-                        Validated:
-                            0,
-
-                        Rejected:
-                            0,
-
-                        Correction:
-                            0,
-
-                        Pending:
-                            0
-
-                    }
-                );
-            }
-
-
-            const row =
-                map.get(key);
-
-
-            row.Farms++;
-
-            row[
-                'Area (ha)'
-            ] +=
-                farm.area;
-
-
-            if (
-                farm.workflow_state ===
-                'validated'
-            ) {
-
-                row.Validated++;
-            }
-
-
-            if (
-                farm.workflow_state ===
-                'rejected'
-            ) {
-
-                row.Rejected++;
-            }
-
-
-            if (
-                farm.workflow_state ===
-                'correction_required'
-            ) {
-
-                row.Correction++;
-            }
-
-
-            if (
-                ![
-                    'validated',
-                    'rejected'
-                ]
-                    .includes(
-                        farm.workflow_state
+    const features =
+        filteredFarms
+            .filter(
+                farm =>
+                    parseGeometry(
+                        farm.geometry
                     )
-            ) {
+            )
+            .map(
+                farm => {
 
-                row.Pending++;
+                    const geometry =
+                        parseGeometry(
+                            farm.geometry
+                        );
+
+                    return {
+
+                        type:
+                            'Feature',
+
+                        properties:
+                            exportRow(
+                                farm
+                            ),
+
+                        geometry
+
+                    };
+
+                }
+            );
+
+    if (!features.length) {
+
+        throw new Error(
+            'No valid geometries were found.'
+        );
+
+    }
+
+    const geojson = {
+
+        type:
+            'FeatureCollection',
+
+        features
+
+    };
+
+    const blob =
+        new Blob(
+            [
+                JSON.stringify(
+                    geojson,
+                    null,
+                    2
+                )
+            ],
+            {
+                type:
+                    'application/geo+json'
             }
-        }
+        );
+
+    saveAs(
+        blob,
+        `MappingTrace_${safeName(
+            currentProject.name
+        )}_${dateStamp()}.geojson`
     );
 
+    showNotification(
+        `GeoJSON generated for ${features.length.toLocaleString()} plots.`,
+        'success'
+    );
 
-    return [
-        ...map.values()
-    ]
-        .map(
-            row => ({
-
-                ...row,
-
-                'Area (ha)':
-                    Number(
-                        row[
-                            'Area (ha)'
-                        ]
-                            .toFixed(
-                                2
-                            )
-                    ),
-
-                'Validation Rate':
-                    `${row.Farms
-                        ? (
-                            row.Validated /
-                            row.Farms *
-                            100
-                        ).toFixed(
-                            1
-                        )
-                        : '0.0'}%`
-
-            })
-        );
 }
 
 
-function workflowStatsForExport() {
+// ============================================================
+// KMZ
+// ============================================================
 
-    return WORKFLOW_STATES
-        .map(
-            state => {
+async function exportKMZ() {
 
-                const rows =
-                    filteredFarms.filter(
-                        farm =>
-                            farm.workflow_state ===
-                            state
-                    );
+    if (
+        typeof JSZip ===
+        'undefined'
+    ) {
 
+        throw new Error(
+            'JSZip library is not loaded.'
+        );
 
-                const area =
-                    rows.reduce(
-                        (
-                            sum,
-                            farm
-                        ) =>
-                            sum +
-                            farm.area,
-                        0
-                    );
+    }
 
+    const placemarks =
+        filteredFarms
+            .map(
+                farm => {
 
-                return {
+                    const geometry =
+                        parseGeometry(
+                            farm.geometry
+                        );
 
-                    'Workflow Stage':
-                        WORKFLOW_LABELS[
-                            state
-                        ],
+                    if (!geometry) {
+                        return '';
+                    }
 
-                    Farms:
-                        rows.length,
+                    const coordinates =
+                        geometryToKmlCoordinates(
+                            geometry
+                        );
 
-                    'Area (ha)':
-                        Number(
-                            area.toFixed(
-                                2
-                            )
-                        )
+                    if (!coordinates) {
+                        return '';
+                    }
 
-                };
+                    return `
+                        <Placemark>
+
+                            <name>
+                                ${escapeXml(
+                                    farm.farmer_name ||
+                                    farm.farm_id ||
+                                    'Farm'
+                                )}
+                            </name>
+
+                            <description>
+                                <![CDATA[
+                                    Farm ID: ${escapeXml(
+                                        farm.farm_id ||
+                                        ''
+                                    )}<br>
+                                    Farmer: ${escapeXml(
+                                        farm.farmer_name ||
+                                        ''
+                                    )}<br>
+                                    Cooperative: ${escapeXml(
+                                        farm.cooperative ||
+                                        ''
+                                    )}<br>
+                                    Area: ${escapeXml(
+                                        String(
+                                            farm.area ||
+                                            0
+                                        )
+                                    )} ha<br>
+                                    Workflow: ${escapeXml(
+                                        workflowLabel[
+                                            farm.workflow_state
+                                        ] ||
+                                        farm.workflow_state ||
+                                        ''
+                                    )}
+                                ]]>
+                            </description>
+
+                            ${coordinates}
+
+                        </Placemark>
+                    `;
+
+                }
+            )
+            .join('');
+
+    if (!placemarks.trim()) {
+
+        throw new Error(
+            'No valid geometries were found for KMZ export.'
+        );
+
+    }
+
+    const kml = `
+        <?xml version="1.0" encoding="UTF-8"?>
+
+        <kml
+            xmlns="http://www.opengis.net/kml/2.2"
+        >
+
+            <Document>
+
+                <name>
+                    MappingTrace —
+                    ${escapeXml(
+                        currentProject.name
+                    )}
+                </name>
+
+                ${placemarks}
+
+            </Document>
+
+        </kml>
+    `;
+
+    const zip =
+        new JSZip();
+
+    zip.file(
+        'doc.kml',
+        kml
+    );
+
+    const blob =
+        await zip.generateAsync(
+            {
+                type:
+                    'blob'
             }
         );
+
+    saveAs(
+        blob,
+        `MappingTrace_${safeName(
+            currentProject.name
+        )}_${dateStamp()}.kmz`
+    );
+
+    showNotification(
+        `KMZ generated for ${filteredFarms.length.toLocaleString()} plots.`,
+        'success'
+    );
+
 }
 
 
-/* ============================================================
-   21. PREVIEW
-   ============================================================ */
+// ============================================================
+// PROGRESS REPORT
+// ============================================================
 
-function previewExport() {
+function exportProgressReport() {
 
-    if (!userCanExport()) {
+    const total =
+        filteredFarms.length;
 
-        notify(
+    const validated =
+        filteredFarms.filter(
+            f =>
+                f.workflow_state ===
+                'validated'
+        ).length;
+
+    const rejected =
+        filteredFarms.filter(
+            f =>
+                f.workflow_state ===
+                'rejected'
+        ).length;
+
+    const correction =
+        filteredFarms.filter(
+            f =>
+                f.workflow_state ===
+                'correction_required'
+        ).length;
+
+    const pending =
+        filteredFarms.filter(
+            f =>
+                !FINAL_GEO_STATES.has(
+                    f.workflow_state
+                )
+        ).length;
+
+    const area =
+        filteredFarms.reduce(
+            (sum, farm) =>
+                sum +
+                (
+                    Number(
+                        farm.area
+                    ) || 0
+                ),
+            0
+        );
+
+    const validationRate =
+        total > 0
+            ? validated /
+              total *
+              100
+            : 0;
+
+    const workbook =
+        XLSX.utils.book_new();
+
+    const summary = [
+
+        {
+            Metric:
+                'Project',
+
+            Value:
+                currentProject.name
+        },
+
+        {
+            Metric:
+                'Export Date',
+
+            Value:
+                new Date()
+                    .toLocaleString()
+        },
+
+        {
+            Metric:
+                'Records',
+
+            Value:
+                total
+        },
+
+        {
+            Metric:
+                'Area (ha)',
+
+            Value:
+                Number(
+                    area.toFixed(2)
+                )
+        },
+
+        {
+            Metric:
+                'Validated',
+
+            Value:
+                validated
+        },
+
+        {
+            Metric:
+                'Rejected',
+
+            Value:
+                rejected
+        },
+
+        {
+            Metric:
+                'Correction Required',
+
+            Value:
+                correction
+        },
+
+        {
+            Metric:
+                'In Progress',
+
+            Value:
+                pending
+        },
+
+        {
+            Metric:
+                'Validation Rate (%)',
+
+            Value:
+                Number(
+                    validationRate
+                        .toFixed(1)
+                )
+        }
+
+    ];
+
+    XLSX.utils.book_append_sheet(
+        workbook,
+        XLSX.utils.json_to_sheet(
+            summary
+        ),
+        'Progress Summary'
+    );
+
+    XLSX.utils.book_append_sheet(
+        workbook,
+        XLSX.utils.json_to_sheet(
+            buildEnumeratorStats()
+        ),
+        'Enumerators'
+    );
+
+    XLSX.utils.book_append_sheet(
+        workbook,
+        XLSX.utils.json_to_sheet(
+            buildCooperativeStats()
+        ),
+        'Cooperatives'
+    );
+
+    XLSX.utils.book_append_sheet(
+        workbook,
+        XLSX.utils.json_to_sheet(
+            buildWorkflowStats()
+        ),
+        'Workflow'
+    );
+
+    XLSX.writeFile(
+        workbook,
+        `MappingTrace_${safeName(
+            currentProject.name
+        )}_Progress_Report_${dateStamp()}.xlsx`
+    );
+
+    showNotification(
+        'Progress report generated.',
+        'success'
+    );
+
+}
+
+
+// ============================================================
+// REJECTED AUDIT
+// ============================================================
+
+async function exportRejectedAudit() {
+
+    if (
+        !canExportPermission
+    ) {
+
+        showNotification(
             'You do not have export permission.',
             'error'
         );
 
         return;
+
     }
 
+    const rejected =
+        filteredFarms.filter(
+            farm =>
+                farm.workflow_state ===
+                'rejected'
+        );
+
+    if (!rejected.length) {
+
+        showNotification(
+            'No rejected plots match the current filters.',
+            'warning'
+        );
+
+        return;
+
+    }
+
+    showLoading(true);
+
+    try {
+
+        const workbook =
+            XLSX.utils.book_new();
+
+        const auditRows =
+            rejected.map(
+                farm => ({
+
+                    'Farm ID':
+                        farm.farm_id,
+
+                    'Farmer ID':
+                        farm.farmer_id ||
+                        '',
+
+                    'Farmer Name':
+                        farm.farmer_name ||
+                        '',
+
+                    'Supplier':
+                        farm.supplier ||
+                        '',
+
+                    'Cooperative':
+                        farm.cooperative ||
+                        '',
+
+                    'Enumerator':
+                        personName(
+                            farm.enumerator_id
+                        ),
+
+                    'Field Officer':
+                        personName(
+                            farm.field_officer_id
+                        ),
+
+                    'Area (ha)':
+                        farm.area,
+
+                    'Workflow State':
+                        'Rejected',
+
+                    'Rejection Reason':
+                        farm.rejection_reason ||
+                        '',
+
+                    'Correction Reason':
+                        farm.correction_reason ||
+                        '',
+
+                    'Rejected By':
+                        personName(
+                            farm.rejected_by
+                        ),
+
+                    'Rejected At':
+                        farm.rejected_at ||
+                        '',
+
+                    'Created At':
+                        farm.created_at ||
+                        ''
+
+                })
+            );
+
+        XLSX.utils.book_append_sheet(
+            workbook,
+            XLSX.utils.json_to_sheet(
+                auditRows
+            ),
+            'Rejected Audit'
+        );
+
+        XLSX.utils.book_append_sheet(
+            workbook,
+            XLSX.utils.json_to_sheet(
+                buildRejectionSummary(
+                    rejected
+                )
+            ),
+            'Summary'
+        );
+
+        XLSX.writeFile(
+            workbook,
+            `MappingTrace_${safeName(
+                currentProject.name
+            )}_Rejected_Audit_${dateStamp()}.xlsx`
+        );
+
+        await recordExport(
+            'rejected_audit',
+            rejected.length
+        );
+
+        await loadExportHistory();
+
+        showNotification(
+            `Rejected audit export generated for ${rejected.length.toLocaleString()} plots.`,
+            'success'
+        );
+
+    } catch (error) {
+
+        console.error(
+            error
+        );
+
+        showNotification(
+            error.message ||
+            'Rejected audit export failed.',
+            'error'
+        );
+
+    } finally {
+
+        showLoading(false);
+
+    }
+
+}
+
+
+// ============================================================
+// PREVIEW
+// ============================================================
+
+function previewData() {
+
+    if (
+        !canExportPermission
+    ) {
+
+        showNotification(
+            'You do not have export permission.',
+            'error'
+        );
+
+        return;
+
+    }
 
     const section =
         document.getElementById(
             'previewSection'
         );
 
-
     const header =
         document.getElementById(
             'previewHeader'
         );
-
 
     const body =
         document.getElementById(
             'previewBody'
         );
 
-
     if (
         !section ||
         !header ||
         !body
     ) {
-
-        notify(
-            'Preview section is not available in the current HTML.',
-            'warning'
-        );
-
         return;
     }
-
 
     header.innerHTML =
         `
         <tr>
 
-            <th>
-                Farm ID
-            </th>
-
-            <th>
-                Farmer
-            </th>
-
-            <th>
-                Cooperative
-            </th>
-
-            <th>
-                Enumerator
-            </th>
-
-            <th>
-                Area (ha)
-            </th>
-
-            <th>
-                Workflow
-            </th>
+            <th>Farm ID</th>
+            <th>Farmer</th>
+            <th>Cooperative</th>
+            <th>Enumerator</th>
+            <th>Area</th>
+            <th>Workflow</th>
 
         </tr>
         `;
-
 
     body.innerHTML =
         filteredFarms
             .slice(
                 0,
-                20
+                10
             )
             .map(
                 farm => `
@@ -4965,7 +3519,8 @@ function previewExport() {
 
                         <td>
                             ${escapeHtml(
-                                farm.cooperative
+                                farm.cooperative ||
+                                ''
                             )}
                         </td>
 
@@ -4978,14 +3533,16 @@ function previewExport() {
                         </td>
 
                         <td>
-                            ${farm.area.toFixed(
-                                2
-                            )}
+                            ${Number(
+                                farm.area ||
+                                0
+                            ).toFixed(2)}
+                            ha
                         </td>
 
                         <td>
                             ${escapeHtml(
-                                WORKFLOW_LABELS[
+                                workflowLabel[
                                     farm.workflow_state
                                 ] ||
                                 farm.workflow_state
@@ -4997,32 +3554,22 @@ function previewExport() {
             )
             .join('');
 
-
     setText(
         'previewTotal',
         filteredFarms.length
             .toLocaleString()
     );
 
-
-    section.classList.remove(
-        'hidden'
-    );
-
-
     section.style.display =
         'block';
 
+    section.scrollIntoView({
+        behavior:
+            'smooth',
+        block:
+            'start'
+    });
 
-    section.scrollIntoView(
-        {
-            behavior:
-                'smooth',
-
-            block:
-                'nearest'
-        }
-    );
 }
 
 
@@ -5033,67 +3580,354 @@ function hidePreview() {
             'previewSection'
         );
 
-
     if (section) {
-
-        section.classList.add(
-            'hidden'
-        );
-
 
         section.style.display =
             'none';
+
     }
+
 }
 
 
-window.hidePreview =
-    hidePreview;
+// ============================================================
+// PERMISSION UI
+// ============================================================
+
+function updatePermissionUI() {
+
+    const badge =
+        document.getElementById(
+            'exportPermissionBadge'
+        );
+
+    if (!badge) {
+        return;
+    }
+
+    badge.classList.remove(
+        'allowed',
+        'denied'
+    );
+
+    if (
+        canManageExportPermissions
+    ) {
+
+        badge.textContent =
+            'Manager export access';
+
+        badge.classList.add(
+            'allowed'
+        );
+
+    } else if (
+        canExportPermission
+    ) {
+
+        badge.textContent =
+            'Export access granted';
+
+        badge.classList.add(
+            'allowed'
+        );
+
+    } else {
+
+        badge.textContent =
+            'Export access restricted';
+
+        badge.classList.add(
+            'denied'
+        );
+
+    }
+
+    const management =
+        document.getElementById(
+            'permissionManagement'
+        );
+
+    if (management) {
+
+        management.classList.toggle(
+            'hidden',
+            !canManageExportPermissions
+        );
+
+    }
+
+    renderPermissionList();
+
+}
 
 
-/* ============================================================
-   22. EXPORT HISTORY
-   ============================================================ */
+// ============================================================
+// PERMISSION MANAGEMENT
+// ============================================================
 
-async function recordExport(
-    format,
-    count
+function renderPermissionList() {
+
+    const container =
+        document.getElementById(
+            'permissionList'
+        );
+
+    if (
+        !container ||
+        !canManageExportPermissions
+    ) {
+        return;
+    }
+
+    const members =
+        [
+            ...memberDirectory.values()
+        ]
+            .filter(
+                member =>
+                    [
+                        'validator',
+                        'field_officer',
+                        'enumerator'
+                    ]
+                        .includes(
+                            String(
+                                member.role
+                            )
+                                .toLowerCase()
+                        )
+            );
+
+    if (!members.length) {
+
+        container.innerHTML =
+            `
+            <div class="empty-filter">
+                No eligible members found.
+            </div>
+            `;
+
+        return;
+
+    }
+
+    container.innerHTML =
+        members
+            .map(
+                member => {
+
+                    const profile =
+                        member.profile;
+
+                    const name =
+                        `${profile?.first_name || ''} ${
+                            profile?.last_name || ''
+                        }`
+                            .trim() ||
+                        profile?.email ||
+                        member.user_id;
+
+                    return `
+                        <div class="permission-row">
+
+                            <div>
+
+                                <strong>
+                                    ${escapeHtml(
+                                        name
+                                    )}
+                                </strong>
+
+                                <div class="permission-role">
+                                    ${escapeHtml(
+                                        profile?.email ||
+                                        member.user_id
+                                    )}
+                                </div>
+
+                            </div>
+
+                            <div class="permission-role">
+                                ${escapeHtml(
+                                    member.role
+                                )}
+                            </div>
+
+                            <div>
+                                Project permission
+                            </div>
+
+                            <div class="permission-toggle">
+
+                                <input
+                                    type="checkbox"
+                                    data-user-id="${escapeHtml(
+                                        member.user_id
+                                    )}"
+                                    ${
+                                        member.can_export
+                                            ? 'checked'
+                                            : ''
+                                    }
+                                >
+
+                            </div>
+
+                        </div>
+                    `;
+
+                }
+            )
+            .join('');
+
+    container
+        .querySelectorAll(
+            'input[data-user-id]'
+        )
+        .forEach(
+            input => {
+
+                input.addEventListener(
+                    'change',
+                    async () => {
+
+                        await setExportPermission(
+                            input.dataset.userId,
+                            input.checked
+                        );
+
+                    }
+                );
+
+            }
+        );
+
+}
+
+
+// ============================================================
+// SET PERMISSION
+// ============================================================
+
+async function setExportPermission(
+    userId,
+    enabled
 ) {
+
+    if (
+        !canManageExportPermissions
+    ) {
+
+        return;
+
+    }
 
     try {
 
         const {
             error
         } =
-            await db
-                .from(
-                    'export_history'
-                )
-                .insert(
+            await supabaseClient
+                .rpc(
+                    'set_project_member_export_permission',
                     {
-
-                        project_id:
+                        p_project_id:
                             currentProject.id,
 
-                        user_id:
-                            currentUser.id,
+                        p_user_id:
+                            userId,
 
-                        format:
-                            format,
-
-                        record_count:
-                            count
-
+                        p_can_export:
+                            enabled
                     }
                 );
 
+        if (error) {
+            throw error;
+        }
+
+        await loadProjectMembers(
+            currentProject.id
+        );
+
+        updatePermissionUI();
+
+        showNotification(
+            enabled
+                ? 'Export permission granted.'
+                : 'Export permission revoked.',
+            'success'
+        );
+
+    } catch (error) {
+
+        console.error(
+            error
+        );
+
+        showNotification(
+            error.message ||
+            'Unable to update export permission.',
+            'error'
+        );
+
+    }
+
+}
+
+
+// ============================================================
+// EXPORT HISTORY
+// ============================================================
+
+async function recordExport(
+    format,
+    count
+) {
+
+    if (!currentProject?.id) {
+        return;
+    }
+
+    try {
+
+        const payload = {
+
+            project_id:
+                currentProject.id,
+
+            user_id:
+                currentUser.id,
+
+            export_type:
+                format,
+
+            record_count:
+                count,
+
+            created_at:
+                new Date()
+                    .toISOString()
+
+        };
+
+        const {
+            error
+        } =
+            await supabaseClient
+                .from('export_history')
+                .insert(
+                    payload
+                );
 
         if (error) {
 
             console.warn(
-                'Export history insert failed:',
-                error
+                'Export history was not recorded:',
+                error.message
             );
+
         }
 
     } catch (error) {
@@ -5102,7 +3936,9 @@ async function recordExport(
             'Export history error:',
             error
         );
+
     }
+
 }
 
 
@@ -5113,15 +3949,13 @@ async function loadExportHistory() {
             'historyList'
         );
 
-
-    if (
-        !container ||
-        !currentProject
-    ) {
-
+    if (!container) {
         return;
     }
 
+    if (!currentProject?.id) {
+        return;
+    }
 
     try {
 
@@ -5129,18 +3963,9 @@ async function loadExportHistory() {
             data,
             error
         } =
-            await db
-                .from(
-                    'export_history'
-                )
-                .select(
-                    `
-                    created_at,
-                    format,
-                    record_count,
-                    user_id
-                    `
-                )
+            await supabaseClient
+                .from('export_history')
+                .select('*')
                 .eq(
                     'project_id',
                     currentProject.id
@@ -5153,124 +3978,1226 @@ async function loadExportHistory() {
                     }
                 )
                 .limit(
-                    20
+                    15
                 );
-
 
         if (error) {
 
-            throw error;
-        }
+            container.innerHTML =
+                `
+                <div class="empty-history">
+                    <i class="fas fa-info-circle"></i>
+                    <p>
+                        Export history is not available.
+                    </p>
+                </div>
+                `;
 
+            return;
+
+        }
 
         if (!data?.length) {
 
             container.innerHTML =
                 `
-                <div
-                    class="empty-history"
-                >
-
-                    <i
-                        class="fas fa-box-open"
-                    ></i>
-
-                    <p>
-                        No exports yet
-                    </p>
-
+                <div class="empty-history">
+                    <i class="fas fa-box-open"></i>
+                    <p>No exports yet</p>
                 </div>
                 `;
 
             return;
-        }
 
+        }
 
         container.innerHTML =
             data
                 .map(
-                    row => `
-                        <div
-                            class="history-row"
-                        >
+                    item => {
 
-                            <div>
+                        return `
+                            <div class="history-row">
 
-                                <strong>
-                                    ${escapeHtml(
-                                        formatLabel(
-                                            row.format
-                                        )
-                                    )}
-                                </strong>
+                                <div>
 
-                                <span>
-                                    ${Number(
-                                        row.record_count ||
-                                        0
-                                    ).toLocaleString()}
-                                    records
-                                </span>
+                                    <strong>
+                                        ${escapeHtml(
+                                            formatLabel(
+                                                item.export_type
+                                            )
+                                        )}
+                                    </strong>
 
-                            </div>
+                                    <span>
+                                        ${Number(
+                                            item.record_count ||
+                                            0
+                                        ).toLocaleString()}
+                                        records
+                                    </span>
 
-                            <div>
+                                </div>
 
-                                <strong>
-                                    ${escapeHtml(
-                                        personName(
-                                            row.user_id
-                                        )
-                                    )}
-                                </strong>
+                                <div>
 
-                                <span>
-                                    ${escapeHtml(
-                                        new Date(
-                                            row.created_at
-                                        )
-                                            .toLocaleString()
-                                    )}
-                                </span>
+                                    <span>
+                                        ${formatDate(
+                                            item.created_at
+                                        )}
+                                    </span>
+
+                                </div>
 
                             </div>
+                        `;
 
-                        </div>
-                    `
+                    }
                 )
                 .join('');
 
     } catch (error) {
 
         console.warn(
-            'Could not load export history:',
             error
         );
 
-
-        container.innerHTML =
-            `
-            <div
-                class="empty-history"
-            >
-
-                <i
-                    class="fas fa-exclamation-circle"
-                ></i>
-
-                <p>
-                    Export history unavailable
-                </p>
-
-            </div>
-            `;
     }
+
 }
 
 
-/* ============================================================
-   23. SIDEBAR
-   ============================================================ */
+// ============================================================
+// BUILD STATISTICS
+// ============================================================
+
+function buildEnumeratorStats() {
+
+    return window.currentEnumeratorRows ||
+        [];
+
+}
+
+
+function buildCooperativeStats() {
+
+    return (
+        window.currentCooperativeRows ||
+        []
+    )
+        .map(
+            row => ({
+
+                Cooperative:
+                    row.Cooperative,
+
+                Farms:
+                    row.Farms,
+
+                'Area (ha)':
+                    Number(
+                        row.Area.toFixed(2)
+                    ),
+
+                Validated:
+                    row.Validated,
+
+                Rejected:
+                    row.Rejected,
+
+                'Correction Required':
+                    row.Correction,
+
+                Pending:
+                    row.Pending,
+
+                'Validation Rate %':
+                    Number(
+                        row.ValidationRate
+                            .toFixed(1)
+                    )
+
+            })
+        );
+
+}
+
+
+function buildWorkflowStats() {
+
+    return WORKFLOW_STAGES
+        .map(
+            state => {
+
+                const farms =
+                    filteredFarms.filter(
+                        farm =>
+                            farm.workflow_state ===
+                            state
+                    );
+
+                return {
+
+                    'Workflow Stage':
+                        workflowLabel[
+                            state
+                        ],
+
+                    Farms:
+                        farms.length,
+
+                    'Area (ha)':
+                        Number(
+                            farms.reduce(
+                                (sum, farm) =>
+                                    sum +
+                                    (
+                                        Number(
+                                            farm.area
+                                        ) || 0
+                                    ),
+                                0
+                            )
+                                .toFixed(2)
+                        )
+
+                };
+
+            }
+        );
+
+}
+
+
+function buildRejectionSummary(
+    farms
+) {
+
+    const groups =
+        new Map();
+
+    farms.forEach(
+        farm => {
+
+            const reason =
+                farm.rejection_reason ||
+                'No reason recorded';
+
+            groups.set(
+                reason,
+                (
+                    groups.get(
+                        reason
+                    ) || 0
+                ) + 1
+            );
+
+        }
+    );
+
+    return [
+        ...groups.entries()
+    ]
+        .sort(
+            (
+                a,
+                b
+            ) =>
+                b[1] -
+                a[1]
+        )
+        .map(
+            ([reason, count]) => ({
+
+                'Rejection Reason':
+                    reason,
+
+                'Number of Plots':
+                    count
+
+            })
+        );
+
+}
+
+
+// ============================================================
+// DATE FILTER
+// ============================================================
+
+function getFarmDate(
+    farm,
+    basis
+) {
+
+    /*
+     * No updated_at.
+     * Fall back safely to created_at.
+     */
+
+    switch (
+        basis
+    ) {
+
+        case 'validated_at':
+
+            return (
+                farm.final_validated_at ||
+                farm.validated_at ||
+                null
+            );
+
+        case 'rejected_at':
+
+            return (
+                farm.rejected_at ||
+                null
+            );
+
+        case 'created_at':
+
+        default:
+
+            return (
+                farm.created_at ||
+                null
+            );
+
+    }
+
+}
+
+
+// ============================================================
+// ACTIVE FILTER CHIPS
+// ============================================================
+
+function updateActiveFilterChips() {
+
+    /*
+     * Compatible with the existing design.
+     * If an active-filter container exists,
+     * populate it. Otherwise do nothing.
+     */
+
+    const container =
+        document.getElementById(
+            'activeFilterChips'
+        );
+
+    if (!container) {
+        return;
+    }
+
+    const chips = [];
+
+    if (
+        selectedSuppliers.size <
+        allSuppliers.length
+    ) {
+
+        chips.push(
+            `Suppliers: ${selectedSuppliers.size}`
+        );
+
+    }
+
+    if (
+        selectedCooperatives.size <
+        allCooperatives.length
+    ) {
+
+        chips.push(
+            `Cooperatives: ${selectedCooperatives.size}`
+        );
+
+    }
+
+    if (
+        selectedEnumerators.size <
+        allEnumerators.length
+    ) {
+
+        chips.push(
+            `Enumerators: ${selectedEnumerators.size}`
+        );
+
+    }
+
+    if (
+        selectedFieldOfficers.size <
+        allFieldOfficers.length
+    ) {
+
+        chips.push(
+            `Field Officers: ${selectedFieldOfficers.size}`
+        );
+
+    }
+
+    const stages =
+        getSelectedWorkflowStages();
+
+    if (
+        stages.size <
+        WORKFLOW_STAGES.length
+    ) {
+
+        chips.push(
+            `Stages: ${stages.size}`
+        );
+
+    }
+
+    container.innerHTML =
+        chips
+            .map(
+                chip =>
+                    `
+                    <span class="filter-chip">
+                        ${escapeHtml(
+                            chip
+                        )}
+                    </span>
+                    `
+            )
+            .join('');
+
+}
+
+
+// ============================================================
+// FILTER COUNTS
+// ============================================================
+
+function updateFilterCount() {
+
+    const fields = [
+
+        [
+            'supplierList',
+            selectedSuppliers.size,
+            allSuppliers.length
+        ],
+
+        [
+            'cooperativeList',
+            selectedCooperatives.size,
+            allCooperatives.length
+        ],
+
+        [
+            'enumeratorList',
+            selectedEnumerators.size,
+            allEnumerators.length
+        ],
+
+        [
+            'fieldOfficerList',
+            selectedFieldOfficers.size,
+            allFieldOfficers.length
+        ]
+
+    ];
+
+    fields.forEach(
+        (
+            [
+                containerId,
+                selected,
+                total
+            ]
+        ) => {
+
+            const container =
+                document.getElementById(
+                    containerId
+                );
+
+            if (!container) {
+                return;
+            }
+
+            const parent =
+                container.closest(
+                    '.filter-section'
+                );
+
+            if (!parent) {
+                return;
+            }
+
+            const button =
+                parent.querySelector(
+                    '.btn-link'
+                );
+
+            if (button) {
+
+                button.textContent =
+                    selected === total
+                        ? 'Clear All'
+                        : 'Select All';
+
+            }
+
+        }
+    );
+
+    updateWorkflowStageControl();
+
+}
+
+
+// ============================================================
+// SELECT ALL FILTERS
+// ============================================================
+
+function toggleSelectionSet(
+    type
+) {
+
+    let set;
+    let values;
+
+    if (
+        type ===
+        'supplier'
+    ) {
+
+        set =
+            selectedSuppliers;
+
+        values =
+            allSuppliers;
+
+    } else if (
+        type ===
+        'cooperative'
+    ) {
+
+        set =
+            selectedCooperatives;
+
+        values =
+            allCooperatives;
+
+    } else if (
+        type ===
+        'enumerator'
+    ) {
+
+        set =
+            selectedEnumerators;
+
+        values =
+            allEnumerators.map(
+                x =>
+                    x.id
+            );
+
+    } else {
+
+        set =
+            selectedFieldOfficers;
+
+        values =
+            allFieldOfficers.map(
+                x =>
+                    x.id
+            );
+
+    }
+
+    if (
+        set.size ===
+        values.length
+    ) {
+
+        set.clear();
+
+    } else {
+
+        values.forEach(
+            value =>
+                set.add(
+                    value
+                )
+        );
+
+    }
+
+    renderFilterLists();
+
+    applyFilters();
+
+}
+
+
+// ============================================================
+// EVENT LISTENERS
+// ============================================================
+
+function setupEventListeners() {
+
+    document
+        .getElementById(
+            'refreshBtn'
+        )
+        ?.addEventListener(
+            'click',
+            async () => {
+
+                await refreshExportCenter();
+
+            }
+        );
+
+    document
+        .getElementById(
+            'refreshHistoryBtn'
+        )
+        ?.addEventListener(
+            'click',
+            loadExportHistory
+        );
+
+    document
+        .getElementById(
+            'exportBtn'
+        )
+        ?.addEventListener(
+            'click',
+            exportData
+        );
+
+    document
+        .getElementById(
+            'previewBtn'
+        )
+        ?.addEventListener(
+            'click',
+            previewData
+        );
+
+    document
+        .getElementById(
+            'resetBtn'
+        )
+        ?.addEventListener(
+            'click',
+            resetFilters
+        );
+
+    document
+        .getElementById(
+            'rejectedAuditBtn'
+        )
+        ?.addEventListener(
+            'click',
+            exportRejectedAudit
+        );
+
+    document
+        .getElementById(
+            'clearDates'
+        )
+        ?.addEventListener(
+            'click',
+            () => {
+
+                setValue(
+                    'dateFrom',
+                    ''
+                );
+
+                setValue(
+                    'dateTo',
+                    ''
+                );
+
+                applyFilters();
+
+            }
+        );
+
+    document
+        .getElementById(
+            'advancedToggleBtn'
+        )
+        ?.addEventListener(
+            'click',
+            toggleAdvancedFilters
+        );
+
+    document
+        .getElementById(
+            'sidebarToggle'
+        )
+        ?.addEventListener(
+            'click',
+            toggleSidebar
+        );
+
+    document
+        .getElementById(
+            'burgerBtn'
+        )
+        ?.addEventListener(
+            'click',
+            toggleMobileSidebar
+        );
+
+    document
+        .getElementById(
+            'sidebarOverlay'
+        )
+        ?.addEventListener(
+            'click',
+            closeMobileSidebar
+        );
+
+    document
+        .getElementById(
+            'dropdownSelected'
+        )
+        ?.addEventListener(
+            'click',
+            toggleProjectDropdown
+        );
+
+    document
+        .getElementById(
+            'projectSearch'
+        )
+        ?.addEventListener(
+            'input',
+            filterProjectDropdown
+        );
+
+    document
+        .getElementById(
+            'supplierSearch'
+        )
+        ?.addEventListener(
+            'input',
+            event =>
+                filterCheckboxList(
+                    'supplierList',
+                    event.target.value
+                )
+        );
+
+    document
+        .getElementById(
+            'coopSearch'
+        )
+        ?.addEventListener(
+            'input',
+            event =>
+                filterCheckboxList(
+                    'cooperativeList',
+                    event.target.value
+                )
+        );
+
+    document
+        .getElementById(
+            'enumeratorSearch'
+        )
+        ?.addEventListener(
+            'input',
+            event =>
+                filterCheckboxList(
+                    'enumeratorList',
+                    event.target.value
+                )
+        );
+
+    document
+        .getElementById(
+            'fieldOfficerSearch'
+        )
+        ?.addEventListener(
+            'input',
+            event =>
+                filterCheckboxList(
+                    'fieldOfficerList',
+                    event.target.value
+                )
+        );
+
+    document
+        .getElementById(
+            'selectAllSuppliers'
+        )
+        ?.addEventListener(
+            'click',
+            () =>
+                toggleSelectionSet(
+                    'supplier'
+                )
+        );
+
+    document
+        .getElementById(
+            'selectAllCooperatives'
+        )
+        ?.addEventListener(
+            'click',
+            () =>
+                toggleSelectionSet(
+                    'cooperative'
+                )
+        );
+
+    document
+        .getElementById(
+            'selectAllEnumerators'
+        )
+        ?.addEventListener(
+            'click',
+            () =>
+                toggleSelectionSet(
+                    'enumerator'
+                )
+        );
+
+    document
+        .getElementById(
+            'selectAllFieldOfficers'
+        )
+        ?.addEventListener(
+            'click',
+            () =>
+                toggleSelectionSet(
+                    'field_officer'
+                )
+        );
+
+    document
+        .querySelectorAll(
+            '.workflow-checkbox'
+        )
+        .forEach(
+            checkbox => {
+
+                checkbox.addEventListener(
+                    'change',
+                    () => {
+
+                        applyFilters();
+
+                        updateWorkflowStageControl();
+
+                    }
+                );
+
+            }
+        );
+
+    document
+        .querySelectorAll(
+            '.format-option'
+        )
+        .forEach(
+            option => {
+
+                option.addEventListener(
+                    'click',
+                    () => {
+
+                        if (
+                            option.classList.contains(
+                                'disabled'
+                            )
+                        ) {
+                            return;
+                        }
+
+                        selectFormat(
+                            option.dataset.format
+                        );
+
+                    }
+                );
+
+            }
+        );
+
+    document
+        .querySelectorAll(
+            '.performance-tab'
+        )
+        .forEach(
+            tab => {
+
+                tab.addEventListener(
+                    'click',
+                    () => {
+
+                        currentPerformanceTab =
+                            tab.dataset.tab;
+
+                        document
+                            .querySelectorAll(
+                                '.performance-tab'
+                            )
+                            .forEach(
+                                button =>
+                                    button.classList.toggle(
+                                        'active',
+                                        button ===
+                                        tab
+                                    )
+                            );
+
+                        document
+                            .getElementById(
+                                'enumeratorPerformance'
+                            )
+                            ?.classList.toggle(
+                                'hidden',
+                                currentPerformanceTab !==
+                                'enumerators'
+                            );
+
+                        document
+                            .getElementById(
+                                'cooperativePerformance'
+                            )
+                            ?.classList.toggle(
+                                'hidden',
+                                currentPerformanceTab !==
+                                'cooperatives'
+                            );
+
+                        document
+                            .getElementById(
+                                'workflowPerformance'
+                            )
+                            ?.classList.toggle(
+                                'hidden',
+                                currentPerformanceTab !==
+                                'workflow'
+                            );
+
+                        renderPerformance();
+
+                    }
+                );
+
+            }
+        );
+
+    document
+        .getElementById(
+            'logoutBtn'
+        )
+        ?.addEventListener(
+            'click',
+            logout
+        );
+
+}
+
+
+// ============================================================
+// REFRESH
+// ============================================================
+
+async function refreshExportCenter() {
+
+    showLoading(true);
+
+    try {
+
+        await loadProjectMembers(
+            currentProject.id
+        );
+
+        await loadFarms(
+            currentProject.id
+        );
+
+        await loadExportHistory();
+
+        showNotification(
+            'Export Center refreshed.',
+            'success'
+        );
+
+    } catch (error) {
+
+        showNotification(
+            error.message ||
+            'Refresh failed.',
+            'error'
+        );
+
+    } finally {
+
+        showLoading(false);
+
+    }
+
+}
+
+
+// ============================================================
+// RESET FILTERS
+// ============================================================
+
+function resetFilters() {
+
+    selectedSuppliers =
+        new Set(
+            allSuppliers
+        );
+
+    selectedCooperatives =
+        new Set(
+            allCooperatives
+        );
+
+    selectedEnumerators =
+        new Set(
+            allEnumerators.map(
+                x =>
+                    x.id
+            )
+        );
+
+    selectedFieldOfficers =
+        new Set(
+            allFieldOfficers.map(
+                x =>
+                    x.id
+            )
+        );
+
+    document
+        .querySelectorAll(
+            '.workflow-checkbox'
+        )
+        .forEach(
+            checkbox => {
+
+                checkbox.checked =
+                    true;
+
+            }
+        );
+
+    setValue(
+        'dateFrom',
+        ''
+    );
+
+    setValue(
+        'dateTo',
+        ''
+    );
+
+    setValue(
+        'areaMin',
+        ''
+    );
+
+    setValue(
+        'areaMax',
+        ''
+    );
+
+    setValue(
+        'qualityFilter',
+        'all'
+    );
+
+    setValue(
+        'dateBasis',
+        'created_at'
+    );
+
+    renderFilterLists();
+
+    filteredFarms =
+        [
+            ...allFarms
+        ];
+
+    updateStats();
+
+    updateActiveFilterChips();
+
+    renderPerformance();
+
+    updateFormatAvailability();
+
+    showNotification(
+        'Filters reset.',
+        'success'
+    );
+
+}
+
+
+// ============================================================
+// ADVANCED FILTERS
+// ============================================================
+
+function toggleAdvancedFilters() {
+
+    const section =
+        document.getElementById(
+            'advancedFilters'
+        );
+
+    const button =
+        document.getElementById(
+            'advancedToggleBtn'
+        );
+
+    if (!section) {
+        return;
+    }
+
+    const hidden =
+        section.classList.toggle(
+            'hidden'
+        );
+
+    if (button) {
+
+        button.innerHTML =
+            hidden
+                ? '<i class="fas fa-chevron-down"></i> Show advanced filters'
+                : '<i class="fas fa-chevron-up"></i> Hide advanced filters';
+
+    }
+
+}
+
+
+// ============================================================
+// FILTER SEARCH
+// ============================================================
+
+function filterCheckboxList(
+    containerId,
+    search
+) {
+
+    const container =
+        document.getElementById(
+            containerId
+        );
+
+    if (!container) {
+        return;
+    }
+
+    const query =
+        String(
+            search ||
+            ''
+        )
+            .toLowerCase()
+            .trim();
+
+    container
+        .querySelectorAll(
+            '.checkbox-item'
+        )
+        .forEach(
+            item => {
+
+                const text =
+                    item.textContent
+                        .toLowerCase();
+
+                item.style.display =
+                    text.includes(
+                        query
+                    )
+                        ? ''
+                        : 'none';
+
+            }
+        );
+
+}
+
+
+// ============================================================
+// PROJECT DROPDOWN
+// ============================================================
+
+function toggleProjectDropdown() {
+
+    const menu =
+        document.getElementById(
+            'dropdownMenu'
+        );
+
+    if (menu) {
+
+        menu.classList.toggle(
+            'show'
+        );
+
+    }
+
+}
+
+
+function closeProjectDropdown() {
+
+    document
+        .getElementById(
+            'dropdownMenu'
+        )
+        ?.classList.remove(
+            'show'
+        );
+
+}
+
+
+function filterProjectDropdown(
+    event
+) {
+
+    const query =
+        event.target.value
+            .toLowerCase()
+            .trim();
+
+    document
+        .querySelectorAll(
+            '#dropdownItems .dropdown-item'
+        )
+        .forEach(
+            item => {
+
+                item.style.display =
+                    item.textContent
+                        .toLowerCase()
+                        .includes(
+                            query
+                        )
+                            ? ''
+                            : 'none';
+
+            }
+        );
+
+}
+
+
+// ============================================================
+// SIDEBAR
+// ============================================================
 
 function toggleSidebar() {
 
@@ -5281,6 +5208,7 @@ function toggleSidebar() {
         ?.classList.toggle(
             'collapsed'
         );
+
 }
 
 
@@ -5290,18 +5218,18 @@ function toggleMobileSidebar() {
         .getElementById(
             'sidebar'
         )
-        ?.classList.toggle(
+        ?.classList.add(
             'mobile-open'
         );
-
 
     document
         .getElementById(
             'sidebarOverlay'
         )
-        ?.classList.toggle(
+        ?.classList.add(
             'active'
         );
+
 }
 
 
@@ -5315,7 +5243,6 @@ function closeMobileSidebar() {
             'mobile-open'
         );
 
-
     document
         .getElementById(
             'sidebarOverlay'
@@ -5323,94 +5250,376 @@ function closeMobileSidebar() {
         ?.classList.remove(
             'active'
         );
+
 }
 
 
-/* ============================================================
-   24. REFRESH / LOGOUT
-   ============================================================ */
+// ============================================================
+// NAVIGATION
+// ============================================================
 
-async function refreshAll() {
+function setupNavigation() {
 
-    try {
+    document
+        .querySelectorAll(
+            '.sidebar a[data-page]'
+        )
+        .forEach(
+            link => {
 
-        showLoading(
-            true
+                link.addEventListener(
+                    'click',
+                    event => {
+
+                        const page =
+                            link.dataset.page;
+
+                        if (
+                            page ===
+                            'exports'
+                        ) {
+                            return;
+                        }
+
+                        /*
+                         * Preserve current project.
+                         */
+
+                        if (
+                            link.href &&
+                            currentProject?.id
+                        ) {
+
+                            event.preventDefault();
+
+                            const url =
+                                new URL(
+                                    link.href,
+                                    window.location.href
+                                );
+
+                            url.searchParams.set(
+                                'project',
+                                currentProject.id
+                            );
+
+                            window.location.href =
+                                url.toString();
+
+                        }
+
+                    }
+                );
+
+            }
         );
 
-
-        await loadMembers();
-
-        await loadFarms();
-
-        initializeWorkflowSelectAll();
-
-        await loadExportHistory();
-
-        updatePermissionUI();
-
-        applyFilters();
-
-
-        notify(
-            'Export Center refreshed.',
-            'success'
-        );
-
-
-    } catch (error) {
-
-        console.error(
-            error
-        );
-
-
-        notify(
-            error.message ||
-            'Refresh failed.',
-            'error'
-        );
-
-
-    } finally {
-
-        showLoading(
-            false
-        );
-    }
 }
 
+
+// ============================================================
+// LOGOUT
+// ============================================================
 
 async function logout() {
 
     try {
 
-        await db.auth.signOut();
+        await supabaseClient
+            .auth
+            .signOut();
 
     } finally {
 
+        localStorage.clear();
+
         window.location.href =
             '../login.html';
+
     }
+
 }
 
 
-/* ============================================================
-   25. HELPERS
-   ============================================================ */
+// ============================================================
+// GEOMETRY
+// ============================================================
+
+function parseGeometry(
+    geometry
+) {
+
+    if (!geometry) {
+        return null;
+    }
+
+    if (
+        typeof geometry ===
+        'object'
+    ) {
+
+        if (
+            geometry.type &&
+            geometry.coordinates
+        ) {
+
+            return geometry;
+
+        }
+
+        if (
+            geometry.geometry &&
+            geometry.geometry.type
+        ) {
+
+            return geometry.geometry;
+
+        }
+
+    }
+
+    if (
+        typeof geometry ===
+        'string'
+    ) {
+
+        try {
+
+            const parsed =
+                JSON.parse(
+                    geometry
+                );
+
+            return parseGeometry(
+                parsed
+            );
+
+        } catch {
+
+            return null;
+
+        }
+
+    }
+
+    return null;
+
+}
+
+
+// ============================================================
+// KML GEOMETRY
+// ============================================================
+
+function geometryToKmlCoordinates(
+    geometry
+) {
+
+    if (!geometry) {
+        return '';
+    }
+
+    if (
+        geometry.type ===
+        'Polygon'
+    ) {
+
+        const rings =
+            geometry.coordinates
+                .map(
+                    ring =>
+                        `
+                        <outerBoundaryIs>
+                            <LinearRing>
+                                <coordinates>
+                                    ${ring
+                                        .map(
+                                            coordinate =>
+                                                `${coordinate[0]},${coordinate[1]},${coordinate[2] || 0}`
+                                        )
+                                        .join(' ')}
+                                </coordinates>
+                            </LinearRing>
+                        </outerBoundaryIs>
+                        `
+                )
+                .join('');
+
+        return `
+            <Polygon>
+                ${rings}
+            </Polygon>
+        `;
+
+    }
+
+    if (
+        geometry.type ===
+        'MultiPolygon'
+    ) {
+
+        return `
+            <MultiGeometry>
+                ${geometry.coordinates
+                    .map(
+                        polygon =>
+                            geometryToKmlCoordinates(
+                                {
+                                    type:
+                                        'Polygon',
+                                    coordinates:
+                                        polygon
+                                }
+                            )
+                    )
+                    .join('')}
+            </MultiGeometry>
+        `;
+
+    }
+
+    return '';
+
+}
+
+
+// ============================================================
+// UTILITIES
+// ============================================================
+
+function personName(
+    id
+) {
+
+    if (!id) {
+        return 'Unassigned';
+    }
+
+    const member =
+        memberDirectory.get(
+            id
+        );
+
+    const profile =
+        member?.profile;
+
+    const name =
+        `${profile?.first_name || ''} ${
+            profile?.last_name || ''
+        }`
+            .trim();
+
+    return (
+        name ||
+        profile?.email ||
+        String(id).slice(
+            0,
+            8
+        )
+    );
+
+}
+
+
+function unique(
+    values
+) {
+
+    return [
+        ...new Set(
+            values.filter(
+                value =>
+                    value !==
+                    null &&
+                    value !==
+                    undefined &&
+                    value !==
+                    ''
+            )
+        )
+    ];
+
+}
+
+
+function localeSort(
+    a,
+    b
+) {
+
+    return String(
+        a
+    ).localeCompare(
+        String(
+            b
+        )
+    );
+
+}
+
+
+function parseNumber(
+    value
+) {
+
+    if (
+        value ===
+        null ||
+        value ===
+        undefined ||
+        value ===
+        ''
+    ) {
+
+        return null;
+
+    }
+
+    const number =
+        Number(
+            value
+        );
+
+    return Number.isFinite(
+        number
+    )
+        ? number
+        : null;
+
+}
+
 
 function getValue(
     id
 ) {
 
     return (
-        document
-            .getElementById(
-                id
-            )
-            ?.value ||
+        document.getElementById(
+            id
+        )?.value ||
         ''
     );
+
+}
+
+
+function setValue(
+    id,
+    value
+) {
+
+    const element =
+        document.getElementById(
+            id
+        );
+
+    if (element) {
+
+        element.value =
+            value;
+
+    }
+
 }
 
 
@@ -5424,238 +5633,81 @@ function setText(
             id
         );
 
-
     if (element) {
 
         element.textContent =
             value;
+
     }
+
 }
 
 
-function unique(
-    values
-) {
-
-    return [
-        ...new Set(
-            values
-                .map(
-                    value =>
-                        String(
-                            value ??
-                            ''
-                        )
-                            .trim()
-                )
-                .filter(Boolean)
-        )
-    ]
-        .sort(
-            (
-                a,
-                b
-            ) =>
-                a.localeCompare(
-                    b
-                )
-        );
-}
-
-
-function personName(
-    userId
-) {
-
-    if (!userId) {
-
-        return 'Unassigned';
-    }
-
-
-    const member =
-        members.find(
-            item =>
-                item.user_id ===
-                userId
-        );
-
-
-    if (!member) {
-
-        return userId;
-    }
-
-
-    const profile =
-        member.profile;
-
-
-    if (!profile) {
-
-        return userId;
-    }
-
-
-    return (
-        [
-            profile.first_name,
-            profile.last_name
-        ]
-            .filter(Boolean)
-            .join(' ') ||
-        profile.email ||
-        userId
-    );
-}
-
-
-function parseGeometry(
+function capitalize(
     value
 ) {
 
-    if (!value) {
+    return String(
+        value
+    )
+        .replace(
+            /^./,
+            character =>
+                character.toUpperCase()
+        );
 
-        return null;
-    }
+}
 
+
+function rateClass(
+    rate
+) {
 
     if (
-        typeof value ===
-        'object'
+        rate >=
+        80
     ) {
 
-        if (
-            value.type ===
-            'Feature'
-        ) {
+        return 'rate-good';
 
-            return value.geometry;
-        }
-
-
-        return value;
     }
 
-
-    try {
-
-        const parsed =
-            JSON.parse(
-                value
-            );
-
-
-        if (
-            parsed.type ===
-            'Feature'
-        ) {
-
-            return parsed.geometry;
-        }
-
-
-        return parsed;
-
-    } catch {
-
-        return null;
-    }
-}
-
-
-function stripZ(
-    geometry
-) {
-
-    if (!geometry) {
-
-        return null;
-    }
-
-
-    function clean(
-        coordinates
+    if (
+        rate >=
+        50
     ) {
 
-        if (
-            !Array.isArray(
-                coordinates
-            )
-        ) {
+        return 'rate-warning';
 
-            return coordinates;
-        }
-
-
-        if (
-            typeof coordinates[0] ===
-            'number'
-        ) {
-
-            return coordinates.slice(
-                0,
-                2
-            );
-        }
-
-
-        return coordinates.map(
-            clean
-        );
     }
 
+    return 'rate-bad';
 
-    return {
-
-        ...geometry,
-
-        coordinates:
-            clean(
-                geometry.coordinates
-            )
-
-    };
 }
 
 
-function formatRole(
-    role
+function emptyTableRow(
+    colspan,
+    message
 ) {
 
-    return String(
-        role ||
-        'user'
-    )
-        .replaceAll(
-            '_',
-            ' '
-        )
-        .replace(
-            /\b\w/g,
-            character =>
-                character.toUpperCase()
-        );
-}
+    return `
+        <tr>
+            <td
+                colspan="${colspan}"
+                style="
+                    text-align:center;
+                    padding:30px;
+                    color:#94a3b8;
+                "
+            >
+                ${escapeHtml(
+                    message
+                )}
+            </td>
+        </tr>
+    `;
 
-
-function formatLabel(
-    value
-) {
-
-    return String(
-        value ||
-        ''
-    )
-        .replaceAll(
-            '_',
-            ' '
-        )
-        .replace(
-            /\b\w/g,
-            character =>
-                character.toUpperCase()
-        );
 }
 
 
@@ -5668,28 +5720,102 @@ function safeName(
         'Project'
     )
         .replace(
-            /[^a-z0-9_-]+/gi,
+            /[^a-z0-9_\-]+/gi,
             '_'
         )
         .replace(
             /^_+|_+$/g,
             ''
-        )
-        .slice(
-            0,
-            80
         );
+
 }
 
 
 function dateStamp() {
 
-    return new Date()
-        .toISOString()
-        .slice(
-            0,
-            10
+    const now =
+        new Date();
+
+    const year =
+        now.getFullYear();
+
+    const month =
+        String(
+            now.getMonth() + 1
+        )
+            .padStart(
+                2,
+                '0'
+            );
+
+    const day =
+        String(
+            now.getDate()
+        )
+            .padStart(
+                2,
+                '0'
+            );
+
+    return `
+        ${year}
+        ${month}
+        ${day}
+    `
+        .replace(
+            /\s+/g,
+            ''
         );
+
+}
+
+
+function formatDate(
+    value
+) {
+
+    if (!value) {
+        return '—';
+    }
+
+    const date =
+        new Date(
+            value
+        );
+
+    if (
+        Number.isNaN(
+            date.getTime()
+        )
+    ) {
+
+        return '—';
+
+    }
+
+    return date.toLocaleString();
+
+}
+
+
+function formatLabel(
+    value
+) {
+
+    return String(
+        value ||
+        ''
+    )
+        .replace(
+            /_/g,
+            ' '
+        )
+        .replace(
+            /\b\w/g,
+            char =>
+                char.toUpperCase()
+        );
+
 }
 
 
@@ -5702,29 +5828,26 @@ function escapeHtml(
         ''
     )
         .replace(
-            /[&<>"']/g,
-            character =>
-                ({
-
-                    '&':
-                        '&amp;',
-
-                    '<':
-                        '&lt;',
-
-                    '>':
-                        '&gt;',
-
-                    '"':
-                        '&quot;',
-
-                    "'":
-                        '&#039;'
-
-                })[
-                    character
-                ]
+            /&/g,
+            '&amp;'
+        )
+        .replace(
+            /</g,
+            '&lt;'
+        )
+        .replace(
+            />/g,
+            '&gt;'
+        )
+        .replace(
+            /"/g,
+            '&quot;'
+        )
+        .replace(
+            /'/g,
+            '&#039;'
         );
+
 }
 
 
@@ -5732,39 +5855,19 @@ function escapeXml(
     value
 ) {
 
-    return String(
-        value ??
-        ''
-    )
-        .replace(
-            /[<>&'"]/g,
-            character =>
-                ({
+    return escapeHtml(
+        value
+    );
 
-                    '<':
-                        '&lt;',
-
-                    '>':
-                        '&gt;',
-
-                    '&':
-                        '&amp;',
-
-                    "'":
-                        '&apos;',
-
-                    '"':
-                        '&quot;'
-
-                })[
-                    character
-                ]
-        );
 }
 
 
+// ============================================================
+// LOADING
+// ============================================================
+
 function showLoading(
-    visible
+    show
 ) {
 
     const overlay =
@@ -5772,119 +5875,189 @@ function showLoading(
             'loadingOverlay'
         );
 
-
-    if (overlay) {
-
-        overlay.style.display =
-            visible
-                ? 'flex'
-                : 'none';
+    if (!overlay) {
+        return;
     }
+
+    overlay.style.display =
+        show
+            ? 'flex'
+            : 'none';
+
 }
 
 
-function notify(
+// ============================================================
+// NOTIFICATION
+// ============================================================
+
+function showNotification(
     message,
     type = 'info'
 ) {
 
-    document
-        .querySelectorAll(
-            '.mt-notification'
-        )
-        .forEach(
-            element =>
-                element.remove()
+    let container =
+        document.getElementById(
+            'alerts-container'
         );
 
+    if (!container) {
 
-    const notification =
+        container =
+            document.createElement(
+                'div'
+            );
+
+        container.id =
+            'alerts-container';
+
+        container.style.position =
+            'fixed';
+
+        container.style.top =
+            '80px';
+
+        container.style.right =
+            '20px';
+
+        container.style.zIndex =
+            '9999';
+
+        container.style.width =
+            '340px';
+
+        document.body.appendChild(
+            container
+        );
+
+    }
+
+    const alert =
         document.createElement(
             'div'
         );
 
+    const icons = {
 
-    notification.className =
-        `mt-notification ${type}`;
+        success:
+            'fa-check-circle',
 
+        error:
+            'fa-times-circle',
 
-    notification.textContent =
-        message;
+        warning:
+            'fa-exclamation-triangle',
 
+        info:
+            'fa-info-circle'
 
-    Object.assign(
-        notification.style,
-        {
+    };
 
-            position:
-                'fixed',
+    alert.style.background =
+        '#ffffff';
 
-            right:
-                '22px',
+    alert.style.border =
+        '1px solid #e2e8f0';
 
-            bottom:
-                '22px',
+    alert.style.borderLeft =
+        `4px solid ${
+            type === 'success'
+                ? '#2c6e49'
+                : type === 'error'
+                    ? '#dc2626'
+                    : type === 'warning'
+                        ? '#f59e0b'
+                        : '#3b82f6'
+        }`;
 
-            zIndex:
-                '99999',
+    alert.style.padding =
+        '12px 14px';
 
-            maxWidth:
-                '420px',
+    alert.style.marginBottom =
+        '8px';
 
-            padding:
-                '13px 17px',
+    alert.style.borderRadius =
+        '8px';
 
-            borderRadius:
-                '10px',
+    alert.style.boxShadow =
+        '0 8px 25px rgba(15,23,42,.12)';
 
-            background:
-                type ===
-                'error'
-                    ? '#fee2e2'
-                    : type ===
-                      'success'
-                        ? '#dcfce7'
-                        : type ===
-                          'warning'
-                            ? '#fef3c7'
-                            : '#e0f2fe',
+    alert.style.fontSize =
+        '12px';
 
-            color:
-                type ===
-                'error'
-                    ? '#991b1b'
-                    : type ===
-                      'success'
-                        ? '#166534'
-                        : type ===
-                          'warning'
-                            ? '#92400e'
-                            : '#075985',
+    alert.innerHTML =
+        `
+        <div style="
+            display:flex;
+            align-items:center;
+            gap:9px;
+        ">
 
-            boxShadow:
-                '0 5px 20px rgba(0,0,0,.14)',
+            <i
+                class="fas ${icons[type] || icons.info}"
+            ></i>
 
-            fontSize:
-                '13px',
+            <span>
+                ${escapeHtml(
+                    message
+                )}
+            </span>
 
-            fontWeight:
-                '600',
+        </div>
+        `;
 
-            lineHeight:
-                '1.45'
-
-        }
+    container.appendChild(
+        alert
     );
-
-
-    document.body.appendChild(
-        notification
-    );
-
 
     setTimeout(
-        () =>
-            notification.remove(),
-        4500
+        () => {
+
+            alert.style.opacity =
+                '0';
+
+            alert.style.transform =
+                'translateX(20px)';
+
+            alert.style.transition =
+                '.25s ease';
+
+            setTimeout(
+                () =>
+                    alert.remove(),
+                300
+            );
+
+        },
+        4000
     );
+
 }
+
+
+// ============================================================
+// INITIAL WORKFLOW SETUP
+// ============================================================
+
+updateWorkflowStageControl();
+
+
+// ============================================================
+// GLOBALS
+// ============================================================
+
+window.hidePreview =
+    hidePreview;
+
+window.selectFormat =
+    selectFormat;
+
+window.previewData =
+    previewData;
+
+window.exportData =
+    exportData;
+
+window.exportRejectedAudit =
+    exportRejectedAudit;
+```
