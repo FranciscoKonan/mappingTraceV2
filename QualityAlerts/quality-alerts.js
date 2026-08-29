@@ -185,7 +185,7 @@ async function qualityDecision(decision){
  }
 
  try{
-  const next=decision==="validated"?"final_validation":decision==="rejected"?"rejected":"gis_compliance_review";
+  const next=decision==="validated"?"final_validation":decision==="rejected"?"rejected":"correction_required";
   const r=await supabaseClient.rpc("transition_farm_workflow",{p_farm_id:currentFarm.id,p_to_state:next,p_reason:reason?.trim()||null});
   if(r.error)throw r.error;
   notify("QC decision saved.","success");
