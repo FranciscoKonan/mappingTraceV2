@@ -132,37 +132,25 @@ async function resolveProject(){
 
 
 async function loadQualityData(){
+ console.log("=== QUALITY DEBUG ===");
+ console.log("Current project:", currentProject);
+ console.log("Current project ID:", currentProject?.id);
+ console.log("Current role:", currentProjectUserRole);
+
  const f=await supabaseClient
    .from("farms")
    .select("*")
    .eq("project_id",currentProject.id)
    .order("created_at",{ascending:false});
 
+ console.log("Farms query error:", f.error);
+ console.log("Farms query data:", f.data);
+ console.log("Farms count:", f.data?.length);
+
  if(f.error)
    throw f.error;
 
  farms=f.data||[];
- issues=[];
-
- for(let i=0;i<farms.length;i+=200){
-   const ids=farms
-     .slice(i,i+200)
-     .map(x=>x.id);
-
-   if(!ids.length)
-     continue;
-
-   const r=await supabaseClient
-     .from("farm_quality_issues")
-     .select("*")
-     .in("farm_id",ids);
-
-   if(r.error)
-     throw r.error;
-
-   issues.push(...(r.data||[]));
- }
-}
 
 
 function bind(){
