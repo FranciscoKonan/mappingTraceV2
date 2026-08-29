@@ -8,7 +8,8 @@
   const SUPABASE_URL =
     "https://crvnohvudurqfukjpisv5.supabase.co";
 
-  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNydm5vaHZ1ZHVycWZ1a2pwaXN2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg0NTUxNzMsImV4cCI6MjA5NDAzMTE3M30.Qp8E57yAN4LnO4A-yirf-Z3QufGZw9OKjBfcQxG7fo8";
+  const SUPABASE_ANON_KEY =
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNydm5vaHZ1ZHVycWZ1a2pwaXN2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg0NTUxNzMsImV4cCI6MjA5NDAzMTE3M30.Qp8E57yAN4LnO4A-yirf-Z3QufGZw9OKjBfcQxG7fo8";
 
 
   // ============================================================
@@ -16,6 +17,7 @@
   // ============================================================
 
   let supabaseClient = null;
+
   let currentUser = null;
   let currentProject = null;
   let currentProjectUserRole = null;
@@ -29,11 +31,15 @@
 
 
   // ============================================================
-  // HELPERS
+  // DOM HELPERS
   // ============================================================
 
-  const $ = id =>
-    document.getElementById(id);
+  const $ = id => document.getElementById(id);
+
+
+  // ============================================================
+  // GENERAL HELPERS
+  // ============================================================
 
   const esc = value =>
     String(value ?? "").replace(
@@ -47,14 +53,165 @@
       })[char]
     );
 
-  const t = value =>
-    String(value || "").toLowerCase();
+
+  const lower = value =>
+    String(value ?? "").trim().toLowerCase();
+
 
   const sev = issue =>
-    t(issue?.severity);
+    lower(issue?.severity);
+
 
   const kind = issue =>
-    t(issue?.issue_type);
+    lower(issue?.issue_type);
+
+
+  const workflowOf = farm =>
+    lower(
+      farm?.workflow_state ||
+      farm?.status
+    );
+
+
+  // ============================================================
+  // ROLE / WORKFLOW CONFIGURATION
+  // ============================================================
+
+  /*
+   * These are the workflow states used by the application.
+   *
+   * The important point is that the queue is no longer
+   * hard-coded to gis_compliance_review.
+   */
+
+  const ROLE_STATES = {
+
+    enumerator: [
+      "enumerator_review",
+      "correction_required"
+    ],
+
+    field_officer: [
+      "field_officer_review",
+      "correction_required"
+    ],
+
+    validator: [
+      "gis_compliance_review"
+    ],
+
+    manager: [
+      "final_validation",
+      "gis_compliance_review"
+    ],
+
+    owner: [
+      "enumerator_review",
+      "field_officer_review",
+      "gis_compliance_review",
+      "final_validation",
+      "correction_required"
+    ],
+
+    super_manager: [
+      "enumerator_review",
+      "field_officer_review",
+      "gis_compliance_review",
+      "final_validation",
+      "correction_required"
+    ]
+  };
+
+
+  /*
+   * Roles allowed to open the Quality Review page.
+   */
+
+  const ALLOWED_ROLES = [
+    "enumerator",
+    "field_officer",
+    "validator",
+    "manager",
+    "owner",
+    "super_manager"
+  ];
+
+
+  function getRoleStates() {
+
+    const role =
+      currentProjectUserRole;
+
+    return ROLE_STATES[role] || [];
+  }
+
+
+  function farmBelongsToCurrentQueue(farm) {
+
+    const workflow =
+      workflowOf(farm);
+
+    return getRoleStates()
+      .includes(workflow);
+  }
+
+
+  // ============================================================
+  // DECISION PERMISSIONS
+  // ============================================================
+
+  /*
+   * Decision permissions are deliberately conservative.
+   *
+   * Enumerator / Field Officer:
+   *     can request correction.
+   *
+   * Validator:
+   *     can request correction, reject or validate.
+   *
+   * Manager / Owner / Super Manager:
+   *     can use the same decision controls.
+   */
+
+  function canRequestCorrection() {
+
+    return [
+      "enumerator",
+      "field_officer",
+      "validator",
+      "manager",
+      "owner",
+      "super_manager"
+    ].includes(
+      currentProjectUserRole
+    );
+  }
+
+
+  function canReject() {
+
+    return [
+      "validator",
+      "manager",
+      "owner",
+      "super_manager"
+    ].includes(
+      currentProjectUserRole
+    );
+  }
+
+
+  function canValidate() {
+
+    return [
+      "validator",
+      "manager",
+      "owner",
+      "super_manager"
+    ].includes(
+      currentProjectUserRole
+    );
+  }
 
 
   // ============================================================
@@ -73,15 +230,22 @@
 
     try {
 
+      initializeSidebar();
+
       // --------------------------------------------------------
-      // Supabase
+      // SUPABASE
       // --------------------------------------------------------
 
-      if (!window.supabase?.createClient) {
+      if (
+        !window.supabase ||
+        !window.supabase.createClient
+      ) {
+
         throw new Error(
           "Supabase library did not load."
         );
       }
+
 
       supabaseClient =
         window.supabase.createClient(
@@ -91,66 +255,68 @@
 
 
       // --------------------------------------------------------
-      // Authentication
+      // AUTHENTICATION
       // --------------------------------------------------------
 
       const sessionResult =
         await supabaseClient.auth.getSession();
 
+
       if (sessionResult.error) {
         throw sessionResult.error;
       }
 
+
       const session =
         sessionResult.data?.session;
 
+
       if (!session?.user) {
-        location.href = "../login.html";
+
+        location.href =
+          "../login.html";
+
         return;
       }
+
 
       currentUser =
         session.user;
 
 
       // --------------------------------------------------------
-      // Profile / Project
+      // PROFILE
       // --------------------------------------------------------
 
       await loadProfile();
+
+
+      // --------------------------------------------------------
+      // PROJECT / ROLE
+      // --------------------------------------------------------
 
       await resolveProject();
 
 
       // --------------------------------------------------------
-      // Role authorization
+      // ROLE AUTHORIZATION
       // --------------------------------------------------------
 
-      const allowedRoles = [
-        "validator",
-        "manager",
-        "owner",
-        "super_manager"
-      ];
-
       if (
-        !allowedRoles.includes(
+        !ALLOWED_ROLES.includes(
           currentProjectUserRole
         )
       ) {
 
         notify(
-          "You do not have access to GIS Quality Review.",
+          "You do not have access to Quality Review.",
           "error"
         );
 
         setTimeout(() => {
 
           location.href =
-            "/Dashboard.html?project=" +
-            encodeURIComponent(
-              currentProject.id
-            );
+            "../Dashboard.html";
 
         }, 1000);
 
@@ -159,14 +325,23 @@
 
 
       // --------------------------------------------------------
-      // Load data
+      // UPDATE UI FOR ROLE
+      // --------------------------------------------------------
+
+      updateRoleUI();
+
+
+      // --------------------------------------------------------
+      // LOAD DATA
       // --------------------------------------------------------
 
       await loadQualityData();
 
+
       bind();
 
       render();
+
 
     } catch (error) {
 
@@ -190,7 +365,7 @@
 
 
   // ============================================================
-  // USER PROFILE
+  // PROFILE
   // ============================================================
 
   async function loadProfile() {
@@ -198,12 +373,15 @@
     const result =
       await supabaseClient
         .from("user_profiles")
-        .select("first_name,email")
+        .select(
+          "first_name,email"
+        )
         .eq(
           "id",
           currentUser.id
         )
         .maybeSingle();
+
 
     if (result.error) {
 
@@ -213,6 +391,7 @@
       );
 
     }
+
 
     const firstName =
       result.data?.first_name ||
@@ -296,14 +475,14 @@
     const membership =
       result.data.find(
         item =>
-          item.project_id ===
-          urlProject
+          String(item.project_id) ===
+          String(urlProject)
       ) ||
 
       result.data.find(
         item =>
-          item.project_id ===
-          savedProject
+          String(item.project_id) ===
+          String(savedProject)
       ) ||
 
       result.data[0];
@@ -323,9 +502,9 @@
 
 
     currentProjectUserRole =
-      String(
-        membership.role || ""
-      ).toLowerCase();
+      lower(
+        membership.role
+      );
 
 
     localStorage.setItem(
@@ -374,37 +553,125 @@
       "",
       url
     );
+
+
+    console.log(
+      "Quality Review role:",
+      currentProjectUserRole
+    );
+
+    console.log(
+      "Quality Review project:",
+      currentProject?.id
+    );
   }
 
 
   // ============================================================
-  // QUALITY DATA
+  // ROLE UI
+  // ============================================================
+
+  function updateRoleUI() {
+
+    const role =
+      currentProjectUserRole;
+
+
+    /*
+     * If the current role is not allowed to validate,
+     * disable the validation button.
+     */
+
+    const validateBtn =
+      $("qcValidateBtn");
+
+
+    if (validateBtn) {
+
+      validateBtn.style.display =
+        canValidate()
+          ? ""
+          : "none";
+
+    }
+
+
+    /*
+     * Reject is validator/manager level.
+     */
+
+    const rejectButtons =
+      document.querySelectorAll(
+        ".qc-decision.reject"
+      );
+
+
+    rejectButtons.forEach(button => {
+
+      button.style.display =
+        canReject()
+          ? ""
+          : "none";
+
+    });
+
+
+    /*
+     * Correction is available to all operational
+     * review roles.
+     */
+
+    const correctionButtons =
+      document.querySelectorAll(
+        ".qc-decision.correction"
+      );
+
+
+    correctionButtons.forEach(button => {
+
+      button.style.display =
+        canRequestCorrection()
+          ? ""
+          : "none";
+
+    });
+
+
+    console.log(
+      "Role configuration applied:",
+      role
+    );
+  }
+
+
+  // ============================================================
+  // LOAD QUALITY DATA
   // ============================================================
 
   async function loadQualityData() {
 
     console.log(
-      "=== QUALITY DEBUG ==="
+      "=== QUALITY REVIEW DATA ==="
     );
 
     console.log(
-      "Current project:",
-      currentProject
-    );
-
-    console.log(
-      "Current project ID:",
+      "Project:",
       currentProject?.id
     );
 
     console.log(
-      "Current role:",
+      "Role:",
       currentProjectUserRole
+    );
+
+    console.log(
+      "Allowed workflow states:",
+      getRoleStates()
     );
 
 
     // ----------------------------------------------------------
-    // Farms
+    // FARMS
     // ----------------------------------------------------------
 
     const farmResult =
@@ -446,11 +713,15 @@
 
 
     // ----------------------------------------------------------
-    // Quality Issues
+    // QUALITY ISSUES
     // ----------------------------------------------------------
 
     issues = [];
 
+
+    /*
+     * Keep batches reasonably small.
+     */
 
     for (
       let index = 0;
@@ -505,40 +776,108 @@
 
 
   // ============================================================
-  // EVENT BINDING
+  // EVENTS
   // ============================================================
 
   function bind() {
 
-    [
-      "qcStatusFilter",
-      "qcTypeFilter"
-    ].forEach(id => {
-
-      $(id)?.addEventListener(
+    $("qcStatusFilter")
+      ?.addEventListener(
         "change",
         renderQueue
       );
 
-    });
+
+    $("qcTypeFilter")
+      ?.addEventListener(
+        "change",
+        renderQueue
+      );
 
 
-    $("refreshBtn")?.addEventListener(
+    $("refreshBtn")
+      ?.addEventListener(
+        "click",
+        refreshAll
+      );
+
+
+    $("logoutBtn")
+      ?.addEventListener(
+        "click",
+        async event => {
+
+          event.preventDefault();
+
+          await supabaseClient.auth.signOut();
+
+          location.href =
+            "../login.html";
+
+        }
+      );
+
+
+    /*
+     * Escape key closes modal.
+     */
+
+    document.addEventListener(
+      "keydown",
+      event => {
+
+        if (
+          event.key === "Escape"
+        ) {
+
+          closeQualityReview();
+
+        }
+
+      }
+    );
+  }
+
+
+  // ============================================================
+  // SIDEBAR
+  // ============================================================
+
+  function initializeSidebar() {
+
+    const sidebar =
+      $("sidebar");
+
+    const toggle =
+      $("sidebarToggle");
+
+    const overlay =
+      $("sidebarOverlay");
+
+
+    toggle?.addEventListener(
       "click",
-      refreshAll
+      () => {
+
+        sidebar?.classList.toggle(
+          "collapsed"
+        );
+
+      }
     );
 
 
-    $("logoutBtn")?.addEventListener(
+    overlay?.addEventListener(
       "click",
-      async event => {
+      () => {
 
-        event.preventDefault();
+        sidebar?.classList.remove(
+          "mobile-open"
+        );
 
-        await supabaseClient.auth.signOut();
-
-        location.href =
-          "../login.html";
+        overlay?.classList.remove(
+          "active"
+        );
 
       }
     );
@@ -564,6 +903,19 @@
 
   function renderStats() {
 
+    /*
+     * Only count farms belonging to the current user's queue.
+     */
+
+    const queueFarms =
+      farms.filter(
+        farm =>
+          farmBelongsToCurrentQueue(
+            farm
+          )
+      );
+
+
     const issueMap =
       new Map();
 
@@ -583,6 +935,7 @@
 
       }
 
+
       issueMap
         .get(issue.farm_id)
         .push(issue);
@@ -596,65 +949,60 @@
     let pending = 0;
 
 
-    farms.forEach(farm => {
+    queueFarms.forEach(
+      farm => {
 
-      const workflow =
-        t(
-          farm.workflow_state ||
-          farm.status
-        );
+        const farmIssues =
+          issueMap.get(
+            farm.id
+          ) || [];
 
 
-      // QC page concerns GIS-review farms.
-      if (
-        workflow !==
-        "gis_compliance_review"
-      ) {
-        return;
+        const hasCritical =
+          farmIssues.some(
+            issue =>
+              sev(issue) ===
+              "critical"
+          );
+
+
+        const hasWarning =
+          farmIssues.some(
+            issue =>
+              [
+                "warning",
+                "high",
+                "medium"
+              ].includes(
+                sev(issue)
+              )
+          );
+
+
+        /*
+         * Every farm in the current review queue
+         * is pending until a workflow decision moves it.
+         */
+
+        pending++;
+
+
+        if (hasCritical) {
+
+          critical++;
+
+        } else if (hasWarning) {
+
+          warning++;
+
+        } else {
+
+          passed++;
+
+        }
+
       }
-
-
-      const farmIssues =
-        issueMap.get(
-          farm.id
-        ) || [];
-
-
-      if (
-        farmIssues.some(
-          issue =>
-            sev(issue) ===
-            "critical"
-        )
-      ) {
-
-        critical++;
-
-      } else if (
-        farmIssues.some(
-          issue =>
-            [
-              "warning",
-              "high",
-              "medium"
-            ].includes(
-              sev(issue)
-            )
-        )
-      ) {
-
-        warning++;
-
-      } else {
-
-        passed++;
-
-      }
-
-
-      pending++;
-
-    });
+    );
 
 
     if ($("pendingCount")) {
@@ -689,7 +1037,10 @@
     }
 
 
-    // Total project farms
+    /*
+     * Total Farms remains project-wide.
+     */
+
     if ($("totalFarmsCount")) {
 
       $("totalFarmsCount").textContent =
@@ -703,13 +1054,18 @@
   // ISSUE TYPE FILTER
   // ============================================================
 
-  function matchesIssue(issue, type) {
+  function matchesIssue(
+    issue,
+    type
+  ) {
 
     const value =
       kind(issue);
 
 
-    if (type === "protected") {
+    if (
+      type === "protected"
+    ) {
 
       return value.includes(
         "protected"
@@ -718,7 +1074,9 @@
     }
 
 
-    if (type === "overlap") {
+    if (
+      type === "overlap"
+    ) {
 
       return value.includes(
         "overlap"
@@ -727,24 +1085,61 @@
     }
 
 
-    if (type === "geometry") {
+    if (
+      type === "geometry"
+    ) {
 
       return (
-        value.includes("geometry") ||
-        value.includes("spike") ||
-        value.includes("self")
+        value.includes(
+          "geometry"
+        ) ||
+
+        value.includes(
+          "spike"
+        ) ||
+
+        value.includes(
+          "self"
+        )
       );
 
     }
 
 
-    return (
-      !value.includes("protected") &&
-      !value.includes("overlap") &&
-      !value.includes("geometry") &&
-      !value.includes("spike") &&
-      !value.includes("self")
-    );
+    /*
+     * Other QC.
+     */
+
+    if (
+      type === "other"
+    ) {
+
+      return (
+        !value.includes(
+          "protected"
+        ) &&
+
+        !value.includes(
+          "overlap"
+        ) &&
+
+        !value.includes(
+          "geometry"
+        ) &&
+
+        !value.includes(
+          "spike"
+        ) &&
+
+        !value.includes(
+          "self"
+        )
+      );
+
+    }
+
+
+    return true;
   }
 
 
@@ -767,120 +1162,141 @@
     const rows = [];
 
 
-    farms.forEach(farm => {
+    farms.forEach(
+      farm => {
 
-      const workflow =
-        t(
-          farm.workflow_state ||
-          farm.status
-        );
+        /*
+         * KEY CHANGE:
+         *
+         * Do NOT hard-code:
+         *
+         * workflow === "gis_compliance_review"
+         *
+         * Instead use the current user's role.
+         */
+
+        if (
+          !farmBelongsToCurrentQueue(
+            farm
+          )
+        ) {
+
+          return;
+
+        }
 
 
-      // Validator / GIS queue:
-      // only farms awaiting GIS compliance review.
-      if (
-        workflow !==
-        "gis_compliance_review"
-      ) {
+        const farmIssues =
+          issues.filter(
+            issue =>
+              issue.farm_id ===
+              farm.id
+          );
 
-        return;
+
+        const critical =
+          farmIssues.some(
+            issue =>
+              sev(issue) ===
+              "critical"
+          );
+
+
+        const warning =
+          farmIssues.some(
+            issue =>
+              [
+                "warning",
+                "high",
+                "medium"
+              ].includes(
+                sev(issue)
+              )
+          );
+
+
+        const status =
+          critical
+            ? "critical"
+            : warning
+              ? "warning"
+              : "passed";
+
+
+        /*
+         * A farm in the current queue is pending.
+         */
+
+        const pending = true;
+
+
+        // ------------------------------------------------------
+        // STATUS FILTER
+        // ------------------------------------------------------
+
+        if (
+          statusFilter ===
+          "pending" &&
+          !pending
+        ) {
+
+          return;
+
+        }
+
+
+        if (
+          statusFilter !==
+            "all" &&
+
+          statusFilter !==
+            "pending" &&
+
+          statusFilter !==
+            status
+        ) {
+
+          return;
+
+        }
+
+
+        // ------------------------------------------------------
+        // ISSUE TYPE FILTER
+        // ------------------------------------------------------
+
+        if (
+          typeFilter !==
+            "all" &&
+
+          !farmIssues.some(
+            issue =>
+              matchesIssue(
+                issue,
+                typeFilter
+              )
+          )
+        ) {
+
+          return;
+
+        }
+
+
+        rows.push({
+
+          f: farm,
+
+          a: farmIssues,
+
+          status,
+
+          pending
+
+        });
 
       }
-
-
-      const farmIssues =
-        issues.filter(
-          issue =>
-            issue.farm_id ===
-            farm.id
-        );
-
-
-      const critical =
-        farmIssues.some(
-          issue =>
-            sev(issue) ===
-            "critical"
-        );
-
-
-      const warning =
-        farmIssues.some(
-          issue =>
-            [
-              "warning",
-              "high",
-              "medium"
-            ].includes(
-              sev(issue)
-            )
-        );
-
-
-      const status =
-        critical
-          ? "critical"
-          : warning
-            ? "warning"
-            : "passed";
-
-
-      const pending = true;
-
-
-      // Status filter
-      if (
-        statusFilter ===
-        "pending" &&
-        !pending
-      ) {
-
-        return;
-
-      }
-
-
-      if (
-        statusFilter !== "all" &&
-        statusFilter !== "pending" &&
-        statusFilter !== status
-      ) {
-
-        return;
-
-      }
-
-
-      // Issue type filter
-      if (
-        typeFilter !== "all" &&
-        !farmIssues.some(
-          issue =>
-            matchesIssue(
-              issue,
-              typeFilter
-            )
-        )
-      ) {
-
-        return;
-
-      }
-
-
-      rows.push({
-
-        f: farm,
-
-        a: farmIssues,
-
-        status: status,
-
-        pending: pending
-
-      });
-
-    });
+    );
 
 
     const container =
@@ -894,16 +1310,26 @@
 
     container.innerHTML =
       rows.length
+
         ? rows
-            .map(queueRow)
+            .map(
+              queueRow
+            )
             .join("")
+
         : `
           <div class="qc-empty">
+
             <i class="fas fa-circle-check"></i>
-            <h3>Queue is clear</h3>
+
+            <h3>
+              Queue is clear
+            </h3>
+
             <p>
               No farms match the current QC filters.
             </p>
+
           </div>
         `;
   }
@@ -925,9 +1351,14 @@
 
 
     return `
+
       <div
         class="qc-table-row qc-row"
-        onclick="openQualityReview('${esc(item.f.id)}')"
+        onclick="
+          openQualityReview(
+            '${esc(item.f.id)}'
+          )
+        "
       >
 
         <div class="qc-farmer">
@@ -954,9 +1385,13 @@
           <strong>
             ${esc(
               issue.title ||
+
               (
-                item.status === "passed"
+                item.status ===
+                "passed"
+
                   ? "No quality issues"
+
                   : "Quality issue detected"
               )
             )}
@@ -988,24 +1423,24 @@
           <span
             class="qc-pill pending"
           >
-            ${item.pending
-              ? "Pending review"
-              : item.status === "passed"
-                ? "Passed"
-                : "Needs review"
-            }
+            Pending review
           </span>
 
         </div>
 
 
         <div>
+
           ${
             area != null
-              ? Number(area).toFixed(2) +
+
+              ? Number(area)
+                  .toFixed(2) +
                 " ha"
+
               : "—"
           }
+
         </div>
 
 
@@ -1015,7 +1450,9 @@
             class="qc-row-action"
             onclick="
               event.stopPropagation();
-              openQualityReview('${esc(item.f.id)}')
+              openQualityReview(
+                '${esc(item.f.id)}'
+              )
             "
           >
             Review
@@ -1037,7 +1474,8 @@
     currentFarm =
       farms.find(
         farm =>
-          farm.id === id
+          String(farm.id) ===
+          String(id)
       );
 
 
@@ -1049,7 +1487,28 @@
       );
 
       return;
+    }
 
+
+    /*
+     * Security/UI check:
+     *
+     * Do not open a farm that isn't in the
+     * current user's queue.
+     */
+
+    if (
+      !farmBelongsToCurrentQueue(
+        currentFarm
+      )
+    ) {
+
+      notify(
+        "This farm is not currently assigned to your review queue.",
+        "error"
+      );
+
+      return;
     }
 
 
@@ -1065,7 +1524,6 @@
       );
 
       return;
-
     }
 
 
@@ -1097,85 +1555,116 @@
       "Running checks…";
 
 
-    $("qcComponents").innerHTML =
-      `
-        <div
-          style="
-            padding:8px;
-            font-size:9px;
-            color:#8993a2
-          "
-        >
-          <i class="fas fa-spinner fa-spin"></i>
-          Running GIS quality checks…
-        </div>
-      `;
+    $("qcComponents").innerHTML = `
+
+      <div
+        style="
+          padding:8px;
+          font-size:9px;
+          color:#8993a2
+        "
+      >
+
+        <i class="fas fa-spinner fa-spin"></i>
+
+        Running GIS quality checks…
+
+      </div>
+    `;
 
 
     $("qcFarmInfo").innerHTML =
       [
+
         [
           "Farmer",
           currentFarm.farmer_name
         ],
+
         [
           "Farmer ID",
           currentFarm.farmer_id ||
           currentFarm.id
         ],
+
         [
           "Area",
           area != null
-            ? Number(area).toFixed(2) +
+            ? Number(area)
+                .toFixed(2) +
               " ha"
             : "—"
         ],
+
         [
           "Workflow",
           currentFarm.workflow_state ||
           currentFarm.status ||
           "pending"
+        ],
+
+        [
+          "Reviewer role",
+          currentProjectUserRole
+            .replaceAll(
+              "_",
+              " "
+            )
         ]
+
       ]
+
         .map(
-          row =>
-            `
-              <div>
-                <span>
-                  ${esc(row[0])}
-                </span>
-                <strong>
-                  ${esc(row[1] || "—")}
-                </strong>
-              </div>
-            `
+          row => `
+
+            <div>
+
+              <span>
+                ${esc(row[0])}
+              </span>
+
+              <strong>
+                ${esc(
+                  row[1] ||
+                  "—"
+                )}
+              </strong>
+
+            </div>
+          `
         )
         .join("");
 
 
-    $("qcReviewIssues").innerHTML =
-      `
-        <div
-          style="
-            padding:8px;
-            font-size:9px;
-            color:#8993a2
-          "
-        >
-          Loading existing quality issues…
-        </div>
-      `;
+    $("qcReviewIssues").innerHTML = `
+
+      <div
+        style="
+          padding:8px;
+          font-size:9px;
+          color:#8993a2
+        "
+      >
+
+        <i class="fas fa-spinner fa-spin"></i>
+
+        Loading existing quality issues…
+
+      </div>
+    `;
 
 
     try {
 
       // --------------------------------------------------------
-      // Existing quality issues
+      // EXISTING ISSUES
       // --------------------------------------------------------
 
       const issueResult =
         await supabaseClient
-          .from("farm_quality_issues")
+          .from(
+            "farm_quality_issues"
+          )
           .select("*")
           .eq(
             "farm_id",
@@ -1183,33 +1672,42 @@
           );
 
 
-      if (!issueResult.error) {
-
-        issues =
-          issues
-            .filter(
-              issue =>
-                issue.farm_id !== id
-            )
-            .concat(
-              issueResult.data || []
-            );
-
+      if (issueResult.error) {
+        throw issueResult.error;
       }
+
+
+      /*
+       * Replace old issues for this farm.
+       */
+
+      issues =
+        issues
+          .filter(
+            issue =>
+              String(issue.farm_id) !==
+              String(id)
+          )
+          .concat(
+            issueResult.data || []
+          );
 
 
       renderReviewShell(
         currentFarm,
+
         issues.filter(
           issue =>
-            issue.farm_id === id
+            String(issue.farm_id) ===
+            String(id)
         ),
+
         null
       );
 
 
       // --------------------------------------------------------
-      // Authoritative QC check
+      // AUTHORITATIVE QUALITY CHECK
       // --------------------------------------------------------
 
       const rpcPromise =
@@ -1237,10 +1735,12 @@
 
 
       const result =
-        await Promise.race([
-          rpcPromise,
-          timeout
-        ]);
+        await Promise.race(
+          [
+            rpcPromise,
+            timeout
+          ]
+        );
 
 
       if (result.error) {
@@ -1264,7 +1764,9 @@
 
         } catch {
 
-          // Keep original value.
+          console.warn(
+            "QC RPC returned non-JSON string."
+          );
 
         }
       }
@@ -1275,12 +1777,14 @@
 
 
       // --------------------------------------------------------
-      // Refresh issues after QC RPC
+      // REFRESH ISSUES AFTER QC
       // --------------------------------------------------------
 
       const fresh =
         await supabaseClient
-          .from("farm_quality_issues")
+          .from(
+            "farm_quality_issues"
+          )
           .select("*")
           .eq(
             "farm_id",
@@ -1288,19 +1792,21 @@
           );
 
 
-      if (!fresh.error) {
-
-        issues =
-          issues
-            .filter(
-              issue =>
-                issue.farm_id !== id
-            )
-            .concat(
-              fresh.data || []
-            );
-
+      if (fresh.error) {
+        throw fresh.error;
       }
+
+
+      issues =
+        issues
+          .filter(
+            issue =>
+              String(issue.farm_id) !==
+              String(id)
+          )
+          .concat(
+            fresh.data || []
+          );
 
 
       populateReview();
@@ -1314,107 +1820,10 @@
       );
 
 
-      $("qcReviewStatus").textContent =
-        "Review required";
-
-
-      $("qcComponents").innerHTML =
-        `
-          <div
-            style="
-              padding:8px;
-              font-size:9px;
-              color:#b42318
-            "
-          >
-            ${esc(
-              error.message ||
-              error
-            )}
-          </div>
-        `;
-
-
-      const list =
-        issues.filter(
-          issue =>
-            issue.farm_id === id
-        );
-
-
-      $("qcIssueCount").textContent =
-        list.length +
-        " issue" +
-        (
-          list.length === 1
-            ? ""
-            : "s"
-        );
-
-
-      $("qcReviewIssues").innerHTML =
-        list.length
-
-          ? list
-              .map(
-                issue =>
-                  `
-                    <div class="qc-issue ${
-                      [
-                        "warning",
-                        "medium",
-                        "high"
-                      ].includes(
-                        sev(issue)
-                      )
-                        ? "warning"
-                        : ""
-                    }">
-
-                      <strong>
-                        ${esc(
-                          issue.title ||
-                          kind(issue)
-                        )}
-                      </strong>
-
-                      <p>
-                        ${esc(
-                          issue.description ||
-                          "Quality issue detected."
-                        )}
-                      </p>
-
-                    </div>
-                  `
-              )
-              .join("")
-
-          : `
-              <div
-                style="
-                  padding:8px;
-                  color:#7d8796;
-                  font-size:9px
-                "
-              >
-                No stored quality issues.
-                The live quality check could not
-                be completed.
-              </div>
-            `;
-
-
-      $("qcDecisionNote").innerHTML =
-        `
-          <i class="fas fa-circle-exclamation"></i>
-          Live QC check did not complete.
-          Do not validate until the check succeeds.
-        `;
-
-
-      $("qcValidateBtn").disabled =
-        true;
+      showExistingIssuesAfterError(
+        id,
+        error
+      );
     }
   }
 
@@ -1430,70 +1839,13 @@
   ) {
 
     const details =
-      result?.score_details || {};
+      result?.score_details ||
+      {};
 
 
-    $("qcComponents").innerHTML =
-      [
-        "geometry",
-        "mapping",
-        "spatial",
-        "attribute",
-        "traceability"
-      ]
-        .map(key => {
-
-          const score =
-            Number(
-              details[
-                key + "_score"
-              ]
-            );
-
-
-          return `
-            <div
-              class="qc-component"
-            >
-
-              <span>
-                ${
-                  key[0].toUpperCase() +
-                  key.slice(1)
-                }
-              </span>
-
-              <div
-                class="qc-bar"
-              >
-
-                <span
-                  style="
-                    width:${
-                      Number.isFinite(
-                        score
-                      )
-                        ? score
-                        : 0
-                    }%
-                  "
-                ></span>
-
-              </div>
-
-              <b>
-                ${
-                  Number.isFinite(score)
-                    ? Math.round(score)
-                    : "—"
-                }
-              </b>
-
-            </div>
-          `;
-
-        })
-        .join("");
+    renderComponents(
+      details
+    );
 
 
     $("qcIssueCount").textContent =
@@ -1511,52 +1863,286 @@
 
         ? list
             .map(
-              issue =>
-                `
-                  <div
-                    class="qc-issue ${
-                      [
-                        "warning",
-                        "medium",
-                        "high"
-                      ].includes(
-                        sev(issue)
-                      )
-                        ? "warning"
-                        : ""
-                    }"
-                  >
-
-                    <strong>
-                      ${esc(
-                        issue.title ||
-                        kind(issue)
-                      )}
-                    </strong>
-
-                    <p>
-                      ${esc(
-                        issue.description ||
-                        "Quality issue detected."
-                      )}
-                    </p>
-
-                  </div>
-                `
+              renderIssue
             )
             .join("")
 
         : `
-            <div
-              style="
-                padding:8px;
-                color:#28734f;
-                font-size:9px
-              "
-            >
-              ✓ No stored quality issues.
-            </div>
-          `;
+
+          <div
+            style="
+              padding:8px;
+              color:#28734f;
+              font-size:9px
+            "
+          >
+
+            ✓ No stored quality issues.
+
+          </div>
+        `;
+  }
+
+
+  // ============================================================
+  // COMPONENTS
+  // ============================================================
+
+  function renderComponents(
+    details
+  ) {
+
+    $("qcComponents").innerHTML =
+
+      [
+        "geometry",
+        "mapping",
+        "spatial",
+        "attribute",
+        "traceability"
+      ]
+
+        .map(
+          key => {
+
+            const score =
+              Number(
+                details[
+                  key +
+                  "_score"
+                ]
+              );
+
+
+            return `
+
+              <div
+                class="qc-component"
+              >
+
+                <span>
+                  ${
+                    key[0]
+                      .toUpperCase() +
+                    key.slice(1)
+                  }
+                </span>
+
+                <div
+                  class="qc-bar"
+                >
+
+                  <span
+                    style="
+                      width:${
+                        Number.isFinite(
+                          score
+                        )
+                          ? Math.max(
+                              0,
+                              Math.min(
+                                100,
+                                score
+                              )
+                            )
+                          : 0
+                      }%
+                    "
+                  ></span>
+
+                </div>
+
+                <b>
+                  ${
+                    Number.isFinite(
+                      score
+                    )
+                      ? Math.round(score)
+                      : "—"
+                  }
+                </b>
+
+              </div>
+            `;
+          }
+        )
+        .join("");
+  }
+
+
+  // ============================================================
+  // ISSUE RENDERER
+  // ============================================================
+
+  function renderIssue(
+    issue
+  ) {
+
+    const warning =
+      [
+        "warning",
+        "medium",
+        "high"
+      ].includes(
+        sev(issue)
+      );
+
+
+    return `
+
+      <div
+        class="qc-issue ${
+          warning
+            ? "warning"
+            : ""
+        }"
+      >
+
+        <strong>
+
+          ${esc(
+            issue.title ||
+            kind(issue) ||
+            "Quality issue"
+          )}
+
+        </strong>
+
+        <p>
+
+          ${esc(
+            issue.description ||
+            "Quality issue detected."
+          )}
+
+        </p>
+
+        ${
+          issue.latitude != null &&
+          issue.longitude != null
+
+            ? `
+
+              <button
+                class="qc-locate"
+                onclick="
+                  locateIssue(
+                    ${Number(
+                      issue.latitude
+                    )},
+                    ${Number(
+                      issue.longitude
+                    )}
+                  )
+                "
+              >
+
+                Locate evidence
+
+              </button>
+            `
+
+            : ""
+        }
+
+      </div>
+    `;
+  }
+
+
+  // ============================================================
+  // ERROR DISPLAY
+  // ============================================================
+
+  function showExistingIssuesAfterError(
+    id,
+    error
+  ) {
+
+    $("qcReviewStatus").textContent =
+      "Review required";
+
+
+    $("qcComponents").innerHTML = `
+
+      <div
+        style="
+          padding:8px;
+          font-size:9px;
+          color:#b42318
+        "
+      >
+
+        ${esc(
+          error?.message ||
+          error
+        )}
+
+      </div>
+    `;
+
+
+    const list =
+      issues.filter(
+        issue =>
+          String(issue.farm_id) ===
+          String(id)
+      );
+
+
+    $("qcIssueCount").textContent =
+      list.length +
+      " issue" +
+      (
+        list.length === 1
+          ? ""
+          : "s"
+      );
+
+
+    $("qcReviewIssues").innerHTML =
+      list.length
+
+        ? list
+            .map(
+              renderIssue
+            )
+            .join("")
+
+        : `
+
+          <div
+            style="
+              padding:8px;
+              color:#7d8796;
+              font-size:9px
+            "
+          >
+
+            No stored quality issues.
+
+            The live quality check could not
+            be completed.
+
+          </div>
+        `;
+
+
+    $("qcDecisionNote").innerHTML = `
+
+      <i class="fas fa-circle-exclamation"></i>
+
+      Live QC check did not complete.
+      Do not validate until the check succeeds.
+
+    `;
+
+
+    $("qcValidateBtn").disabled =
+      true;
+
+
+    renderMap(list);
   }
 
 
@@ -1574,8 +2160,8 @@
     const list =
       issues.filter(
         issue =>
-          issue.farm_id ===
-          currentFarm.id
+          String(issue.farm_id) ===
+          String(currentFarm.id)
       );
 
 
@@ -1605,17 +2191,26 @@
       "review";
 
 
+    // ----------------------------------------------------------
+    // PROTECTED AREA
+    // ----------------------------------------------------------
+
     const protectedCritical =
       list.some(
         issue =>
-          sev(issue) === "critical" &&
+          sev(issue) ===
+            "critical" &&
+
           (
-            kind(issue).includes(
-              "protected"
-            ) ||
-            t(issue.title).includes(
-              "protected area"
-            )
+            kind(issue)
+              .includes(
+                "protected"
+              ) ||
+
+            lower(issue.title)
+              .includes(
+                "protected area"
+              )
           )
       );
 
@@ -1623,14 +2218,19 @@
     const otherCritical =
       list.some(
         issue =>
-          sev(issue) === "critical" &&
+          sev(issue) ===
+            "critical" &&
+
           !(
-            kind(issue).includes(
-              "protected"
-            ) ||
-            t(issue.title).includes(
-              "protected area"
-            )
+            kind(issue)
+              .includes(
+                "protected"
+              ) ||
+
+            lower(issue.title)
+              .includes(
+                "protected area"
+              )
           )
       );
 
@@ -1649,87 +2249,44 @@
     }
 
 
+    /*
+     * Validation is blocked for critical issues.
+     *
+     * For protected areas, the existing legal assessment
+     * remains required.
+     */
+
     $("qcValidateBtn").disabled =
+      !canValidate() ||
       otherCritical ||
       protectedCritical;
 
 
     $("qcDecisionNote").innerHTML =
+
       critical
 
         ? `
+
           <i class="fas fa-triangle-exclamation"></i>
+
           Critical issue detected —
           validation is blocked.
+
         `
 
         : `
+
           <i class="fas fa-circle-info"></i>
+
           Review all evidence before deciding.
+
         `;
 
 
-    $("qcComponents").innerHTML =
-      [
-        "geometry",
-        "mapping",
-        "spatial",
-        "attribute",
-        "traceability"
-      ]
-        .map(key => {
-
-          const score =
-            Number(
-              details[
-                key + "_score"
-              ]
-            );
-
-
-          return `
-            <div
-              class="qc-component"
-            >
-
-              <span>
-                ${
-                  key[0].toUpperCase() +
-                  key.slice(1)
-                }
-              </span>
-
-              <div
-                class="qc-bar"
-              >
-
-                <span
-                  style="
-                    width:${
-                      Number.isFinite(
-                        score
-                      )
-                        ? score
-                        : 0
-                    }%
-                  "
-                ></span>
-
-              </div>
-
-              <b>
-                ${
-                  Number.isFinite(score)
-                    ? Math.round(score)
-                    : "—"
-                }
-              </b>
-
-            </div>
-          `;
-
-        })
-        .join("");
+    renderComponents(
+      details
+    );
 
 
     const area =
@@ -1738,45 +2295,65 @@
 
 
     $("qcFarmInfo").innerHTML =
+
       [
+
         [
           "Farmer",
           currentFarm.farmer_name
         ],
+
         [
           "Farmer ID",
           currentFarm.farmer_id ||
           currentFarm.id
         ],
+
         [
           "Area",
           area != null
-            ? Number(area).toFixed(2) +
+            ? Number(area)
+                .toFixed(2) +
               " ha"
             : "—"
         ],
+
         [
           "Workflow",
           currentFarm.workflow_state ||
           currentFarm.status
-        ]
-      ]
-        .map(
-          row =>
-            `
-              <div>
-                <span>
-                  ${esc(row[0])}
-                </span>
+        ],
 
-                <strong>
-                  ${esc(
-                    row[1] ||
-                    "—"
-                  )}
-                </strong>
-              </div>
-            `
+        [
+          "Reviewer",
+          currentProjectUserRole
+            .replaceAll(
+              "_",
+              " "
+            )
+        ]
+
+      ]
+
+        .map(
+          row => `
+
+            <div>
+
+              <span>
+                ${esc(row[0])}
+              </span>
+
+              <strong>
+                ${esc(
+                  row[1] ||
+                  "—"
+                )}
+              </strong>
+
+            </div>
+
+          `
         )
         .join("");
 
@@ -1796,73 +2373,24 @@
 
         ? list
             .map(
-              issue =>
-                `
-                  <div
-                    class="qc-issue ${
-                      [
-                        "warning",
-                        "medium",
-                        "high"
-                      ].includes(
-                        sev(issue)
-                      )
-                        ? "warning"
-                        : ""
-                    }"
-                  >
-
-                    <strong>
-                      ${esc(
-                        issue.title ||
-                        kind(issue)
-                      )}
-                    </strong>
-
-                    <p>
-                      ${esc(
-                        issue.description ||
-                        "Quality issue detected."
-                      )}
-                    </p>
-
-                    ${
-                      issue.latitude != null &&
-                      issue.longitude != null
-
-                        ? `
-                          <button
-                            class="qc-locate"
-                            onclick="
-                              locateIssue(
-                                ${Number(issue.latitude)},
-                                ${Number(issue.longitude)}
-                              )
-                            "
-                          >
-                            Locate evidence
-                          </button>
-                        `
-
-                        : ""
-                    }
-
-                  </div>
-                `
+              renderIssue
             )
             .join("")
 
         : `
-            <div
-              style="
-                padding:8px;
-                color:#28734f;
-                font-size:10px
-              "
-            >
-              ✓ No quality issues detected.
-            </div>
-          `;
+
+          <div
+            style="
+              padding:8px;
+              color:#28734f;
+              font-size:10px
+            "
+          >
+
+            ✓ No quality issues detected.
+
+          </div>
+        `;
 
 
     renderMap(list);
@@ -1873,221 +2401,281 @@
   // MAP
   // ============================================================
 
-  function renderMap(list) {
+  function renderMap(
+    list
+  ) {
 
-    setTimeout(() => {
+    setTimeout(
+      () => {
 
-      if (!window.L) {
-        return;
-      }
-
-
-      currentMap?.remove();
+        if (!window.L) {
+          return;
+        }
 
 
-      currentMap =
-        L.map(
-          "qcReviewMap"
+        currentMap?.remove();
+
+
+        currentMap =
+          L.map(
+            "qcReviewMap"
+          );
+
+
+        L.tileLayer(
+          "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+          {
+            attribution:
+              "Tiles © Esri"
+          }
+        ).addTo(
+          currentMap
         );
 
 
-      L.tileLayer(
-        "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-        {
-          attribution:
-            "Tiles © Esri"
-        }
-      ).addTo(
-        currentMap
-      );
+        const layers = [];
 
 
-      const layers = [];
-
-
-      let geometry =
-        currentFarm.geometry;
-
-
-      if (
-        typeof geometry ===
-        "string"
-      ) {
-
-        try {
-
-          geometry =
-            JSON.parse(
-              geometry
-            );
-
-        } catch {
-
-          geometry = null;
-
-        }
-      }
-
-
-      if (geometry) {
-
-        layers.push(
-          L.geoJSON(
-            geometry,
-            {
-              style: {
-                color: "#245f45",
-                weight: 3,
-                fillOpacity: 0.12
-              }
-            }
-          ).addTo(
-            currentMap
-          )
-        );
-
-      }
-
-
-      list.forEach(issue => {
-
-        let geometry =
-          issue.issue_geometry;
+        let farmGeometry =
+          currentFarm?.geometry;
 
 
         if (
-          typeof geometry ===
+          typeof farmGeometry ===
           "string"
         ) {
 
           try {
 
-            geometry =
+            farmGeometry =
               JSON.parse(
-                geometry
+                farmGeometry
               );
 
           } catch {
 
-            geometry = null;
+            farmGeometry =
+              null;
 
           }
         }
 
 
-        if (
-          !geometry &&
-          issue.latitude != null &&
-          issue.longitude != null
-        ) {
+        if (farmGeometry) {
 
-          geometry = {
-            type: "Point",
-            coordinates: [
-              +issue.longitude,
-              +issue.latitude
-            ]
-          };
+          try {
 
-        }
-
-
-        if (geometry) {
-
-          layers.push(
-            L.geoJSON(
-              geometry,
-              {
-                pointToLayer:
-                  (
-                    feature,
-                    latlng
-                  ) =>
-                    L.circleMarker(
-                      latlng,
-                      {
-                        radius: 7,
-                        color: "#dc2626",
-                        fillOpacity: 0.9
-                      }
-                    ),
-
-                style: {
-                  color: "#dc2626",
-                  weight: 3
+            const layer =
+              L.geoJSON(
+                farmGeometry,
+                {
+                  style: {
+                    color: "#245f45",
+                    weight: 3,
+                    fillOpacity: 0.12
+                  }
                 }
-              }
-            ).addTo(
-              currentMap
-            )
-          );
+              ).addTo(
+                currentMap
+              );
 
+
+            layers.push(
+              layer
+            );
+
+          } catch (error) {
+
+            console.warn(
+              "Farm geometry could not be displayed:",
+              error
+            );
+
+          }
         }
 
-      });
 
+        list.forEach(
+          issue => {
 
-      if (layers.length) {
-
-        let bounds =
-          layers[0]
-            .getBounds();
-
-
-        layers
-          .slice(1)
-          .forEach(layer => {
-
-            const layerBounds =
-              layer.getBounds();
+            let geometry =
+              issue.issue_geometry;
 
 
             if (
-              layerBounds.isValid()
+              typeof geometry ===
+              "string"
             ) {
 
-              bounds =
-                bounds.extend(
-                  layerBounds
+              try {
+
+                geometry =
+                  JSON.parse(
+                    geometry
+                  );
+
+              } catch {
+
+                geometry =
+                  null;
+
+              }
+            }
+
+
+            if (
+              !geometry &&
+
+              issue.latitude != null &&
+
+              issue.longitude != null
+            ) {
+
+              geometry = {
+
+                type:
+                  "Point",
+
+                coordinates: [
+
+                  Number(
+                    issue.longitude
+                  ),
+
+                  Number(
+                    issue.latitude
+                  )
+
+                ]
+
+              };
+
+            }
+
+
+            if (!geometry) {
+              return;
+            }
+
+
+            try {
+
+              const layer =
+                L.geoJSON(
+                  geometry,
+                  {
+
+                    pointToLayer:
+                      (
+                        feature,
+                        latlng
+                      ) =>
+
+                        L.circleMarker(
+                          latlng,
+                          {
+                            radius: 7,
+                            color: "#dc2626",
+                            fillOpacity: 0.9
+                          }
+                        ),
+
+                    style: {
+                      color: "#dc2626",
+                      weight: 3
+                    }
+
+                  }
+                ).addTo(
+                  currentMap
                 );
 
+
+              layers.push(
+                layer
+              );
+
+            } catch (error) {
+
+              console.warn(
+                "Issue geometry could not be displayed:",
+                error
+              );
+
             }
+          }
+        );
 
-          });
+
+        if (layers.length) {
+
+          let bounds =
+            layers[0]
+              .getBounds();
 
 
-        if (
-          bounds.isValid()
-        ) {
+          layers
+            .slice(1)
+            .forEach(
+              layer => {
 
-          currentMap.fitBounds(
-            bounds,
-            {
-              padding: [
-                25,
-                25
-              ]
-            }
+                const layerBounds =
+                  layer.getBounds();
+
+
+                if (
+                  layerBounds.isValid()
+                ) {
+
+                  bounds =
+                    bounds.extend(
+                      layerBounds
+                    );
+
+                }
+
+              }
+            );
+
+
+          if (
+            bounds.isValid()
+          ) {
+
+            currentMap.fitBounds(
+              bounds,
+              {
+                padding: [
+                  25,
+                  25
+                ]
+              }
+            );
+
+          }
+
+        } else {
+
+          /*
+           * Côte d'Ivoire fallback.
+           */
+
+          currentMap.setView(
+            [
+              7.54,
+              -5.55
+            ],
+            7
           );
 
         }
 
-      } else {
 
-        currentMap.setView(
-          [
-            7.54,
-            -5.55
-          ],
-          7
-        );
+        currentMap.invalidateSize();
 
-      }
-
-
-      currentMap.invalidateSize();
-
-    }, 100);
+      },
+      100
+    );
   }
 
 
@@ -2152,6 +2740,11 @@
       );
 
     }
+
+
+    currentFarm = null;
+
+    currentResult = null;
   }
 
 
@@ -2168,25 +2761,89 @@
     }
 
 
+    const workflow =
+      workflowOf(
+        currentFarm
+      );
+
+
     const list =
       issues.filter(
         issue =>
-          issue.farm_id ===
-          currentFarm.id
+          String(issue.farm_id) ===
+          String(currentFarm.id)
       );
 
+
+    // ----------------------------------------------------------
+    // PERMISSION
+    // ----------------------------------------------------------
+
+    if (
+      decision ===
+      "validated" &&
+      !canValidate()
+    ) {
+
+      notify(
+        "You do not have permission to approve this farm.",
+        "error"
+      );
+
+      return;
+    }
+
+
+    if (
+      decision ===
+      "rejected" &&
+      !canReject()
+    ) {
+
+      notify(
+        "You do not have permission to reject this farm.",
+        "error"
+      );
+
+      return;
+    }
+
+
+    if (
+      decision ===
+      "correction_required" &&
+      !canRequestCorrection()
+    ) {
+
+      notify(
+        "You do not have permission to request correction.",
+        "error"
+      );
+
+      return;
+    }
+
+
+    // ----------------------------------------------------------
+    // PROTECTED / CRITICAL CHECKS
+    // ----------------------------------------------------------
 
     const protectedCritical =
       list.some(
         issue =>
-          sev(issue) === "critical" &&
+          sev(issue) ===
+            "critical" &&
+
           (
-            kind(issue).includes(
-              "protected"
-            ) ||
-            t(issue.title).includes(
-              "protected area"
-            )
+            kind(issue)
+              .includes(
+                "protected"
+              ) ||
+
+            lower(issue.title)
+              .includes(
+                "protected area"
+              )
           )
       );
 
@@ -2194,20 +2851,25 @@
     const otherCritical =
       list.some(
         issue =>
-          sev(issue) === "critical" &&
+          sev(issue) ===
+            "critical" &&
+
           !(
-            kind(issue).includes(
-              "protected"
-            ) ||
-            t(issue.title).includes(
-              "protected area"
-            )
+            kind(issue)
+              .includes(
+                "protected"
+              ) ||
+
+            lower(issue.title)
+              .includes(
+                "protected area"
+              )
           )
       );
 
 
     // ----------------------------------------------------------
-    // VALIDATION CHECKS
+    // VALIDATION
     // ----------------------------------------------------------
 
     if (
@@ -2223,14 +2885,14 @@
         );
 
         return;
-
       }
 
 
       if (protectedCritical) {
 
         const verified =
-          $("qcLegalVerified")?.checked;
+          $("qcLegalVerified")
+            ?.checked;
 
 
         const reference =
@@ -2255,7 +2917,6 @@
           );
 
           return;
-
         }
 
 
@@ -2267,7 +2928,6 @@
           );
 
           return;
-
         }
 
 
@@ -2279,9 +2939,39 @@
           );
 
           return;
-
         }
       }
+    }
+
+
+    // ----------------------------------------------------------
+    // SAME-STATE PROTECTION
+    // ----------------------------------------------------------
+
+    /*
+     * This specifically prevents:
+     *
+     * correction_required
+     *          ↓
+     * correction_required
+     *
+     * which was causing your previous RPC error.
+     */
+
+    if (
+      decision ===
+      "correction_required" &&
+
+      workflow ===
+      "correction_required"
+    ) {
+
+      notify(
+        "This farm is already marked as correction required. It must first return to the appropriate review stage.",
+        "error"
+      );
+
+      return;
     }
 
 
@@ -2291,11 +2981,14 @@
 
     const confirmed =
       confirm(
-        decision === "validated"
+
+        decision ===
+        "validated"
 
           ? "Approve and continue to Final Validation?"
 
-          : decision === "rejected"
+          : decision ===
+            "rejected"
 
             ? "Reject this farm?"
 
@@ -2317,18 +3010,19 @@
 
     if (
       decision ===
-      "validated" &&
+        "validated" &&
+
       protectedCritical
     ) {
 
       reason =
         `Protected Area reviewed; legal authorization verified. Document: ${
           $("qcAuthorizationRef")
-            .value
+            ?.value
             .trim()
         }. Validator comment: ${
           $("qcValidatorComment")
-            .value
+            ?.value
             .trim()
         }`;
 
@@ -2339,8 +3033,11 @@
 
       reason =
         prompt(
-          decision === "rejected"
+          decision ===
+            "rejected"
+
             ? "Rejection reason:"
+
             : "Correction reason:"
         );
 
@@ -2352,22 +3049,59 @@
 
 
     // ----------------------------------------------------------
-    // WORKFLOW TRANSITION
+    // TARGET WORKFLOW
+    // ----------------------------------------------------------
+
+    let nextState;
+
+
+    if (
+      decision ===
+      "validated"
+    ) {
+
+      nextState =
+        "final_validation";
+
+    } else if (
+      decision ===
+      "rejected"
+    ) {
+
+      nextState =
+        "rejected";
+
+    } else {
+
+      nextState =
+        "correction_required";
+
+    }
+
+
+    console.log(
+      "Workflow transition:",
+      {
+        farm_id:
+          currentFarm.id,
+
+        from:
+          workflow,
+
+        to:
+          nextState,
+
+        role:
+          currentProjectUserRole
+      }
+    );
+
+
+    // ----------------------------------------------------------
+    // DATABASE TRANSITION
     // ----------------------------------------------------------
 
     try {
-
-      const nextState =
-        decision === "validated"
-
-          ? "final_validation"
-
-          : decision === "rejected"
-
-            ? "rejected"
-
-            : "correction_required";
-
 
       const result =
         await supabaseClient.rpc(
@@ -2399,7 +3133,9 @@
 
       closeQualityReview();
 
+
       await refreshAll();
+
 
     } catch (error) {
 
@@ -2412,7 +3148,7 @@
       notify(
         "Decision failed: " +
         (
-          error.message ||
+          error?.message ||
           error
         ),
         "error"
@@ -2429,24 +3165,34 @@
 
     showLoading(true);
 
+
     try {
 
       await loadQualityData();
 
       render();
 
+
       notify(
         "Quality queue refreshed.",
         "success"
       );
 
+
     } catch (error) {
 
+      console.error(
+        "Refresh error:",
+        error
+      );
+
+
       notify(
-        error.message ||
+        error?.message ||
         error,
         "error"
       );
+
 
     } finally {
 
@@ -2457,10 +3203,12 @@
 
 
   // ============================================================
-  // UI HELPERS
+  // LOADING
   // ============================================================
 
-  function showLoading(value) {
+  function showLoading(
+    value
+  ) {
 
     const overlay =
       $("loadingOverlay");
@@ -2477,6 +3225,10 @@
   }
 
 
+  // ============================================================
+  // NOTIFICATION
+  // ============================================================
+
   function notify(
     message,
     kindValue
@@ -2492,22 +3244,37 @@
       message;
 
 
-    notification.style.cssText =
-      `
-        position:fixed;
-        right:20px;
-        bottom:20px;
-        z-index:9999;
-        background:${
-          kindValue === "error"
-            ? "#b42318"
-            : "#23764b"
-        };
-        color:#fff;
-        padding:10px 14px;
-        border-radius:6px;
-        font-size:10px;
-      `;
+    notification.style.cssText = `
+
+      position:fixed;
+
+      right:20px;
+
+      bottom:20px;
+
+      z-index:9999;
+
+      background:${
+        kindValue === "error"
+          ? "#b42318"
+          : "#23764b"
+      };
+
+      color:#fff;
+
+      padding:10px 14px;
+
+      border-radius:6px;
+
+      font-size:10px;
+
+      max-width:420px;
+
+      box-shadow:
+        0 6px 20px
+        rgba(0,0,0,.18);
+
+    `;
 
 
     document.body.appendChild(
@@ -2524,17 +3291,20 @@
 
 
   // ============================================================
-  // HTML INLINE HANDLER EXPORTS
+  // GLOBAL HANDLERS
   // ============================================================
 
   window.openQualityReview =
     openQualityReview;
 
+
   window.closeQualityReview =
     closeQualityReview;
 
+
   window.qualityDecision =
     qualityDecision;
+
 
   window.locateIssue =
     locateIssue;
