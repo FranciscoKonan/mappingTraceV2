@@ -42,7 +42,7 @@ if(!allowedRoles.includes(currentProjectUserRole)){
   );
 
   setTimeout(()=>{
-    location.href="/Dashboard.html?project="+currentProject.id;
+    location.href="/Dashboard.html;
   },1000);
 
   return;
