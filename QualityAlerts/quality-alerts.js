@@ -64,15 +64,37 @@ function matchesIssue(i,k){
  return !x.includes("protected")&&!x.includes("overlap")&&!x.includes("geometry")&&!x.includes("spike")&&!x.includes("self");
 }
 function renderQueue(){
- const sf=$("qcStatusFilter")?.value||"all",tf=$("qcTypeFilter")?.value||"all",rows=[];
+ const sf=$("qcStatusFilter")?.value||"all",
+       tf=$("qcTypeFilter")?.value||"all",
+       rows=[];
+
  farms.forEach(f=>{
-  const a=issues.filter(i=>i.farm_id===f.id),critical=a.some(i=>sev(i)==="critical"),warning=a.some(i=>["warning","high","medium"].includes(sev(i)));
-  const status=critical?"critical":warning?"warning":"passed",wf=t(f.workflow_state||f.status);
-  const pending=["pending","gis_compliance_review","enumerator_review","field_officer_review"].includes(wf);
-  if(sf==="pending"&&!pending)return;if(sf!=="all"&&sf!=="pending"&&sf!==status)return;if(tf!=="all"&&!a.some(i=>matchesIssue(i,tf)))return;
-  rows.push({f:f,a:a,status:status,pending:pending});
+  const wf=t(f.workflow_state||f.status);
+
+  // GIS Validator queue: only farms currently awaiting GIS review
+  if(wf!=="gis_compliance_review") return;
+
+  const a=issues.filter(i=>i.farm_id===f.id),
+        critical=a.some(i=>sev(i)==="critical"),
+        warning=a.some(i=>["warning","high","medium"].includes(sev(i))),
+        status=critical?"critical":warning?"warning":"passed",
+        pending=true;
+
+  if(sf==="pending"&&!pending)return;
+  if(sf!=="all"&&sf!=="pending"&&sf!==status)return;
+  if(tf!=="all"&&!a.some(i=>matchesIssue(i,tf)))return;
+
+  rows.push({
+   f:f,
+   a:a,
+   status:status,
+   pending:pending
+  });
  });
- $("qcQueueBody").innerHTML=rows.length?rows.map(queueRow).join(""):'<div class="qc-empty"><i class="fas fa-circle-check"></i><h3>Queue is clear</h3><p>No farms match the current QC filters.</p></div>';
+
+ $("qcQueueBody").innerHTML=rows.length
+  ?rows.map(queueRow).join("")
+  :'<div class="qc-empty"><i class="fas fa-circle-check"></i><h3>Queue is clear</h3><p>No farms match the current QC filters.</p></div>';
 }
 function queueRow(x){
  const i=x.a[0]||{},area=x.f.area_ha??x.f.area;
