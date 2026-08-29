@@ -1430,25 +1430,32 @@ function renderQueue() {
 
 
     /*
-     * Security/UI check:
-     *
-     * Do not open a farm that isn't in the
-     * current user's queue.
-     */
+ * Validator and management roles may VIEW any farm
+ * in the project because they need the complete
+ * Quality Control picture.
+ *
+ * Only the workflow decision remains restricted
+ * by role/workflow permissions.
+ */
+const canViewAnyFarm = [
+  "validator",
+  "manager",
+  "owner",
+  "super_manager"
+].includes(
+  currentProjectUserRole
+);
 
-    if (
-      !farmBelongsToCurrentQueue(
-        currentFarm
-      )
-    ) {
-
-      notify(
-        "This farm is not currently assigned to your review queue.",
-        "error"
-      );
-
-      return;
-    }
+if (
+  !canViewAnyFarm &&
+  !farmBelongsToCurrentQueue(currentFarm)
+) {
+  notify(
+    "This farm is not currently assigned to your review queue.",
+    "error"
+  );
+  return;
+}
 
 
     const modal =
