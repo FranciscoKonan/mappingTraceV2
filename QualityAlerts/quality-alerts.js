@@ -158,7 +158,7 @@ async function qualityDecision(decision){
  if(decision!=="validated"){reason=prompt(decision==="rejected"?"Rejection reason:":"Correction reason:");if(!reason?.trim())return;}
  try{
   const next=decision==="validated"?"final_validation":decision==="rejected"?"rejected":"gis_compliance_review";
-  const r=await supabaseClient.rpc("transition_farm_workflow",{p_farm_id:currentFarm.id,p_new_state:next,p_comment:reason?.trim()||null});if(r.error)throw r.error;
+  const r=await supabaseClient.rpc("transition_farm_workflow",{p_farm_id:currentFarm.id,p_reason:reason?.trim()||null,p_to_state:next});if(r.error)throw r.error;
   notify("QC decision saved.","success");closeQualityReview();await refreshAll();
  }catch(e){notify("Decision failed: "+e.message,"error");}
 }
