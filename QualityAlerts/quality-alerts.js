@@ -16,46 +16,72 @@ const t=x=>String(x||"").toLowerCase(),sev=x=>t(x.severity),kind=x=>t(x.issue_ty
 
 document.addEventListener("DOMContentLoaded",init);
 async function init(){
- showLoading(true);
- try{
-  if(!window.supabase?.createClient)throw Error("Supabase library did not load.");
-  supabaseClient=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
-  const s=await supabaseClient.auth.getSession();
-  if(s.error)throw s.error;
-  if(!s.data?.session?.user){location.href="../login.html";return;}
-  currentUser=s.data.session.user;
+  showLoading(true);
 
-await loadProfile();
-await resolveProject();
+  try{
+    if(!window.supabase?.createClient){
+      throw Error("Supabase library did not load.");
+    }
 
-const allowedRoles=[
-  "validator",
-  "manager",
-  "owner",
-  "super_manager"
-];
+    supabaseClient=window.supabase.createClient(
+      SUPABASE_URL,
+      SUPABASE_ANON_KEY
+    );
 
-if(!allowedRoles.includes(currentProjectUserRole)){
-  notify(
-    "You do not have access to GIS Quality Review.",
-    "error"
-  );
+    const s=await supabaseClient.auth.getSession();
 
-  setTimeout(()=>{
-    location.href="/Dashboard.html?project="+currentProject.id;
-  },1000);
+    if(s.error){
+      throw s.error;
+    }
 
-  return;
-}
+    if(!s.data?.session?.user){
+      location.href="../login.html";
+      return;
+    }
 
-  return;
-}
+    currentUser=s.data.session.user;
 
-await loadQualityData();
-bind();
-render();
- }catch(e){console.error("Quality Control initialization error:",e);notify(e.message||e,"error");}
- finally{showLoading(false);}
+    await loadProfile();
+    await resolveProject();
+
+    const allowedRoles=[
+      "validator",
+      "manager",
+      "owner",
+      "super_manager"
+    ];
+
+    if(!allowedRoles.includes(currentProjectUserRole)){
+      notify(
+        "You do not have access to GIS Quality Review.",
+        "error"
+      );
+
+      setTimeout(()=>{
+        location.href="/Dashboard.html?project="+currentProject.id;
+      },1000);
+
+      return;
+    }
+
+    await loadQualityData();
+    bind();
+    render();
+
+  }catch(e){
+    console.error(
+      "Quality Control initialization error:",
+      e
+    );
+
+    notify(
+      e.message||e,
+      "error"
+    );
+
+  }finally{
+    showLoading(false);
+  }
 }
 async function loadProfile(){
  const r=await supabaseClient
