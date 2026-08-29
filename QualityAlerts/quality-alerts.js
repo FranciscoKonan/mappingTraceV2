@@ -582,16 +582,14 @@
      * disable the validation button.
      */
 
-    const validateBtn =
-      $("qcValidateBtn");
+  const validateBtn =
+    $("qcValidateBtn");
 
-
-    if (validateBtn) {
-
-      validateBtn.style.display =
-        canValidate()
-          ? ""
-          : "none";
+  if (validateBtn) {
+    validateBtn.style.display =
+      canActOnFarm && canValidate()
+        ? ""
+        : "none";
 
     }
 
@@ -2091,51 +2089,50 @@ if (
     renderMap(list);
   }
 
+// ============================================================
+// POPULATE REVIEW
+// ============================================================
 
-  // ============================================================
-  // POPULATE REVIEW
-  // ============================================================
+function populateReview() {
 
-  function populateReview() {
+  const details =
+    currentResult?.score_details ||
+    {};
 
-    const details =
-      currentResult?.score_details ||
-      {};
+  const workflow =
+    workflowOf(currentFarm);
 
+  const canActOnFarm =
+    farmBelongsToCurrentQueue(currentFarm);
 
-    const list =
-      issues.filter(
-        issue =>
-          String(issue.farm_id) ===
-          String(currentFarm.id)
-      );
+  const list =
+    issues.filter(
+      issue =>
+        String(issue.farm_id) ===
+        String(currentFarm.id)
+    );
 
+  const critical =
+    list.some(
+      issue =>
+        sev(issue) ===
+        "critical"
+    );
 
-    const critical =
-      list.some(
-        issue =>
-          sev(issue) ===
-          "critical"
-      );
+  const score =
+    Number(
+      currentResult?.overall_score ??
+      details.overall_score
+    );
 
+  $("qcReviewScore").textContent =
+    Number.isFinite(score)
+      ? Math.round(score)
+      : "—";
 
-    const score =
-      Number(
-        currentResult?.overall_score ??
-        details.overall_score
-      );
-
-
-    $("qcReviewScore").textContent =
-      Number.isFinite(score)
-        ? Math.round(score)
-        : "—";
-
-
-    $("qcReviewStatus").textContent =
-      currentResult?.quality_status ||
-      "review";
-
+  $("qcReviewStatus").textContent =
+    currentResult?.quality_status ||
+    "review";
 
     // ----------------------------------------------------------
     // PROTECTED AREA
