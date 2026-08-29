@@ -1,7 +1,15 @@
 (() => {
 "use strict";
 const SUPABASE_URL="https://crvnohvudurqfukjpisv.supabase.co",SUPABASE_ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNydm5vaHZ1ZHVycWZ1a2pwaXN2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg0NTUxNzMsImV4cCI6MjA5NDAzMTE3M30.Qp8E57yAN4LnO4A-yirf-Z3QufGZw9OKjBfcQxG7fo8";
-let supabaseClient=null,currentUser=null,currentProject=null,farms=[],issues=[],currentFarm=null,currentResult=null,currentMap=null;
+let supabaseClient=null,
+    currentUser=null,
+    currentProject=null,
+    currentProjectUserRole=null,
+    farms=[],
+    issues=[],
+    currentFarm=null,
+    currentResult=null,
+    currentMap=null;
 const $=id=>document.getElementById(id);
 const esc=v=>String(v??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]));
 const t=x=>String(x||"").toLowerCase(),sev=x=>t(x.severity),kind=x=>t(x.issue_type);
@@ -15,38 +23,163 @@ async function init(){
   const s=await supabaseClient.auth.getSession();
   if(s.error)throw s.error;
   if(!s.data?.session?.user){location.href="../login.html";return;}
-  currentUser=s.data.session.user;await loadProfile();await resolveProject();await loadQualityData();bind();render();
+  currentUser=s.data.session.user;
+
+await loadProfile();
+await resolveProject();
+
+const allowedRoles=[
+  "validator",
+  "manager",
+  "owner",
+  "super_manager"
+];
+
+if(!allowedRoles.includes(currentProjectUserRole)){
+  notify(
+    "You do not have access to GIS Quality Review.",
+    "error"
+  );
+
+  setTimeout(()=>{
+    location.href="../Dashboard/dashboard.html";
+  },1000);
+
+  return;
+}
+
+await loadQualityData();
+bind();
+render();
  }catch(e){console.error("Quality Control initialization error:",e);notify(e.message||e,"error");}
  finally{showLoading(false);}
 }
 async function loadProfile(){
- const r=await supabaseClient.from("user_profiles").select("first_name,email").eq("id",currentUser.id).maybeSingle();
+ const r=await supabaseClient
+   .from("user_profiles")
+   .select("first_name,email")
+   .eq("id",currentUser.id)
+   .maybeSingle();
+
  if(r.error)throw Error("user_profiles: "+r.error.message);
- const n=r.data?.first_name||currentUser.email?.split("@")[0]||"User";
- if($("userName"))$("userName").textContent=n;if($("userAvatar"))$("userAvatar").textContent=n.slice(0,2).toUpperCase();
+
+ const n=r.data?.first_name
+   ||currentUser.email?.split("@")[0]
+   ||"User";
+
+ if($("userName"))
+   $("userName").textContent=n;
+
+ if($("userAvatar"))
+   $("userAvatar").textContent=n.slice(0,2).toUpperCase();
 }
+
+
 async function resolveProject(){
- const r=await supabaseClient.from("project_members").select("project_id,role,projects(*)").eq("user_id",currentUser.id).eq("status","active");
- if(r.error)throw Error("project_members: "+r.error.message);if(!r.data?.length)throw Error("No active project membership found.");
- const q=new URLSearchParams(location.search).get("project"),saved=localStorage.getItem("lastProject_"+currentUser.id);
- const m=r.data.find(x=>x.project_id===q)||r.data.find(x=>x.project_id===saved)||r.data[0];
- currentProject=m.projects;localStorage.setItem("lastProject_"+currentUser.id,currentProject.id);
- if($("projectBadge"))$("projectBadge").textContent=currentProject.name;if($("selectedProjectName"))$("selectedProjectName").textContent=currentProject.name;if($("userRole"))$("userRole").textContent=(m.role||"").replaceAll("_"," ").toUpperCase();
- const u=new URL(location.href);u.searchParams.set("project",currentProject.id);history.replaceState({},"",u);
+ const r=await supabaseClient
+   .from("project_members")
+   .select("project_id,role,projects(*)")
+   .eq("user_id",currentUser.id)
+   .eq("status","active");
+
+ if(r.error)
+   throw Error("project_members: "+r.error.message);
+
+ if(!r.data?.length)
+   throw Error("No active project membership found.");
+
+ const q=new URLSearchParams(location.search).get("project");
+ const saved=localStorage.getItem("lastProject_"+currentUser.id);
+
+ const m=
+   r.data.find(x=>x.project_id===q)
+   ||r.data.find(x=>x.project_id===saved)
+   ||r.data[0];
+
+ if(!m)
+   throw Error("No valid project membership found.");
+
+ currentProject=m.projects;
+
+ // Store the user's role for this project
+ currentProjectUserRole=(m.role||"").toLowerCase();
+
+ localStorage.setItem(
+   "lastProject_"+currentUser.id,
+   currentProject.id
+ );
+
+ if($("projectBadge"))
+   $("projectBadge").textContent=currentProject.name;
+
+ if($("selectedProjectName"))
+   $("selectedProjectName").textContent=currentProject.name;
+
+ if($("userRole"))
+   $("userRole").textContent=
+     currentProjectUserRole
+       .replaceAll("_"," ")
+       .toUpperCase();
+
+ const u=new URL(location.href);
+ u.searchParams.set("project",currentProject.id);
+
+ history.replaceState({},"",u);
 }
+
+
 async function loadQualityData(){
- const f=await supabaseClient.from("farms").select("*").eq("project_id",currentProject.id).order("created_at",{ascending:false});
- if(f.error)throw f.error;farms=f.data||[];issues=[];
+ const f=await supabaseClient
+   .from("farms")
+   .select("*")
+   .eq("project_id",currentProject.id)
+   .order("created_at",{ascending:false});
+
+ if(f.error)
+   throw f.error;
+
+ farms=f.data||[];
+ issues=[];
+
  for(let i=0;i<farms.length;i+=200){
-  const ids=farms.slice(i,i+200).map(x=>x.id);if(!ids.length)continue;
-  const r=await supabaseClient.from("farm_quality_issues").select("*").in("farm_id",ids);
-  if(r.error)throw r.error;issues.push(...(r.data||[]));
+   const ids=farms
+     .slice(i,i+200)
+     .map(x=>x.id);
+
+   if(!ids.length)
+     continue;
+
+   const r=await supabaseClient
+     .from("farm_quality_issues")
+     .select("*")
+     .in("farm_id",ids);
+
+   if(r.error)
+     throw r.error;
+
+   issues.push(...(r.data||[]));
  }
 }
+
+
 function bind(){
- ["qcStatusFilter","qcTypeFilter"].forEach(id=>$(id)?.addEventListener("change",renderQueue));
- $("refreshBtn")?.addEventListener("click",refreshAll);
- $("logoutBtn")?.addEventListener("click",async e=>{e.preventDefault();await supabaseClient.auth.signOut();location.href="../login.html";});
+ ["qcStatusFilter","qcTypeFilter"].forEach(id=>{
+   $(id)?.addEventListener("change",renderQueue);
+ });
+
+ $("refreshBtn")?.addEventListener(
+   "click",
+   refreshAll
+ );
+
+ $("logoutBtn")?.addEventListener(
+   "click",
+   async e=>{
+     e.preventDefault();
+     await supabaseClient.auth.signOut();
+     location.href="../login.html";
+   }
+ );
 }
 function render(){renderStats();renderQueue();}
 function renderStats(){
