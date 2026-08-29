@@ -79,15 +79,55 @@ function queueRow(x){
  return `<div class="qc-table-row qc-row" onclick="openQualityReview('${esc(x.f.id)}')"><div class="qc-farmer"><strong>${esc(x.f.farmer_name||"Unnamed farmer")}</strong><small>${esc(x.f.farmer_id||x.f.id)}</small></div><div class="qc-issue-title"><strong>${esc(i.title||(x.status==="passed"?"No quality issues":"Quality issue detected"))}</strong><small>${esc(i.description||"Farm requires routine quality review.")}</small></div><div><span class="qc-pill ${x.status}">${x.status}</span></div><div><span class="qc-pill pending">${x.pending?"Pending review":x.status==="passed"?"Passed":"Needs review"}</span></div><div>${area!=null?Number(area).toFixed(2)+" ha":"—"}</div><div><button class="qc-row-action" onclick="event.stopPropagation();openQualityReview('${esc(x.f.id)}')">Review</button></div></div>`;
 }
 async function openQualityReview(id){
- currentFarm=farms.find(f=>f.id===id);if(!currentFarm)return;
- $("qcReviewModal").classList.remove("hidden");$("qcReviewTitle").textContent=currentFarm.farmer_name||"Farm Review";$("qcReviewSubtitle").textContent=currentFarm.farmer_id||currentFarm.id;
- $("qcReviewIssues").innerHTML='<div style="padding:10px;font-size:10px;color:#7d8796">Running full quality check…</div>';
+ currentFarm=farms.find(f=>f.id===id);if(!currentFarm){notify("Farm not found in the loaded project.","error");return;}
+ const modal=$("qcReviewModal"); if(!modal){notify("Review modal is missing from the page.","error");return;}
+ modal.classList.remove("hidden");
+ $("qcReviewTitle").textContent=currentFarm.farmer_name||"Farm Review";
+ $("qcReviewSubtitle").textContent=currentFarm.farmer_id||currentFarm.id;
+ // Render the farm immediately. Never leave the reviewer looking at a blank modal while the RPC runs.
+ const area=currentFarm.area_ha??currentFarm.area;
+ $("qcReviewScore").textContent="—";
+ $("qcReviewStatus").textContent="Running checks…";
+ $("qcComponents").innerHTML='<div style="padding:8px;font-size:9px;color:#8993a2"><i class="fas fa-spinner fa-spin"></i> Running GIS quality checks…</div>';
+ $("qcFarmInfo").innerHTML=[["Farmer",currentFarm.farmer_name],["Farmer ID",currentFarm.farmer_id||currentFarm.id],["Area",area!=null?Number(area).toFixed(2)+" ha":"—"],["Workflow",currentFarm.workflow_state||currentFarm.status||"pending"]].map(a=>`<div><span>${esc(a[0])}</span><strong>${esc(a[1]||"—")}</strong></div>`).join("");
+ $("qcReviewIssues").innerHTML='<div style="padding:8px;font-size:9px;color:#8993a2">Loading existing quality issues…</div>';
  try{
-  const r=await supabaseClient.rpc("run_full_quality_check",{p_farm_id:id});if(r.error)throw r.error;currentResult=r.data||{};
-  const q=await supabaseClient.from("farm_quality_issues").select("*").eq("farm_id",id);if(q.error)throw q.error;
-  issues=issues.filter(x=>x.farm_id!==id).concat(q.data||[]);populateReview();
- }catch(e){$("qcReviewIssues").innerHTML=`<div style="padding:10px;color:#b42318;font-size:10px">${esc(e.message||e)}</div>`;}
+  // Existing issues are useful even if the RPC is temporarily slow.
+  const q=await supabaseClient.from("farm_quality_issues").select("*").eq("farm_id",id);
+  if(!q.error){issues=issues.filter(x=>x.farm_id!==id).concat(q.data||[]);}
+  renderReviewShell(currentFarm, issues.filter(x=>x.farm_id===id), null);
+
+  // Run the authoritative check with a timeout so a slow/blocked RPC cannot freeze the UI.
+  const rpcPromise=supabaseClient.rpc("run_full_quality_check",{p_farm_id:id});
+  const timeout=new Promise((_,reject)=>setTimeout(()=>reject(new Error("Quality check is taking longer than expected. Existing results are shown; use Refresh and try again.")),10000));
+  const r=await Promise.race([rpcPromise,timeout]);
+  if(r.error)throw r.error;
+  let result=r.data||{};
+  if(typeof result==="string"){try{result=JSON.parse(result)}catch{}}
+  currentResult=result;
+  // Refresh issues after the check because the RPC may have created/updated them.
+  const fresh=await supabaseClient.from("farm_quality_issues").select("*").eq("farm_id",id);
+  if(!fresh.error){issues=issues.filter(x=>x.farm_id!==id).concat(fresh.data||[]);}
+  populateReview();
+ }catch(e){
+  console.error("Farm quality review:",e);
+  // Keep the farm information visible and show the actual reason instead of a blank panel.
+  $("qcReviewStatus").textContent="Review required";
+  $("qcComponents").innerHTML='<div style="padding:8px;font-size:9px;color:#b42318">'+esc(e.message||e)+"</div>";
+  const list=issues.filter(x=>x.farm_id===id);
+  $("qcIssueCount").textContent=list.length+" issue"+(list.length===1?"":"s");
+  $("qcReviewIssues").innerHTML=list.length?list.map(i=>`<div class="qc-issue ${["warning","medium","high"].includes(sev(i))?"warning":""}"><strong>${esc(i.title||kind(i))}</strong><p>${esc(i.description||"Quality issue detected.")}</p></div>`).join(""):('<div style="padding:8px;color:#7d8796;font-size:9px">No stored quality issues. The live quality check could not be completed.</div>');
+  $("qcDecisionNote").innerHTML='<i class="fas fa-circle-exclamation"></i> Live QC check did not complete. Do not validate until the check succeeds.';
+  $("qcValidateBtn").disabled=true;
+ }
 }
+function renderReviewShell(farm,list,result){
+ const d=result?.score_details||{};
+ $("qcComponents").innerHTML=["geometry","mapping","spatial","attribute","traceability"].map(k=>{const n=Number(d[k+"_score"]);return `<div class="qc-component"><span>${k[0].toUpperCase()+k.slice(1)}</span><div class="qc-bar"><span style="width:${Number.isFinite(n)?n:0}%"></span></div><b>${Number.isFinite(n)?Math.round(n):"—"}</b></div>`}).join("");
+ $("qcIssueCount").textContent=list.length+" issue"+(list.length===1?"":"s");
+ $("qcReviewIssues").innerHTML=list.length?list.map(i=>`<div class="qc-issue ${["warning","medium","high"].includes(sev(i))?"warning":""}"><strong>${esc(i.title||kind(i))}</strong><p>${esc(i.description||"Quality issue detected.")}</p></div>`).join(""): '<div style="padding:8px;color:#28734f;font-size:9px">✓ No stored quality issues.</div>';
+}
+
 function populateReview(){
  const d=currentResult.score_details||{},list=issues.filter(i=>i.farm_id===currentFarm.id),critical=list.some(i=>sev(i)==="critical"),score=Number(currentResult.overall_score??d.overall_score);
  $("qcReviewScore").textContent=Number.isFinite(score)?Math.round(score):"—";$("qcReviewStatus").textContent=currentResult.quality_status||"review";$("qcValidateBtn").disabled=critical;
