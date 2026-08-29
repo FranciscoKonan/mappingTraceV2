@@ -2200,6 +2200,7 @@ function populateReview() {
      */
 
     $("qcValidateBtn").disabled =
+      !canActOnFarm ||
       !canValidate() ||
       otherCritical ||
       protectedCritical;
