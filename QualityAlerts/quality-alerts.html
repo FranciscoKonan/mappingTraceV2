@@ -9,7 +9,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     
-    <link rel="stylesheet" href="quality-alerts.css">
+    <link rel="stylesheet" href="quality-alerts.css?v=gis-review-1">
     <link rel="icon" type="image/x-icon" href="../assets/favicon.ico">
 </head>
 <body>
@@ -96,7 +96,16 @@
 <div id="qcReviewModal" class="qc-modal hidden"><div class="qc-review">
 <div class="qc-review-top"><div><span class="qc-kicker">FARM QUALITY REVIEW</span><h2 id="qcReviewTitle">Farm Review</h2><p id="qcReviewSubtitle"></p></div><button class="qc-icon-btn" onclick="closeQualityReview()"><i class="fas fa-times"></i></button></div>
 <div class="qc-review-body"><div class="qc-review-topgrid"><div class="qc-score-panel"><span>Overall Quality Score</span><strong id="qcReviewScore">—</strong><em id="qcReviewStatus">Pending review</em></div><div class="qc-components-panel"><h3>Quality checks</h3><div id="qcComponents"></div></div></div>
-<div class="qc-review-grid"><div><div class="qc-panel"><div class="qc-panel-title"><h3>Farm information</h3></div><div id="qcFarmInfo" class="qc-info-grid"></div></div><div class="qc-panel"><div class="qc-panel-title"><h3>Evidence & Issues</h3><span id="qcIssueCount"></span></div><div id="qcReviewIssues"></div></div></div>
+<div class="qc-review-grid"><div><div class="qc-panel"><div class="qc-panel-title"><h3>Farm information</h3></div><div id="qcFarmInfo" class="qc-info-grid"></div></div><div class="qc-panel"><div class="qc-panel-title"><h3>Evidence & Issues</h3><span id="qcIssueCount"></span></div><div id="qcReviewIssues"></div>
+<div id="qcProtectedAssessment" class="qc-protected-assessment" style="display:none">
+<div class="qc-protected-title"><i class="fas fa-shield-halved"></i><strong>Protected Area — Validator Assessment</strong></div>
+<p>This farm intersects a protected area. Review the evidence and legal authorization before approving.</p>
+<label class="qc-check-row"><input id="qcLegalVerified" type="checkbox"> Legal authorization verified by validator</label>
+<label class="qc-field-label" for="qcAuthorizationRef">Authorization / document reference</label>
+<input id="qcAuthorizationRef" class="qc-text-input" type="text" placeholder="Document or permit reference">
+<label class="qc-field-label" for="qcValidatorComment">Validator comment</label>
+<textarea id="qcValidatorComment" class="qc-textarea" rows="3" placeholder="Record the basis for your decision"></textarea>
+</div></div></div>
 <div class="qc-map-panel"><div class="qc-map-head"><span><i class="fas fa-map"></i> Spatial evidence</span><span>Farm & issue locations</span></div><div id="qcReviewMap"></div></div></div></div>
 <div class="qc-review-footer"><div id="qcDecisionNote"><i class="fas fa-circle-info"></i> Review all evidence before deciding.</div><div class="qc-decision-actions"><button class="qc-decision correction" onclick="qualityDecision('correction_required')"><i class="fas fa-rotate-left"></i> Request Correction</button><button class="qc-decision reject" onclick="qualityDecision('rejected')"><i class="fas fa-ban"></i> Reject</button><button id="qcValidateBtn" class="qc-decision validate" onclick="qualityDecision('validated')"><i class="fas fa-check"></i> Approve & Validate</button></div></div>
 </div></div>
@@ -104,6 +113,6 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
-    <script src="quality-alerts.js?v=workflow-fixed"></script>
+    <script src="quality-alerts.js?v=gis-review-1"></script>
 </body>
 </html>

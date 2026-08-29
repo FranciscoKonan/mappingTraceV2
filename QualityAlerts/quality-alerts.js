@@ -130,7 +130,13 @@ function renderReviewShell(farm,list,result){
 
 function populateReview(){
  const d=currentResult.score_details||{},list=issues.filter(i=>i.farm_id===currentFarm.id),critical=list.some(i=>sev(i)==="critical"),score=Number(currentResult.overall_score??d.overall_score);
- $("qcReviewScore").textContent=Number.isFinite(score)?Math.round(score):"—";$("qcReviewStatus").textContent=currentResult.quality_status||"review";$("qcValidateBtn").disabled=critical;
+ $("qcReviewScore").textContent=Number.isFinite(score)?Math.round(score):"—";
+ $("qcReviewStatus").textContent=currentResult.quality_status||"review";
+ const protectedCritical=list.some(i=>sev(i)==="critical" && (kind(i).includes("protected") || t(i.title).includes("protected area")));
+ const otherCritical=list.some(i=>sev(i)==="critical" && !(kind(i).includes("protected") || t(i.title).includes("protected area")));
+ const assessment=$("qcProtectedAssessment");
+ if(assessment)assessment.style.display=protectedCritical?"block":"none";
+ $("qcValidateBtn").disabled=otherCritical || protectedCritical;
  $("qcDecisionNote").innerHTML=critical?'<i class="fas fa-triangle-exclamation"></i> Critical issue detected — validation is blocked.':'<i class="fas fa-circle-info"></i> Review all evidence before deciding.';
  $("qcComponents").innerHTML=["geometry","mapping","spatial","attribute","traceability"].map(k=>{const n=Number(d[k+"_score"]);return `<div class="qc-component"><span>${k[0].toUpperCase()+k.slice(1)}</span><div class="qc-bar"><span style="width:${Number.isFinite(n)?n:0}%"></span></div><b>${Number.isFinite(n)?Math.round(n):"—"}</b></div>`;}).join("");
  const area=currentFarm.area_ha??currentFarm.area;
@@ -141,7 +147,7 @@ function populateReview(){
 }
 function renderMap(list){
  setTimeout(()=>{
-  if(!window.L)return;currentMap?.remove();currentMap=L.map("qcReviewMap");L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"© OpenStreetMap contributors"}).addTo(currentMap);
+  if(!window.L)return;currentMap?.remove();currentMap=L.map("qcReviewMap");L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",{attribution:"Tiles © Esri"}).addTo(currentMap);
   const layers=[];let g=currentFarm.geometry;if(typeof g==="string"){try{g=JSON.parse(g)}catch{g=null}}
   if(g)layers.push(L.geoJSON(g,{style:{color:"#245f45",weight:3,fillOpacity:.12}}).addTo(currentMap));
   list.forEach(i=>{let z=i.issue_geometry;if(typeof z==="string"){try{z=JSON.parse(z)}catch{z=null}}if(!z&&i.latitude!=null&&i.longitude!=null)z={type:"Point",coordinates:[+i.longitude,+i.latitude]};if(z)layers.push(L.geoJSON(z,{pointToLayer:(f,ll)=>L.circleMarker(ll,{radius:7,color:"#dc2626",fillOpacity:.9}),style:{color:"#dc2626",weight:3}}).addTo(currentMap));});
@@ -153,14 +159,42 @@ function locateIssue(lat,lng){if(currentMap){currentMap.setView([lat,lng],17);L.
 function closeQualityReview(){currentMap?.remove();currentMap=null;$("qcReviewModal").classList.add("hidden");}
 async function qualityDecision(decision){
  if(!currentFarm)return;
- if(!confirm(decision==="validated"?"Approve and validate this farm?":decision==="rejected"?"Reject this farm?":"Request correction for this farm?"))return;
+ const list=issues.filter(i=>i.farm_id===currentFarm.id);
+ const protectedCritical=list.some(i=>sev(i)==="critical" && (kind(i).includes("protected") || t(i.title).includes("protected area")));
+ const otherCritical=list.some(i=>sev(i)==="critical" && !(kind(i).includes("protected") || t(i.title).includes("protected area")));
+
+ if(decision==="validated"){
+  if(otherCritical){notify("Approval blocked: a critical non-protected-area issue must be resolved first.","error");return;}
+  if(protectedCritical){
+   const verified=$("qcLegalVerified")?.checked;
+   const ref=$("qcAuthorizationRef")?.value.trim()||"";
+   const comment=$("qcValidatorComment")?.value.trim()||"";
+   if(!verified){notify("Verify the legal authorization before approving this protected-area case.","error");return;}
+   if(!ref){notify("Enter the authorization / document reference.","error");return;}
+   if(!comment){notify("Enter a validator comment for the protected-area decision.","error");return;}
+  }
+ }
+ if(!confirm(decision==="validated"?"Approve and continue to Final Validation?":decision==="rejected"?"Reject this farm?":"Request correction for this farm?"))return;
+
  let reason=null;
- if(decision!=="validated"){reason=prompt(decision==="rejected"?"Rejection reason:":"Correction reason:");if(!reason?.trim())return;}
+ if(decision==="validated" && protectedCritical){
+  reason=`Protected Area reviewed; legal authorization verified. Document: ${$("qcAuthorizationRef").value.trim()}. Validator comment: ${$("qcValidatorComment").value.trim()}`;
+ }else if(decision!=="validated"){
+  reason=prompt(decision==="rejected"?"Rejection reason:":"Correction reason:");
+  if(!reason?.trim())return;
+ }
+
  try{
   const next=decision==="validated"?"final_validation":decision==="rejected"?"rejected":"gis_compliance_review";
-  const r=await supabaseClient.rpc("transition_farm_workflow",{p_farm_id:currentFarm.id,p_reason:reason?.trim()||null,p_to_state:next});if(r.error)throw r.error;
-  notify("QC decision saved.","success");closeQualityReview();await refreshAll();
- }catch(e){notify("Decision failed: "+e.message,"error");}
+  const r=await supabaseClient.rpc("transition_farm_workflow",{p_farm_id:currentFarm.id,p_to_state:next,p_reason:reason?.trim()||null});
+  if(r.error)throw r.error;
+  notify("QC decision saved.","success");
+  closeQualityReview();
+  await refreshAll();
+ }catch(e){
+  console.error("QC decision error:",e);
+  notify("Decision failed: "+(e.message||e),"error");
+ }
 }
 async function refreshAll(){showLoading(true);try{await loadQualityData();render();notify("Quality queue refreshed.","success");}catch(e){notify(e.message||e,"error")}finally{showLoading(false)}}
 function showLoading(v){const o=$("loadingOverlay");if(o)o.style.display=v?"flex":"none";}
