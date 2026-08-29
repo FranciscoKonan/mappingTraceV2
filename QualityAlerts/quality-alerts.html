@@ -82,7 +82,7 @@
                                 Quality Alerts
                                 <span class="project-badge" id="projectBadge">Loading...</span>
                             </h1>
-                            <div class="breadcrumb">Home / Submissions</div>
+                            <div class="breadcrumb">Home / Quality Alerts</div>
                         </div>
                     </div>
                 </div>
@@ -107,11 +107,11 @@
                         <div class="user-name" id="userName">User</div>
                         <div class="user-role" id="userRole">Role</div>
                     </div>
-                    <button class="sync-btn" id="refreshBtn"><i class="fas fa-sync-alt"></i> Sync</button>
+                    <button class="sync-btn" id="refreshBtn"><i class="fas fa-sync-alt"></i> Refresh</button>
                 </div>
             </header>
 
-            <!-- SUBMISSIONS CONTENT -->
+            <!-- ALERTS CONTENT -->
             <div class="alerts-container">
                 <!-- Stats Cards -->
                 <div class="stats-grid">
@@ -299,8 +299,6 @@
                     </div>
                 </div>
             </div>
-        
-            </div>
         </main>
     </div>
 
@@ -308,49 +306,10 @@
         <i class="fas fa-spinner fa-spin"></i><span>Loading...</span>
     </div>
 
-
-    <div class="qc-review-modal hidden" id="qcReviewModal">
-      <div class="qc-review-dialog">
-        <div class="qc-review-header">
-          <div>
-            <div class="qc-review-kicker">GIS QUALITY REVIEW</div>
-            <h2 id="qcReviewTitle">Farm Quality Review</h2>
-            <p id="qcReviewSubtitle"></p>
-          </div>
-          <button class="qc-close" onclick="closeQualityReview()"><i class="fas fa-times"></i></button>
-        </div>
-        <div class="qc-review-body">
-          <div class="qc-review-summary">
-            <div class="qc-score-card"><span>Overall Quality Score</span><strong id="qcReviewScore">—</strong><em id="qcReviewStatus">Pending</em></div>
-            <div class="qc-check-card">
-              <h3>Quality Components</h3>
-              <div id="qcComponents"></div>
-            </div>
-          </div>
-          <div class="qc-review-grid">
-            <div>
-              <div class="qc-info-card"><h3>Farm Information</h3><div id="qcFarmInfo" class="qc-info-grid"></div></div>
-              <div class="qc-issues-card"><h3>Quality Issues <span id="qcIssueCount"></span></h3><div id="qcReviewIssues"></div></div>
-            </div>
-            <div class="qc-map-card"><div id="qcReviewMap"></div></div>
-          </div>
-        </div>
-        <div class="qc-review-footer">
-          <span id="qcDecisionNote">Review the evidence before making a decision.</span>
-          <div class="qc-decision-actions">
-            <button class="qc-btn correction" onclick="qualityDecision('correction_required')"><i class="fas fa-pen"></i> Request Correction</button>
-            <button class="qc-btn reject" onclick="qualityDecision('rejected')"><i class="fas fa-times"></i> Reject</button>
-            <button id="qcValidateBtn" class="qc-btn validate" onclick="qualityDecision('validated')"><i class="fas fa-check"></i> Validate</button>
-          </div>
-        </div>
-      </div>
-    </div>
-
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="quality-alerts.js"></script>
+    <script src="quality-alerts.js?v=20260829-2"></script>
 </body>
 </html>
