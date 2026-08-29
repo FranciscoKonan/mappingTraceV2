@@ -1,109 +1,496 @@
 (() => {
-"use strict";
-const SUPABASE_URL="https://crvnohvudurqfukjpisv.supabase.co",SUPABASE_ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNydm5vaHZ1ZHVycWZ1a2pwaXN2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg0NTUxNzMsImV4cCI6MjA5NDAzMTE3M30.Qp8E57yAN4LnO4A-yirf-Z3QufGZw9OKjBfcQxG7fo8";
-let supabaseClient=null,
-    currentUser=null,
-    currentProject=null,
-    currentProjectUserRole=null,
-    farms=[],
-    issues=[],
-    currentFarm=null,
-    currentResult=null,
-    currentMap=null;
-const $=id=>document.getElementById(id);
-const esc=v=>String(v??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]));
-const t=x=>String(x||"").toLowerCase(),sev=x=>t(x.severity),kind=x=>t(x.issue_type);
+  "use strict";
 
-document.addEventListener("DOMContentLoaded",init);
-async function init(){
-  showLoading(true);
+  // ============================================================
+  // CONFIGURATION
+  // ============================================================
 
-  try{
-    if(!window.supabase?.createClient){
-      throw Error("Supabase library did not load.");
-    }
+  const SUPABASE_URL =
+    "https://crvnohvudurqfukjpisv5.supabase.co";
 
-    supabaseClient=window.supabase.createClient(
-      SUPABASE_URL,
-      SUPABASE_ANON_KEY
+  const SUPABASE_ANON_KEY = "...";
+
+
+  // ============================================================
+  // APPLICATION STATE
+  // ============================================================
+
+  let supabaseClient = null;
+  let currentUser = null;
+  let currentProject = null;
+  let currentProjectUserRole = null;
+
+  let farms = [];
+  let issues = [];
+
+  let currentFarm = null;
+  let currentResult = null;
+  let currentMap = null;
+
+
+  // ============================================================
+  // DOM / HELPERS
+  // ============================================================
+
+  const $ = id => document.getElementById(id);
+
+  const esc = value =>
+    String(value ?? "").replace(
+      /[&<>"']/g,
+      char => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#039;"
+      })[char]
     );
 
-    const s=await supabaseClient.auth.getSession();
+  const t = value =>
+    String(value || "").toLowerCase();
 
-    if(s.error){
-      throw s.error;
-    }
+  const sev = issue =>
+    t(issue?.severity);
 
-    if(!s.data?.session?.user){
-      location.href="../login.html";
-      return;
-    }
+  const kind = issue =>
+    t(issue?.issue_type);
 
-    currentUser=s.data.session.user;
 
-    await loadProfile();
-    await resolveProject();
+  // ============================================================
+  // INITIALIZATION
+  // ============================================================
 
-    const allowedRoles=[
-      "validator",
-      "manager",
-      "owner",
-      "super_manager"
-    ];
+  document.addEventListener(
+    "DOMContentLoaded",
+    init
+  );
 
-    if(!allowedRoles.includes(currentProjectUserRole)){
+
+  async function init() {
+    showLoading(true);
+
+    try {
+      // --------------------------------------------------------
+      // Supabase initialization
+      // --------------------------------------------------------
+
+      if (!window.supabase?.createClient) {
+        throw new Error(
+          "Supabase library did not load."
+        );
+      }
+
+      supabaseClient =
+        window.supabase.createClient(
+          SUPABASE_URL,
+          SUPABASE_ANON_KEY
+        );
+
+
+      // --------------------------------------------------------
+      // Authentication
+      // --------------------------------------------------------
+
+      const sessionResult =
+        await supabaseClient.auth.getSession();
+
+      if (sessionResult.error) {
+        throw sessionResult.error;
+      }
+
+      const session =
+        sessionResult.data?.session;
+
+      if (!session?.user) {
+        location.href = "../login.html";
+        return;
+      }
+
+      currentUser = session.user;
+
+
+      // --------------------------------------------------------
+      // User / project
+      // --------------------------------------------------------
+
+      await loadProfile();
+      await resolveProject();
+
+
+      // --------------------------------------------------------
+      // Role authorization
+      // --------------------------------------------------------
+
+      const allowedRoles = [
+        "validator",
+        "manager",
+        "owner",
+        "super_manager"
+      ];
+
+      if (
+        !allowedRoles.includes(
+          currentProjectUserRole
+        )
+      ) {
+        notify(
+          "You do not have access to GIS Quality Review.",
+          "error"
+        );
+
+        setTimeout(() => {
+          location.href =
+            "/Dashboard.html?project=" +
+            encodeURIComponent(
+              currentProject.id
+            );
+        }, 1000);
+
+        return;
+      }
+
+
+      // --------------------------------------------------------
+      // Load application data
+      // --------------------------------------------------------
+
+      await loadQualityData();
+
+      bind();
+
+      render();
+
+    } catch (error) {
+
+      console.error(
+        "Quality Control initialization error:",
+        error
+      );
+
       notify(
-        "You do not have access to GIS Quality Review.",
+        error?.message || String(error),
         "error"
       );
 
-      setTimeout(()=>{
-        location.href="/Dashboard.html?project="+currentProject.id;
-      },1000);
+    } finally {
 
-      return;
+      showLoading(false);
+    }
+  }
+
+
+  // ============================================================
+  // USER PROFILE
+  // ============================================================
+
+  async function loadProfile() {
+
+    const result =
+      await supabaseClient
+        .from("user_profiles")
+        .select("first_name,email")
+        .eq("id", currentUser.id)
+        .maybeSingle();
+
+    if (result.error) {
+      throw new Error(
+        "user_profiles: " +
+        result.error.message
+      );
     }
 
-    await loadQualityData();
-    bind();
-    render();
+    const firstName =
+      result.data?.first_name ||
+      currentUser.email?.split("@")[0] ||
+      "User";
 
-  }catch(e){
-    console.error(
-      "Quality Control initialization error:",
-      e
-    );
 
-    notify(
-      e.message||e,
-      "error"
-    );
+    if ($("userName")) {
+      $("userName").textContent =
+        firstName;
+    }
 
-  }finally{
-    showLoading(false);
+
+    if ($("userAvatar")) {
+      $("userAvatar").textContent =
+        firstName
+          .slice(0, 2)
+          .toUpperCase();
+    }
   }
-}
-async function loadProfile(){
- const r=await supabaseClient
-   .from("user_profiles")
-   .select("first_name,email")
-   .eq("id",currentUser.id)
-   .maybeSingle();
-
- if(r.error)throw Error("user_profiles: "+r.error.message);
-
- const n=r.data?.first_name
-   ||currentUser.email?.split("@")[0]
-   ||"User";
-
- if($("userName"))
-   $("userName").textContent=n;
-
- if($("userAvatar"))
-   $("userAvatar").textContent=n.slice(0,2).toUpperCase();
-}
 
 
+  // ============================================================
+  // PROJECT / ROLE
+  // ============================================================
+
+  async function resolveProject() {
+
+    const result =
+      await supabaseClient
+        .from("project_members")
+        .select(
+          "project_id,role,projects(*)"
+        )
+        .eq(
+          "user_id",
+          currentUser.id
+        )
+        .eq(
+          "status",
+          "active"
+        );
+
+    if (result.error) {
+      throw new Error(
+        "project_members: " +
+        result.error.message
+      );
+    }
+
+    if (!result.data?.length) {
+      throw new Error(
+        "No active project membership found."
+      );
+    }
+
+
+    const urlProject =
+      new URLSearchParams(
+        location.search
+      ).get("project");
+
+    const savedProject =
+      localStorage.getItem(
+        "lastProject_" +
+        currentUser.id
+      );
+
+
+    const membership =
+      result.data.find(
+        item =>
+          item.project_id ===
+          urlProject
+      ) ||
+      result.data.find(
+        item =>
+          item.project_id ===
+          savedProject
+      ) ||
+      result.data[0];
+
+
+    if (!membership) {
+      throw new Error(
+        "No valid project membership found."
+      );
+    }
+
+
+    currentProject =
+      membership.projects;
+
+    currentProjectUserRole =
+      String(
+        membership.role || ""
+      ).toLowerCase();
+
+
+    localStorage.setItem(
+      "lastProject_" +
+      currentUser.id,
+      currentProject.id
+    );
+
+
+    if ($("projectBadge")) {
+      $("projectBadge").textContent =
+        currentProject.name;
+    }
+
+
+    if ($("selectedProjectName")) {
+      $("selectedProjectName").textContent =
+        currentProject.name;
+    }
+
+
+    if ($("userRole")) {
+      $("userRole").textContent =
+        currentProjectUserRole
+          .replaceAll("_", " ")
+          .toUpperCase();
+    }
+
+
+    const url =
+      new URL(location.href);
+
+    url.searchParams.set(
+      "project",
+      currentProject.id
+    );
+
+    history.replaceState(
+      {},
+      "",
+      url
+    );
+  }
+
+
+  // ============================================================
+  // QUALITY DATA
+  // ============================================================
+
+  async function loadQualityData() {
+
+    console.log(
+      "=== QUALITY DEBUG ==="
+    );
+
+    console.log(
+      "Current project:",
+      currentProject
+    );
+
+    console.log(
+      "Current project ID:",
+      currentProject?.id
+    );
+
+    console.log(
+      "Current role:",
+      currentProjectUserRole
+    );
+
+
+    const farmResult =
+      await supabaseClient
+        .from("farms")
+        .select("*")
+        .eq(
+          "project_id",
+          currentProject.id
+        )
+        .order(
+          "created_at",
+          { ascending: false }
+        );
+
+
+    console.log(
+      "Farms query error:",
+      farmResult.error
+    );
+
+    console.log(
+      "Farms query data:",
+      farmResult.data
+    );
+
+    console.log(
+      "Farms count:",
+      farmResult.data?.length
+    );
+
+
+    if (farmResult.error) {
+      throw farmResult.error;
+    }
+
+
+    farms =
+      farmResult.data || [];
+
+    issues = [];
+
+
+    // Load quality issues in batches
+    for (
+      let index = 0;
+      index < farms.length;
+      index += 200
+    ) {
+
+      const farmIds =
+        farms
+          .slice(index, index + 200)
+          .map(farm => farm.id);
+
+
+      if (!farmIds.length) {
+        continue;
+      }
+
+
+      const issueResult =
+        await supabaseClient
+          .from("farm_quality_issues")
+          .select("*")
+          .in(
+            "farm_id",
+            farmIds
+          );
+
+
+      if (issueResult.error) {
+        throw issueResult.error;
+      }
+
+
+      issues.push(
+        ...(issueResult.data || [])
+      );
+    }
+  }
+
+
+  // ============================================================
+  // EVENT BINDING
+  // ============================================================
+
+  function bind() {
+
+    [
+      "qcStatusFilter",
+      "qcTypeFilter"
+    ].forEach(id => {
+
+      $(id)?.addEventListener(
+        "change",
+        renderQueue
+      );
+
+    });
+
+
+    $("refreshBtn")?.addEventListener(
+      "click",
+      refreshAll
+    );
+
+
+    $("logoutBtn")?.addEventListener(
+      "click",
+      async event => {
+
+        event.preventDefault();
+
+        await supabaseClient.auth.signOut();
+
+        location.href =
+          "../login.html";
+      }
+    );
+  }
+
+
+  // ============================================================
+  // PUBLIC FUNCTIONS
+  // ============================================================
+ 
 async function resolveProject(){
  const r=await supabaseClient
    .from("project_members")
@@ -366,10 +753,39 @@ async function qualityDecision(decision){
  }catch(e){
   console.error("QC decision error:",e);
   notify("Decision failed: "+(e.message||e),"error");
- }
 }
-async function refreshAll(){showLoading(true);try{await loadQualityData();render();notify("Quality queue refreshed.","success");}catch(e){notify(e.message||e,"error")}finally{showLoading(false)}}
-function showLoading(v){const o=$("loadingOverlay");if(o)o.style.display=v?"flex":"none";}
-function notify(message,kindValue){const n=document.createElement("div");n.textContent=message;n.style.cssText=`position:fixed;right:20px;bottom:20px;z-index:9999;background:${kindValue==="error"?"#b42318":"#23764b"};color:#fff;padding:10px 14px;border-radius:6px;font-size:10px`;document.body.appendChild(n);setTimeout(()=>n.remove(),3500);}
-window.openQualityReview=openQualityReview;window.closeQualityReview=closeQualityReview;window.qualityDecision=qualityDecision;window.locateIssue=locateIssue;
+}
+async function refreshAll(){
+  showLoading(true);
+  try{
+    await loadQualityData();
+    render();
+    notify("Quality queue refreshed.","success");
+  }catch(e){
+    notify(e.message||e,"error");
+  }finally{
+    showLoading(false);
+  }
+}
+
+function showLoading(v){
+  const o=$("loadingOverlay");
+  if(o)o.style.display=v?"flex":"none";
+}
+
+function notify(message,kindValue){
+  const n=document.createElement("div");
+  n.textContent=message;
+  n.style.cssText=`position:fixed;right:20px;bottom:20px;z-index:9999;background:${kindValue==="error"?"#b42318":"#23764b"};color:#fff;padding:10px 14px;border-radius:6px;font-size:10px`;
+  document.body.appendChild(n);
+  setTimeout(()=>n.remove(),3500);
+}
+
+
+// Export functions for HTML onclick handlers
+window.openQualityReview = openQualityReview;
+window.closeQualityReview = closeQualityReview;
+window.qualityDecision = qualityDecision;
+window.locateIssue = locateIssue;
+
 })();
