@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quality Alerts | MappingTrace</title>
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <link rel="stylesheet" href="quality-alerts.css">
+    <link rel="icon" type="image/x-icon" href="../assets/favicon.ico">
+</head>
+<body>
+    <!-- Mobile Sidebar Overlay -->
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+    <div class="layout">
+        <!-- SIDEBAR -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <h2>
+                    <i class="fas fa-map-marked-alt"></i>
+                    <span>MappingTrace</span>
+                </h2>
+                <button class="sidebar-toggle" id="sidebarToggle" title="Toggle sidebar">
+                    <i class="fas fa-chevron-left"></i>
+                </button>
+            </div>
+            <nav class="menu">
+                <div class="menu-label">Main</div>
+                <a href="../Dashboard.html" data-page="dashboard">
+                    <i class="fas fa-tachometer-alt"></i>
+                    <span>Dashboard</span>
+                </a>
+                <a href="../LiveMapping/live-mapping.html" data-page="live-mapping">
+                    <i class="fas fa-map"></i>
+                    <span>Live Mapping</span>
+                </a>
+                <a href="../Submissions/submissions.html" data-page="submissions">
+                    <i class="fas fa-clipboard-list"></i>
+                    <span>Submissions</span>
+                </a>
+                <a href="#" class="active" data-page="quality-alerts">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <span>Quality Alerts</span>
+                </a>
+                <a href="../Exports/exports.html" data-page="exports">
+                    <i class="fas fa-file-export"></i>
+                    <span>Exports</span>
+                </a>
+                
+                <hr class="menu-divider">
+                <div class="data-mgmt-link">
+                    <a href="../DataManagement.html" id="dataMgmtLink">
+                        <i class="fas fa-database"></i>
+                        <span>Data Management</span>
+                    </a>
+                </div>
+                
+                <div class="menu-bottom">
+                    <a href="#" id="logoutBtn">
+                        <i class="fas fa-sign-out-alt"></i>
+                        <span>Logout</span>
+                    </a>
+                </div>
+            </nav>
+        </aside>
+
+        <!-- MAIN CONTENT -->
+        <main class="main-content">
+<div class="qc-page-head"><div><div class="qc-kicker">QUALITY CONTROL</div><h1>Quality Review</h1><p>Review submitted farms, investigate quality issues and make a workflow decision.</p></div><button id="refreshBtn" class="qc-refresh"><i class="fas fa-sync-alt"></i> Refresh</button></div>
+<section class="qc-summary-grid">
+<div class="qc-summary-card"><span>Pending Review</span><strong id="pendingCount">0</strong><i class="fas fa-hourglass-half"></i></div>
+<div class="qc-summary-card"><span>Critical</span><strong id="criticalCount">0</strong><i class="fas fa-circle-exclamation"></i></div>
+<div class="qc-summary-card"><span>Warnings</span><strong id="warningCount">0</strong><i class="fas fa-triangle-exclamation"></i></div>
+<div class="qc-summary-card"><span>Passed</span><strong id="passedCount">0</strong><i class="fas fa-circle-check"></i></div>
+<div class="qc-summary-card"><span>Total Farms</span><strong id="totalFarmsCount">0</strong><i class="fas fa-layer-group"></i></div>
+</section>
+<section class="qc-workspace">
+<div class="qc-queue-card">
+<div class="qc-card-head"><div><h2>Review Queue</h2><p>Farms requiring quality-control attention.</p></div>
+<div class="qc-queue-tools"><select id="qcStatusFilter"><option value="all">All statuses</option><option value="pending">Pending review</option><option value="critical">Critical</option><option value="warning">Warning</option><option value="passed">Passed</option></select>
+<select id="qcTypeFilter"><option value="all">All issue types</option><option value="protected">Protected Area</option><option value="overlap">Farm Overlap</option><option value="geometry">Geometry</option><option value="other">Other QC</option></select></div></div>
+<div class="qc-queue-table"><div class="qc-table-row qc-table-header"><div>FARMER / FARM</div><div>QUALITY ISSUE</div><div>SEVERITY</div><div>STATUS</div><div>AREA</div><div></div></div><div id="qcQueueBody"></div></div>
+</div>
+<aside class="qc-flow-card"><div class="qc-card-head"><div><h2>QC Workflow</h2><p>Decision sequence</p></div></div><div class="qc-flow">
+<div class="qc-flow-step active"><b>01</b><span>Submission</span><small>Farm received</small></div><div class="qc-flow-line"></div>
+<div class="qc-flow-step"><b>02</b><span>Quality Checks</span><small>GIS & data validation</small></div><div class="qc-flow-line"></div>
+<div class="qc-flow-step"><b>03</b><span>Review</span><small>Evidence assessment</small></div><div class="qc-flow-line"></div>
+<div class="qc-flow-step"><b>04</b><span>Decision</span><small>Approve / Correct / Reject</small></div>
+</div><div class="qc-flow-note"><i class="fas fa-shield-halved"></i><span>Critical spatial issues should be resolved before validation.</span></div></aside>
+</section>
+</main>
+<div id="qcReviewModal" class="qc-modal hidden"><div class="qc-review">
+<div class="qc-review-top"><div><span class="qc-kicker">FARM QUALITY REVIEW</span><h2 id="qcReviewTitle">Farm Review</h2><p id="qcReviewSubtitle"></p></div><button class="qc-icon-btn" onclick="closeQualityReview()"><i class="fas fa-times"></i></button></div>
+<div class="qc-review-body"><div class="qc-review-topgrid"><div class="qc-score-panel"><span>Overall Quality Score</span><strong id="qcReviewScore">—</strong><em id="qcReviewStatus">Pending review</em></div><div class="qc-components-panel"><h3>Quality checks</h3><div id="qcComponents"></div></div></div>
+<div class="qc-review-grid"><div><div class="qc-panel"><div class="qc-panel-title"><h3>Farm information</h3></div><div id="qcFarmInfo" class="qc-info-grid"></div></div><div class="qc-panel"><div class="qc-panel-title"><h3>Evidence & Issues</h3><span id="qcIssueCount"></span></div><div id="qcReviewIssues"></div></div></div>
+<div class="qc-map-panel"><div class="qc-map-head"><span><i class="fas fa-map"></i> Spatial evidence</span><span>Farm & issue locations</span></div><div id="qcReviewMap"></div></div></div></div>
+<div class="qc-review-footer"><div id="qcDecisionNote"><i class="fas fa-circle-info"></i> Review all evidence before deciding.</div><div class="qc-decision-actions"><button class="qc-decision correction" onclick="qualityDecision('correction_required')"><i class="fas fa-rotate-left"></i> Request Correction</button><button class="qc-decision reject" onclick="qualityDecision('rejected')"><i class="fas fa-ban"></i> Reject</button><button id="qcValidateBtn" class="qc-decision validate" onclick="qualityDecision('validated')"><i class="fas fa-check"></i> Approve & Validate</button></div></div>
+</div></div>
+<!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
+    <script src="quality-alerts.js?v=workflow-fixed"></script>
+</body>
+</html>
