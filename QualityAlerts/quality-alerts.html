@@ -69,247 +69,41 @@
         </aside>
 
         <!-- MAIN CONTENT -->
-        <main class="main">
-            <!-- HEADER -->
-            <header class="main-header">
-                <div class="header-left">
-                    <button class="burger-btn" id="burgerBtn" aria-label="Toggle sidebar">
-                        <i class="fas fa-bars"></i>
-                    </button>
-                    <div class="header-title">
-                        <div>
-                            <h1>
-                                Quality Alerts
-                                <span class="project-badge" id="projectBadge">Loading...</span>
-                            </h1>
-                            <div class="breadcrumb">Home / Quality Alerts</div>
-                        </div>
-                    </div>
-                </div>
-                <div class="user-info">
-                    <div class="project-selector-container hidden" id="projectSelectorContainer">
-                        <label><i class="fas fa-folder-open"></i> Project:</label>
-                        <div class="custom-dropdown" id="customDropdown">
-                            <div class="dropdown-selected" id="dropdownSelected">
-                                <span id="selectedProjectName">Loading...</span>
-                                <i class="fas fa-chevron-down"></i>
-                            </div>
-                            <div class="dropdown-menu" id="dropdownMenu">
-                                <div class="dropdown-search">
-                                    <input type="text" id="projectSearch" placeholder="Search projects...">
-                                </div>
-                                <div id="dropdownItems"></div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="user-avatar" id="userAvatar">JD</div>
-                    <div class="user-details">
-                        <div class="user-name" id="userName">User</div>
-                        <div class="user-role" id="userRole">Role</div>
-                    </div>
-                    <button class="sync-btn" id="refreshBtn"><i class="fas fa-sync-alt"></i> Refresh</button>
-                </div>
-            </header>
-
-            <!-- ALERTS CONTENT -->
-            <div class="alerts-container">
-                <!-- Stats Cards -->
-                <div class="stats-grid">
-                    <div class="stat-card critical">
-                        <div class="stat-icon"><i class="fas fa-skull-crossbones"></i></div>
-                        <div class="stat-info">
-                            <h4>Critical</h4>
-                            <div class="stat-value" id="criticalCount">0</div>
-                        </div>
-                    </div>
-                    <div class="stat-card high">
-                        <div class="stat-icon"><i class="fas fa-exclamation-triangle"></i></div>
-                        <div class="stat-info">
-                            <h4>High</h4>
-                            <div class="stat-value" id="highCount">0</div>
-                        </div>
-                    </div>
-                    <div class="stat-card medium">
-                        <div class="stat-icon"><i class="fas fa-exclamation"></i></div>
-                        <div class="stat-info">
-                            <h4>Medium</h4>
-                            <div class="stat-value" id="mediumCount">0</div>
-                        </div>
-                    </div>
-                    <div class="stat-card low">
-                        <div class="stat-icon"><i class="fas fa-info-circle"></i></div>
-                        <div class="stat-info">
-                            <h4>Low</h4>
-                            <div class="stat-value" id="lowCount">0</div>
-                        </div>
-                    </div>
-                    <div class="stat-card total">
-                        <div class="stat-icon"><i class="fas fa-bell"></i></div>
-                        <div class="stat-info">
-                            <h4>Total Alerts</h4>
-                            <div class="stat-value" id="totalAlerts">0</div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Tab Navigation -->
-                <div class="tabs-container">
-                    <button class="tab-btn active" data-tab="protected" onclick="switchTab('protected')">
-                        <i class="fas fa-shield-alt"></i> Protected Area Quality
-                        <span class="tab-badge" id="protectedBadge">0</span>
-                    </button>
-                    <button class="tab-btn" data-tab="polygon" onclick="switchTab('polygon')">
-                        <i class="fas fa-draw-polygon"></i> Polygon Quality
-                        <span class="tab-badge" id="polygonBadge">0</span>
-                    </button>
-                </div>
-
-                <!-- Protected Area Quality Section -->
-                <div class="tab-content active" id="protectedTab">
-                    <!-- Protected Area Filters -->
-                    <div class="filters-bar">
-                        <div class="filter-group">
-                            <label>Severity</label>
-                            <select id="protectedSeverityFilter" class="filter-select">
-                                <option value="all">All Severities</option>
-                                <option value="critical">Critical</option>
-                                <option value="high">High</option>
-                                <option value="medium">Medium</option>
-                                <option value="low">Low</option>
-                            </select>
-                        </div>
-                        <div class="filter-group">
-                            <label>Supplier</label>
-                            <select id="protectedSupplierFilter" class="filter-select">
-                                <option value="all">All Suppliers</option>
-                            </select>
-                        </div>
-                        <div class="filter-group">
-                            <label>Status</label>
-                            <select id="protectedStatusFilter" class="filter-select">
-                                <option value="all">All Status</option>
-                                <option value="new">New</option>
-                                <option value="acknowledged">Acknowledged</option>
-                                <option value="resolved">Resolved</option>
-                            </select>
-                        </div>
-                        <div class="filter-actions">
-                            <button class="btn-primary" onclick="applyProtectedFilters()"><i class="fas fa-search"></i> Apply</button>
-                            <button class="btn-secondary" onclick="clearProtectedFilters()"><i class="fas fa-times"></i> Clear</button>
-                            <button class="btn-secondary" onclick="markProtectedRead()"><i class="fas fa-check-double"></i> Mark All Read</button>
-                        </div>
-                    </div>
-
-                    <!-- Protected Area Alerts List -->
-                    <div class="alerts-list-container">
-                        <div class="list-header">
-                            <h3><i class="fas fa-shield-alt"></i> Protected Area Alerts</h3>
-                            <div class="list-actions">
-                                <span class="alert-count" id="protectedAlertCount">0 alerts</span>
-                                <button class="btn-icon" onclick="refreshProtectedAlerts()" title="Refresh"><i class="fas fa-redo-alt"></i></button>
-                            </div>
-                        </div>
-                        <div id="protectedAlertsList" class="alerts-list">
-                            <div class="empty-state">
-                                <i class="fas fa-check-circle"></i>
-                                <h3>No Protected Area Alerts</h3>
-                                <p>All farms are outside protected areas.</p>
-                            </div>
-                        </div>
-                        <div class="list-footer">
-                            <div class="list-stats">Showing <span id="protectedShowingCount">0</span> alerts</div>
-                            <div class="pagination">
-                                <button class="pagination-btn" id="protectedPrevBtn" disabled onclick="protectedPrevPage()"><i class="fas fa-chevron-left"></i></button>
-                                <span id="protectedPageInfo">Page 1 of 1</span>
-                                <button class="pagination-btn" id="protectedNextBtn" disabled onclick="protectedNextPage()"><i class="fas fa-chevron-right"></i></button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Polygon Quality Section -->
-                <div class="tab-content" id="polygonTab">
-                    <!-- Polygon Quality Filters -->
-                    <div class="filters-bar">
-                        <div class="filter-group">
-                            <label>Alert Type</label>
-                            <select id="polygonTypeFilter" class="filter-select">
-                                <option value="all">All Types</option>
-                                <option value="overlap">Overlap</option>
-                                <option value="duplicate">Duplicate</option>
-                                <option value="self_intersection">Self-Intersection</option>
-                            </select>
-                        </div>
-                        <div class="filter-group">
-                            <label>Severity</label>
-                            <select id="polygonSeverityFilter" class="filter-select">
-                                <option value="all">All Severities</option>
-                                <option value="critical">Critical</option>
-                                <option value="high">High</option>
-                                <option value="medium">Medium</option>
-                                <option value="low">Low</option>
-                            </select>
-                        </div>
-                        <div class="filter-group">
-                            <label>Supplier</label>
-                            <select id="polygonSupplierFilter" class="filter-select">
-                                <option value="all">All Suppliers</option>
-                            </select>
-                        </div>
-                        <div class="filter-group">
-                            <label>Status</label>
-                            <select id="polygonStatusFilter" class="filter-select">
-                                <option value="all">All Status</option>
-                                <option value="new">New</option>
-                                <option value="acknowledged">Acknowledged</option>
-                                <option value="resolved">Resolved</option>
-                            </select>
-                        </div>
-                        <div class="filter-actions">
-                            <button class="btn-primary" onclick="applyPolygonFilters()"><i class="fas fa-search"></i> Apply</button>
-                            <button class="btn-secondary" onclick="clearPolygonFilters()"><i class="fas fa-times"></i> Clear</button>
-                            <button class="btn-secondary" onclick="markPolygonRead()"><i class="fas fa-check-double"></i> Mark All Read</button>
-                        </div>
-                    </div>
-
-                    <!-- Polygon Quality Alerts List -->
-                    <div class="alerts-list-container">
-                        <div class="list-header">
-                            <h3><i class="fas fa-draw-polygon"></i> Polygon Quality Alerts</h3>
-                            <div class="list-actions">
-                                <span class="alert-count" id="polygonAlertCount">0 alerts</span>
-                                <button class="btn-icon" onclick="refreshPolygonAlerts()" title="Refresh"><i class="fas fa-redo-alt"></i></button>
-                            </div>
-                        </div>
-                        <div id="polygonAlertsList" class="alerts-list">
-                            <div class="empty-state">
-                                <i class="fas fa-check-circle"></i>
-                                <h3>No Polygon Quality Alerts</h3>
-                                <p>All polygons pass quality checks.</p>
-                            </div>
-                        </div>
-                        <div class="list-footer">
-                            <div class="list-stats">Showing <span id="polygonShowingCount">0</span> alerts</div>
-                            <div class="pagination">
-                                <button class="pagination-btn" id="polygonPrevBtn" disabled onclick="polygonPrevPage()"><i class="fas fa-chevron-left"></i></button>
-                                <span id="polygonPageInfo">Page 1 of 1</span>
-                                <button class="pagination-btn" id="polygonNextBtn" disabled onclick="polygonNextPage()"><i class="fas fa-chevron-right"></i></button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </main>
-    </div>
-
-    <div id="loadingOverlay" class="loading-spinner">
-        <i class="fas fa-spinner fa-spin"></i><span>Loading...</span>
-    </div>
-
-    <!-- Scripts -->
+        <main class="main-content">
+<div class="qc-page-head"><div><div class="qc-kicker">QUALITY CONTROL</div><h1>Quality Review</h1><p>Review submitted farms, investigate quality issues and make a workflow decision.</p></div><button id="refreshBtn" class="qc-refresh"><i class="fas fa-sync-alt"></i> Refresh</button></div>
+<section class="qc-summary-grid">
+<div class="qc-summary-card"><span>Pending Review</span><strong id="pendingCount">0</strong><i class="fas fa-hourglass-half"></i></div>
+<div class="qc-summary-card"><span>Critical</span><strong id="criticalCount">0</strong><i class="fas fa-circle-exclamation"></i></div>
+<div class="qc-summary-card"><span>Warnings</span><strong id="warningCount">0</strong><i class="fas fa-triangle-exclamation"></i></div>
+<div class="qc-summary-card"><span>Passed</span><strong id="passedCount">0</strong><i class="fas fa-circle-check"></i></div>
+<div class="qc-summary-card"><span>Total Farms</span><strong id="totalFarmsCount">0</strong><i class="fas fa-layer-group"></i></div>
+</section>
+<section class="qc-workspace">
+<div class="qc-queue-card">
+<div class="qc-card-head"><div><h2>Review Queue</h2><p>Farms requiring quality-control attention.</p></div>
+<div class="qc-queue-tools"><select id="qcStatusFilter"><option value="all">All statuses</option><option value="pending">Pending review</option><option value="critical">Critical</option><option value="warning">Warning</option><option value="passed">Passed</option></select>
+<select id="qcTypeFilter"><option value="all">All issue types</option><option value="protected">Protected Area</option><option value="overlap">Farm Overlap</option><option value="geometry">Geometry</option><option value="other">Other QC</option></select></div></div>
+<div class="qc-queue-table"><div class="qc-table-row qc-table-header"><div>FARMER / FARM</div><div>QUALITY ISSUE</div><div>SEVERITY</div><div>STATUS</div><div>AREA</div><div></div></div><div id="qcQueueBody"></div></div>
+</div>
+<aside class="qc-flow-card"><div class="qc-card-head"><div><h2>QC Workflow</h2><p>Decision sequence</p></div></div><div class="qc-flow">
+<div class="qc-flow-step active"><b>01</b><span>Submission</span><small>Farm received</small></div><div class="qc-flow-line"></div>
+<div class="qc-flow-step"><b>02</b><span>Quality Checks</span><small>GIS & data validation</small></div><div class="qc-flow-line"></div>
+<div class="qc-flow-step"><b>03</b><span>Review</span><small>Evidence assessment</small></div><div class="qc-flow-line"></div>
+<div class="qc-flow-step"><b>04</b><span>Decision</span><small>Approve / Correct / Reject</small></div>
+</div><div class="qc-flow-note"><i class="fas fa-shield-halved"></i><span>Critical spatial issues should be resolved before validation.</span></div></aside>
+</section>
+</main>
+<div id="qcReviewModal" class="qc-modal hidden"><div class="qc-review">
+<div class="qc-review-top"><div><span class="qc-kicker">FARM QUALITY REVIEW</span><h2 id="qcReviewTitle">Farm Review</h2><p id="qcReviewSubtitle"></p></div><button class="qc-icon-btn" onclick="closeQualityReview()"><i class="fas fa-times"></i></button></div>
+<div class="qc-review-body"><div class="qc-review-topgrid"><div class="qc-score-panel"><span>Overall Quality Score</span><strong id="qcReviewScore">—</strong><em id="qcReviewStatus">Pending review</em></div><div class="qc-components-panel"><h3>Quality checks</h3><div id="qcComponents"></div></div></div>
+<div class="qc-review-grid"><div><div class="qc-panel"><div class="qc-panel-title"><h3>Farm information</h3></div><div id="qcFarmInfo" class="qc-info-grid"></div></div><div class="qc-panel"><div class="qc-panel-title"><h3>Evidence & Issues</h3><span id="qcIssueCount"></span></div><div id="qcReviewIssues"></div></div></div>
+<div class="qc-map-panel"><div class="qc-map-head"><span><i class="fas fa-map"></i> Spatial evidence</span><span>Farm & issue locations</span></div><div id="qcReviewMap"></div></div></div></div>
+<div class="qc-review-footer"><div id="qcDecisionNote"><i class="fas fa-circle-info"></i> Review all evidence before deciding.</div><div class="qc-decision-actions"><button class="qc-decision correction" onclick="qualityDecision('correction_required')"><i class="fas fa-rotate-left"></i> Request Correction</button><button class="qc-decision reject" onclick="qualityDecision('rejected')"><i class="fas fa-ban"></i> Reject</button><button id="qcValidateBtn" class="qc-decision validate" onclick="qualityDecision('validated')"><i class="fas fa-check"></i> Approve & Validate</button></div></div>
+</div></div>
+<!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
-    <script src="quality-alerts.js?v=20260829-2"></script>
+    <script src="quality-alerts.js?v=workflow-fixed"></script>
 </body>
 </html>
