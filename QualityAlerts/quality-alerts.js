@@ -567,79 +567,78 @@
   }
 
 
-  // ============================================================
-  // ROLE UI
-  // ============================================================
+ // ============================================================
+// ROLE UI
+// ============================================================
 
-  function updateRoleUI() {
+function updateRoleUI() {
 
-    const role =
-      currentProjectUserRole;
+  const role =
+    currentProjectUserRole;
 
 
-    /*
-     * If the current role is not allowed to validate,
-     * disable the validation button.
-     */
+  /*
+   * Role-level visibility only.
+   *
+   * Farm-specific workflow permissions are handled
+   * inside populateReview(), after currentFarm exists.
+   */
 
   const validateBtn =
     $("qcValidateBtn");
 
   if (validateBtn) {
     validateBtn.style.display =
-      canActOnFarm && canValidate()
+      canValidate()
+        ? ""
+        : "none";
+  }
+
+
+  /*
+   * Reject is validator/manager level.
+   */
+
+  const rejectButtons =
+    document.querySelectorAll(
+      ".qc-decision.reject"
+    );
+
+  rejectButtons.forEach(button => {
+
+    button.style.display =
+      canReject()
         ? ""
         : "none";
 
-    }
+  });
 
 
-    /*
-     * Reject is validator/manager level.
-     */
+  /*
+   * Correction is available to operational
+   * review roles.
+   */
 
-    const rejectButtons =
-      document.querySelectorAll(
-        ".qc-decision.reject"
-      );
-
-
-    rejectButtons.forEach(button => {
-
-      button.style.display =
-        canReject()
-          ? ""
-          : "none";
-
-    });
-
-
-    /*
-     * Correction is available to all operational
-     * review roles.
-     */
-
-    const correctionButtons =
-      document.querySelectorAll(
-        ".qc-decision.correction"
-      );
-
-
-    correctionButtons.forEach(button => {
-
-      button.style.display =
-        canRequestCorrection()
-          ? ""
-          : "none";
-
-    });
-
-
-    console.log(
-      "Role configuration applied:",
-      role
+  const correctionButtons =
+    document.querySelectorAll(
+      ".qc-decision.correction"
     );
-  }
+
+  correctionButtons.forEach(button => {
+
+    button.style.display =
+      canRequestCorrection()
+        ? ""
+        : "none";
+
+  });
+
+
+  console.log(
+    "Role configuration applied:",
+    role
+  );
+}
 
 
   // ============================================================
@@ -2710,6 +2709,16 @@ function populateReview() {
         currentFarm
       );
 
+    const canActOnFarm =
+  farmBelongsToCurrentQueue(currentFarm);
+
+if (!canActOnFarm) {
+  notify(
+    "This farm is not currently in your review queue.",
+    "error"
+  );
+  return;
+}
 
     const list =
       issues.filter(
