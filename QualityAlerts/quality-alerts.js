@@ -901,154 +901,86 @@
   // STATISTICS
   // ============================================================
 
-  function renderStats() {
+ function renderStats() {
+  const issueMap = new Map();
 
-    /*
-     * Only count farms belonging to the current user's queue.
-     */
+  issues.forEach(issue => {
+    if (!issueMap.has(issue.farm_id)) {
+      issueMap.set(issue.farm_id, []);
+    }
 
-    const queueFarms =
-      farms.filter(
-        farm =>
-          farmBelongsToCurrentQueue(
-            farm
-          )
+    issueMap.get(issue.farm_id).push(issue);
+  });
+
+  let critical = 0;
+  let warning = 0;
+  let passed = 0;
+  let pending = 0;
+
+  /*
+   * IMPORTANT:
+   * Statistics are project-wide.
+   *
+   * Validator must be able to see the complete QC picture,
+   * not only farms currently in gis_compliance_review.
+   */
+  farms.forEach(farm => {
+    const farmIssues =
+      issueMap.get(farm.id) || [];
+
+    const hasCritical =
+      farmIssues.some(
+        issue => sev(issue) === "critical"
       );
 
-
-    const issueMap =
-      new Map();
-
-
-    issues.forEach(issue => {
-
-      if (
-        !issueMap.has(
-          issue.farm_id
-        )
-      ) {
-
-        issueMap.set(
-          issue.farm_id,
-          []
-        );
-
-      }
-
-
-      issueMap
-        .get(issue.farm_id)
-        .push(issue);
-
-    });
-
-
-    let critical = 0;
-    let warning = 0;
-    let passed = 0;
-    let pending = 0;
-
-
-    queueFarms.forEach(
-      farm => {
-
-        const farmIssues =
-          issueMap.get(
-            farm.id
-          ) || [];
-
-
-        const hasCritical =
-          farmIssues.some(
-            issue =>
-              sev(issue) ===
-              "critical"
-          );
-
-
-        const hasWarning =
-          farmIssues.some(
-            issue =>
-              [
-                "warning",
-                "high",
-                "medium"
-              ].includes(
-                sev(issue)
-              )
-          );
-
-
-        /*
-         * Every farm in the current review queue
-         * is pending until a workflow decision moves it.
-         */
-
-        pending++;
-
-
-        if (hasCritical) {
-
-          critical++;
-
-        } else if (hasWarning) {
-
-          warning++;
-
-        } else {
-
-          passed++;
-
-        }
-
-      }
-    );
-
-
-    if ($("pendingCount")) {
-
-      $("pendingCount").textContent =
-        pending;
-
-    }
-
-
-    if ($("criticalCount")) {
-
-      $("criticalCount").textContent =
-        critical;
-
-    }
-
-
-    if ($("warningCount")) {
-
-      $("warningCount").textContent =
-        warning;
-
-    }
-
-
-    if ($("passedCount")) {
-
-      $("passedCount").textContent =
-        passed;
-
-    }
-
+    const hasWarning =
+      farmIssues.some(
+        issue =>
+          ["warning", "high", "medium"]
+            .includes(sev(issue))
+      );
 
     /*
-     * Total Farms remains project-wide.
+     * "Pending Review" means this farm is currently
+     * waiting for the logged-in user's workflow stage.
      */
-
-    if ($("totalFarmsCount")) {
-
-      $("totalFarmsCount").textContent =
-        farms.length;
-
+    if (farmBelongsToCurrentQueue(farm)) {
+      pending++;
     }
+
+    /*
+     * QC severity is calculated for ALL project farms.
+     */
+    if (hasCritical) {
+      critical++;
+    } else if (hasWarning) {
+      warning++;
+    } else {
+      passed++;
+    }
+  });
+
+  if ($("pendingCount")) {
+    $("pendingCount").textContent = pending;
   }
 
+  if ($("criticalCount")) {
+    $("criticalCount").textContent = critical;
+  }
+
+  if ($("warningCount")) {
+    $("warningCount").textContent = warning;
+  }
+
+  if ($("passedCount")) {
+    $("passedCount").textContent = passed;
+  }
+
+  if ($("totalFarmsCount")) {
+    $("totalFarmsCount").textContent =
+      farms.length;
+  }
+}
 
   // ============================================================
   // ISSUE TYPE FILTER
@@ -1147,192 +1079,195 @@
   // QUALITY QUEUE
   // ============================================================
 
-  function renderQueue() {
+function renderQueue() {
+  const statusFilter =
+    $("qcStatusFilter")?.value || "all";
 
-    const statusFilter =
-      $("qcStatusFilter")?.value ||
-      "all";
+  const typeFilter =
+    $("qcTypeFilter")?.value || "all";
 
+  const rows = [];
 
-    const typeFilter =
-      $("qcTypeFilter")?.value ||
-      "all";
+  farms.forEach(farm => {
+    const workflow =
+      workflowOf(farm);
 
+    /*
+     * OWNER / SUPER MANAGER:
+     * See the complete QC queue.
+     *
+     * VALIDATOR:
+     * See all QC results, but farms requiring
+     * Validator action are naturally prioritized.
+     *
+     * ENUMERATOR / FIELD OFFICER:
+     * See their own workflow queue.
+     */
 
-    const rows = [];
+    const isAdminRole =
+      [
+        "owner",
+        "super_manager",
+        "manager"
+      ].includes(
+        currentProjectUserRole
+      );
 
+    const isValidator =
+      currentProjectUserRole ===
+      "validator";
 
-    farms.forEach(
-      farm => {
+    const isCurrentQueue =
+      farmBelongsToCurrentQueue(
+        farm
+      );
 
-        /*
-         * KEY CHANGE:
-         *
-         * Do NOT hard-code:
-         *
-         * workflow === "gis_compliance_review"
-         *
-         * Instead use the current user's role.
-         */
-
-        if (
-          !farmBelongsToCurrentQueue(
-            farm
-          )
-        ) {
-
-          return;
-
-        }
-
-
-        const farmIssues =
-          issues.filter(
-            issue =>
-              issue.farm_id ===
-              farm.id
-          );
-
-
-        const critical =
-          farmIssues.some(
-            issue =>
-              sev(issue) ===
-              "critical"
-          );
-
-
-        const warning =
-          farmIssues.some(
-            issue =>
-              [
-                "warning",
-                "high",
-                "medium"
-              ].includes(
-                sev(issue)
-              )
-          );
-
-
-        const status =
-          critical
-            ? "critical"
-            : warning
-              ? "warning"
-              : "passed";
-
-
-        /*
-         * A farm in the current queue is pending.
-         */
-
-        const pending = true;
-
-
-        // ------------------------------------------------------
-        // STATUS FILTER
-        // ------------------------------------------------------
-
-        if (
-          statusFilter ===
-          "pending" &&
-          !pending
-        ) {
-
-          return;
-
-        }
-
-
-        if (
-          statusFilter !==
-            "all" &&
-
-          statusFilter !==
-            "pending" &&
-
-          statusFilter !==
-            status
-        ) {
-
-          return;
-
-        }
-
-
-        // ------------------------------------------------------
-        // ISSUE TYPE FILTER
-        // ------------------------------------------------------
-
-        if (
-          typeFilter !==
-            "all" &&
-
-          !farmIssues.some(
-            issue =>
-              matchesIssue(
-                issue,
-                typeFilter
-              )
-          )
-        ) {
-
-          return;
-
-        }
-
-
-        rows.push({
-
-          f: farm,
-
-          a: farmIssues,
-
-          status,
-
-          pending
-
-        });
-
-      }
-    );
-
-
-    const container =
-      $("qcQueueBody");
-
-
-    if (!container) {
+    /*
+     * Validator can VIEW all farms.
+     * Other operational roles remain limited
+     * to their assigned review states.
+     */
+    if (
+      !isAdminRole &&
+      !isValidator &&
+      !isCurrentQueue
+    ) {
       return;
     }
 
+    const farmIssues =
+      issues.filter(
+        issue =>
+          String(issue.farm_id) ===
+          String(farm.id)
+      );
 
-    container.innerHTML =
-      rows.length
+    const hasCritical =
+      farmIssues.some(
+        issue =>
+          sev(issue) === "critical"
+      );
 
-        ? rows
-            .map(
-              queueRow
-            )
-            .join("")
+    const hasWarning =
+      farmIssues.some(
+        issue =>
+          [
+            "warning",
+            "high",
+            "medium"
+          ].includes(
+            sev(issue)
+          )
+      );
 
-        : `
-          <div class="qc-empty">
+    const status =
+      hasCritical
+        ? "critical"
+        : hasWarning
+          ? "warning"
+          : "passed";
 
-            <i class="fas fa-circle-check"></i>
+    /*
+     * Pending means the farm is awaiting action
+     * from the current user's workflow stage.
+     *
+     * For Validator this means:
+     * gis_compliance_review
+     */
+    const pending =
+      isCurrentQueue;
 
-            <h3>
-              Queue is clear
-            </h3>
+    // ----------------------------------------------------------
+    // STATUS FILTER
+    // ----------------------------------------------------------
 
-            <p>
-              No farms match the current QC filters.
-            </p>
+    if (
+      statusFilter === "pending" &&
+      !pending
+    ) {
+      return;
+    }
 
-          </div>
-        `;
+    if (
+      statusFilter !== "all" &&
+      statusFilter !== "pending" &&
+      statusFilter !== status
+    ) {
+      return;
+    }
+
+    // ----------------------------------------------------------
+    // ISSUE TYPE FILTER
+    // ----------------------------------------------------------
+
+    if (
+      typeFilter !== "all" &&
+      !farmIssues.some(
+        issue =>
+          matchesIssue(
+            issue,
+            typeFilter
+          )
+      )
+    ) {
+      return;
+    }
+
+    rows.push({
+      f: farm,
+      a: farmIssues,
+      status,
+      pending,
+      currentQueue: isCurrentQueue
+    });
+  });
+
+  /*
+   * Put farms requiring Validator action first.
+   *
+   * This means Validator still gets the complete
+   * Quality Alerts view, but the actionable queue
+   * stays at the top.
+   */
+  if (
+    currentProjectUserRole ===
+    "validator"
+  ) {
+    rows.sort(
+      (a, b) =>
+        Number(b.currentQueue) -
+        Number(a.currentQueue)
+    );
   }
+
+  const container =
+    $("qcQueueBody");
+
+  if (!container) {
+    return;
+  }
+
+  container.innerHTML =
+    rows.length
+
+      ? rows
+          .map(queueRow)
+          .join("")
+
+      : `
+        <div class="qc-empty">
+          <i class="fas fa-circle-check"></i>
+
+          <h3>
+            Queue is clear
+          </h3>
+
+          <p>
+            No farms match the current QC filters.
+          </p>
+        </div>
+      `;
+}
 
 
   // ============================================================
@@ -1420,11 +1355,15 @@
 
         <div>
 
-          <span
-            class="qc-pill pending"
-          >
-            Pending review
-          </span>
+        <span class="qc-pill ${item.pending ? "pending" : item.status}">
+          ${
+            item.pending
+              ? "Pending review"
+              : item.status === "passed"
+                ? "Passed"
+                : "Needs review"
+          }
+        </span>
 
         </div>
 
