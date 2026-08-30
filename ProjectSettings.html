@@ -581,24 +581,100 @@ function renderAll() {
 
 function renderKPIs() {
     const totalFarms = allFarms.length;
-    const totalArea = allFarms.reduce((s, f) => s + (f.area || 0), 0);
-    const totalTarget = enumeratorTargets.reduce((s, t) => s + (Number(t.target_farms) || 0), 0);
-    const totalAchieved = projectEnumerators.reduce((s, e) => s + getEnumeratorFarmStats(e).achieved, 0);
-    const completionRate = totalTarget > 0 ? Math.min(100, Math.round((totalAchieved / totalTarget) * 100)) : 0;
+
+    const totalArea = allFarms.reduce(
+        (s, f) => s + (Number(f.area) || 0),
+        0
+    );
+
+    const totalTarget = enumeratorTargets.reduce(
+        (s, t) => s + (Number(t.target_farms) || 0),
+        0
+    );
+
+    const totalAchieved = projectEnumerators.reduce(
+        (s, e) => s + getEnumeratorFarmStats(e).achieved,
+        0
+    );
+
+    const completionRate = totalTarget > 0
+        ? Math.min(100, Math.round((totalAchieved / totalTarget) * 100))
+        : 0;
 
     let daysElapsed = 0;
+    let projectStatus = 'Not started';
+
     if (projectSettings?.start_date) {
-        const start = new Date(`${projectSettings.start_date}T00:00:00`);
-        const end = projectSettings.end_date ? new Date(`${projectSettings.end_date}T23:59:59`) : null;
+        const start = new Date(
+            `${projectSettings.start_date}T00:00:00`
+        );
+
+        const end = projectSettings.end_date
+            ? new Date(`${projectSettings.end_date}T23:59:59`)
+            : null;
+
         const today = new Date();
-        const effectiveToday = end ? new Date(Math.min(today.getTime(), end.getTime())) : today;
-        daysElapsed = Math.max(0, Math.floor((effectiveToday - start) / (1000 * 60 * 60 * 24)));
+
+        if (today < start) {
+            // Project has not started
+            daysElapsed = 0;
+            projectStatus = 'Not started';
+
+        } else if (end && today > end) {
+            // Project has ended
+            daysElapsed = Math.max(
+                0,
+                Math.floor(
+                    (end - start) / (1000 * 60 * 60 * 24)
+                )
+            );
+
+            projectStatus = 'Ended';
+
+        } else {
+            // Project is currently active
+            daysElapsed = Math.max(
+                0,
+                Math.floor(
+                    (today - start) / (1000 * 60 * 60 * 24)
+                )
+            );
+
+            projectStatus = 'Active';
+        }
     }
-    
+
     document.getElementById('totalFarms').innerHTML = totalFarms;
-    document.getElementById('totalArea').innerHTML = totalArea.toFixed(1);
-    document.getElementById('daysElapsed').innerHTML = daysElapsed;
-    document.getElementById('completionRate').innerHTML = completionRate + '%';
+
+    document.getElementById('totalArea').innerHTML =
+        totalArea.toFixed(1);
+
+    document.getElementById('daysElapsed').innerHTML =
+        daysElapsed;
+
+    document.getElementById('completionRate').innerHTML =
+        completionRate + '%';
+
+    // Optional: update the label/status if the element exists
+    const daysLabel = document.getElementById('daysElapsedLabel');
+
+    if (daysLabel) {
+        if (projectStatus === 'Ended') {
+            daysLabel.innerHTML = 'Project Duration (days)';
+        } else if (projectStatus === 'Active') {
+            daysLabel.innerHTML = 'Days Elapsed';
+        } else {
+            daysLabel.innerHTML = 'Project Duration (days)';
+        }
+    }
+
+    // Optional project status indicator
+    const projectStatusElement =
+        document.getElementById('projectStatus');
+
+    if (projectStatusElement) {
+        projectStatusElement.innerHTML = projectStatus;
+    }
 }
 
 function renderPerformanceTable() {
