@@ -727,9 +727,63 @@ function renderTopPerformers() {
     const sorted = projectEnumerators.map(e => {
         const target = enumeratorTargets.find(t => t.user_id === e.user_id);
         const stats = getEnumeratorFarmStats(e);
-        return { ...e, target: Number(target?.target_farms) || 0, achieved: stats.achieved };
-    }).sort((a, b) => b.achieved - a.achieved).slice(0, 3);
-    document.getElementById('topPerformers').innerHTML = sorted.map((e, i) => `<div style="flex:1;min-width:200px;background:linear-gradient(135deg,#2c6e49,#4CAF50);color:white;padding:24px;border-radius:16px;text-align:center;"><div style="font-size:14px;opacity:0.9">#${i + 1}</div><div style="font-size:20px;font-weight:700">${escapeHtml(e.name)}</div><div style="font-size:32px;font-weight:800;margin-top:12px">${e.achieved}</div><div style="font-size:13px;opacity:0.9">${e.target ? `of ${e.target} target` : 'target not set'}</div></div>`).join('') || '<div style="color:#64748b">No active project enumerators.</div>';
+
+        const targetFarms = Number(target?.target_farms) || 0;
+        const achieved = stats.achieved;
+
+        const completionRate = targetFarms > 0
+            ? Math.min(100, Math.round((achieved / targetFarms) * 100))
+            : 0;
+
+        return {
+            ...e,
+            target: targetFarms,
+            achieved,
+            completionRate
+        };
+    })
+    .filter(e => e.target > 0)
+    .sort((a, b) => {
+        // Primary: completion rate
+        if (b.completionRate !== a.completionRate) {
+            return b.completionRate - a.completionRate;
+        }
+
+        // Tie-breaker: achieved farms
+        return b.achieved - a.achieved;
+    })
+    .slice(0, 3);
+
+    document.getElementById('topPerformers').innerHTML =
+        sorted.map((e, i) => `
+            <div style="
+                flex:1;
+                min-width:200px;
+                background:linear-gradient(135deg,#2c6e49,#4CAF50);
+                color:white;
+                padding:24px;
+                border-radius:16px;
+                text-align:center;
+            ">
+                <div style="font-size:14px;opacity:0.9">
+                    #${i + 1}
+                </div>
+
+                <div style="font-size:20px;font-weight:700">
+                    ${escapeHtml(e.name)}
+                </div>
+
+                <div style="font-size:32px;font-weight:800;margin-top:12px">
+                    ${e.completionRate}%
+                </div>
+
+                <div style="font-size:13px;opacity:0.9">
+                    ${e.achieved} of ${e.target} farms
+                </div>
+            </div>
+        `)
+        .join('')
+        || '<div style="color:#64748b">No project enumerators with targets.</div>';
 }
 
 function renderDailyTrendChart() {
