@@ -744,16 +744,36 @@ function renderDailyTrendChart() {
         daily[date] = (daily[date] || 0) + 1;
     });
 
-    // Sort chronologically
-    const sorted = Object.keys(daily).sort();
+// Sort chronologically
+const sorted = Object.keys(daily).sort();
 
-    // Format dates only for display
-    const labels = sorted.map(date => {
-        const [year, month, day] = date.split('-');
-        return `${month}/${day}/${year}`;
-    });
+let chartDates = [];
 
-    const values = sorted.map(date => daily[date]);
+if (sorted.length > 0) {
+    const startDate = new Date(`${sorted[0]}T00:00:00`);
+    const endDate = new Date(`${sorted[sorted.length - 1]}T00:00:00`);
+
+    const current = new Date(startDate);
+
+    while (current <= endDate) {
+        const year = current.getFullYear();
+        const month = String(current.getMonth() + 1).padStart(2, '0');
+        const day = String(current.getDate()).padStart(2, '0');
+
+        chartDates.push(`${year}-${month}-${day}`);
+
+        current.setDate(current.getDate() + 1);
+    }
+}
+
+// Format dates for display
+const labels = chartDates.map(date => {
+    const [year, month, day] = date.split('-');
+    return `${month}/${day}/${year}`;
+});
+
+// Use 0 for days with no submissions
+const values = chartDates.map(date => daily[date] || 0);
 
     const ctx = document
         .getElementById('dailyTrendChart')
