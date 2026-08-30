@@ -387,7 +387,14 @@ async function loadDailyProgress() {
         const enumerator = projectEnumerators.find(e => e.user_id === target.user_id);
         const stats = enumerator ? getEnumeratorFarmStats(enumerator) : getEnumeratorFarmStats({ name: target.enumerator_name });
         if (target.achieved_farms !== stats.achieved || Number(target.area_total || 0) !== stats.totalArea) {
-            updates.push(supabaseClient.from('enumerator_targets').update({ achieved_farms: stats.achieved, area_total: stats.totalArea }).eq('id', target.id));
+            updates.push(
+    supabaseClient
+        .from('enumerator_targets')
+        .update({
+            achieved_farms: stats.achieved
+        })
+        .eq('id', target.id)
+);
         }
     }
     if (updates.length) await Promise.all(updates);
