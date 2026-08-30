@@ -402,23 +402,32 @@ function getEnumeratorFarmStats(enumerator) {
         if (!farmEnumerator) return false;
 
         // Preferred match: farm stores the actual user UUID
-        if (userId && farmEnumerator === userId) {
-            return true;
+        const matchesEnumerator =
+            userId && farmEnumerator === userId
+                ? true
+                : aliases.has(farmEnumerator.toLowerCase());
+
+        if (!matchesEnumerator) return false;
+
+        // Rejected farms do not count toward achievement
+        const status = String(farm.status || '').trim().toLowerCase();
+
+        if (status === 'rejected') {
+            return false;
         }
 
-        // Legacy match: farm stores an enumerator name/email
-        return aliases.has(farmEnumerator.toLowerCase());
+        return true;
     });
 
     return {
         achieved: farms.length,
+
         totalArea: farms.reduce(
             (sum, farm) => sum + (Number(farm.area) || 0),
             0
         )
     };
 }
-
 async function loadDailyProgress() {
     const updates = [];
 
