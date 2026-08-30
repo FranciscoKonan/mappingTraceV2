@@ -915,11 +915,80 @@ pointHoverRadius: function(context) {
 }
 
 function renderProjectSummary() {
-    const totalTarget = enumeratorTargets.reduce((s, t) => s + (Number(t.target_farms) || 0), 0);
-    const totalAchieved = projectEnumerators.reduce((s, e) => s + getEnumeratorFarmStats(e).achieved, 0);
+    const activeEnumeratorIds = new Set(
+        projectEnumerators.map(e => e.user_id)
+    );
+
+    // Only targets belonging to active project enumerators
+    const activeTargets = enumeratorTargets.filter(t =>
+        activeEnumeratorIds.has(t.user_id) &&
+        !t.is_virtual &&
+        !t.is_legacy
+    );
+
+    const totalTarget = activeTargets.reduce(
+        (s, t) => s + (Number(t.target_farms) || 0),
+        0
+    );
+
+    const totalAchieved = projectEnumerators.reduce(
+        (s, e) => s + getEnumeratorFarmStats(e).achieved,
+        0
+    );
+
     const activeEnumerators = projectEnumerators.length;
-    const configured = enumeratorTargets.filter(t => !t.is_virtual && !t.is_legacy).length;
-    document.getElementById('projectSummary').innerHTML = `<div class="kpi-grid"><div class="kpi-card"><div class="kpi-value">${activeEnumerators}</div><div class="kpi-label">Active Project Enumerators</div></div><div class="kpi-card"><div class="kpi-value">${configured}</div><div class="kpi-label">Targets Configured</div></div><div class="kpi-card"><div class="kpi-value">${totalAchieved}/${totalTarget || 0}</div><div class="kpi-label">Farms Achievement</div></div></div>`;
+
+    // A target is considered configured only when it is > 0
+    const configured = activeTargets.filter(
+        t => Number(t.target_farms) > 0
+    ).length;
+
+    const achievementRate = totalTarget > 0
+        ? Math.min(
+            100,
+            Math.round((totalAchieved / totalTarget) * 100)
+        )
+        : 0;
+
+    document.getElementById('projectSummary').innerHTML = `
+        <div class="kpi-grid">
+
+            <div class="kpi-card">
+                <div class="kpi-value">
+                    ${activeEnumerators}
+                </div>
+                <div class="kpi-label">
+                    Active Project Enumerators
+                </div>
+            </div>
+
+            <div class="kpi-card">
+                <div class="kpi-value">
+                    ${configured}/${activeEnumerators}
+                </div>
+                <div class="kpi-label">
+                    Targets Configured
+                </div>
+            </div>
+
+            <div class="kpi-card">
+                <div class="kpi-value">
+                    ${totalAchieved}/${totalTarget}
+                </div>
+                <div class="kpi-label">
+                    Farms Achievement
+                </div>
+                <div style="
+                    font-size:12px;
+                    color:#64748b;
+                    margin-top:4px;
+                ">
+                    ${achievementRate}% of target
+                </div>
+            </div>
+
+        </div>
+    `;
 }
 
 function switchTab(tab) {
