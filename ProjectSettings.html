@@ -567,6 +567,54 @@ function renderFullPage() {
 }
 
 function renderAll() {
+    function renderEnumeratorSelector() {
+    const select = document.getElementById('newEnumeratorUser');
+
+    if (!select) return;
+
+    const enumerators = window.projectEnumerators || [];
+
+    if (enumerators.length === 0) {
+        select.innerHTML = `
+            <option value="">
+                No active enumerators found
+            </option>
+        `;
+        select.disabled = true;
+        return;
+    }
+
+    const assignedUserIds = new Set(
+        enumeratorTargets
+            .filter(t => t.user_id)
+            .map(t => t.user_id)
+    );
+
+    const available = enumerators.filter(
+        e => !assignedUserIds.has(e.user_id)
+    );
+
+    if (available.length === 0) {
+        select.innerHTML = `
+            <option value="">
+                All enumerators already have targets
+            </option>
+        `;
+        select.disabled = true;
+        return;
+    }
+
+    select.disabled = false;
+
+    select.innerHTML = `
+        <option value="">Select an enumerator...</option>
+        ${available.map(e => `
+            <option value="${e.user_id}">
+                ${escapeHtml(e.name)}
+            </option>
+        `).join('')}
+    `;
+}
     renderEnumeratorSelector();
     renderKPIs();
     renderPerformanceTable();
