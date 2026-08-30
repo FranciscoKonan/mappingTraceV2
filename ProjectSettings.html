@@ -502,7 +502,13 @@ function renderFullPage() {
     <div class="kpi-label" id="daysElapsedLabel">Days Elapsed</div>
     <div id="projectStatus" style="font-size:12px;color:#64748b;margin-top:4px;"></div>
 </div>
-                <div class="kpi-card"><div class="kpi-value" id="completionRate">0%</div><div class="kpi-label">Overall Completion</div></div>
+                <div class="kpi-card">
+    <div class="kpi-value" id="completionRate">0%</div>
+    <div class="kpi-label">Overall Completion</div>
+    <div id="completionDetail"
+         style="font-size:12px;color:#64748b;margin-top:4px;">
+    </div>
+</div>
             </div>
             
             <div class="card">
@@ -658,6 +664,12 @@ function renderKPIs() {
 
     document.getElementById('completionRate').innerHTML =
         completionRate + '%';
+    const completionDetail = document.getElementById('completionDetail');
+
+if (completionDetail) {
+    completionDetail.innerHTML =
+        `${totalAchieved} / ${totalTarget} farms`;
+}
 
     // Optional: update the label/status if the element exists
     const daysLabel = document.getElementById('daysElapsedLabel');
