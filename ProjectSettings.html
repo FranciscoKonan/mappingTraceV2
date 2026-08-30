@@ -206,20 +206,30 @@ async function loadProjectEnumerators() {
     const profileById = Object.fromEntries(profiles.map(p => [p.id, p]));
     projectEnumerators = (members || []).map(member => {
         const profile = profileById[member.user_id] || {};
-        const name =
-    profile.full_name ||
-    [profile.first_name, profile.last_name].filter(Boolean).join(' ') ||
-    profile.email ||
-    member.user_id;
-        const email = '';
-        return {
-            user_id: member.user_id,
-            name,
-            email,
-            aliases: [...new Set([name].filter(Boolean))]
-        };
-    });
-}
+const profileById = Object.fromEntries(
+    (profiles || []).map(p => [p.id, p])
+);
+
+projectEnumerators = (members || []).map(member => {
+    const profile = profileById[member.user_id] || {};
+
+    const name =
+        profile.full_name ||
+        [profile.first_name, profile.last_name]
+            .filter(Boolean)
+            .join(' ') ||
+        profile.email ||
+        member.user_id;
+
+    const email = profile.email || '';
+
+    return {
+        user_id: member.user_id,
+        name,
+        email,
+        role: member.role
+    };
+});
 
 async function loadProjectSettings() {
     const projectId = getProjectIdFromUrl();
