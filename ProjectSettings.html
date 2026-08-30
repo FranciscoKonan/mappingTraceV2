@@ -599,9 +599,15 @@ function renderAll() {
 }
 
 function renderKPIs() {
-    const totalFarms = allFarms.length;
+    // Exclude rejected farms from active production KPIs
+    const activeFarms = allFarms.filter(f => {
+        const status = String(f.status || '').trim().toLowerCase();
+        return status !== 'rejected';
+    });
 
-    const totalArea = allFarms.reduce(
+    const totalFarms = activeFarms.length;
+
+    const totalArea = activeFarms.reduce(
         (s, f) => s + (Number(f.area) || 0),
         0
     );
@@ -620,6 +626,7 @@ function renderKPIs() {
         ? Math.min(100, Math.round((totalAchieved / totalTarget) * 100))
         : 0;
 
+    // Project timing
     let daysElapsed = 0;
     let projectStatus = 'Not started';
 
@@ -635,12 +642,10 @@ function renderKPIs() {
         const today = new Date();
 
         if (today < start) {
-            // Project has not started
             daysElapsed = 0;
             projectStatus = 'Not started';
 
         } else if (end && today > end) {
-            // Project has ended
             daysElapsed = Math.max(
                 0,
                 Math.floor(
@@ -651,7 +656,6 @@ function renderKPIs() {
             projectStatus = 'Ended';
 
         } else {
-            // Project is currently active
             daysElapsed = Math.max(
                 0,
                 Math.floor(
@@ -663,6 +667,7 @@ function renderKPIs() {
         }
     }
 
+    // KPI values
     document.getElementById('totalFarms').innerHTML = totalFarms;
 
     document.getElementById('totalArea').innerHTML =
@@ -673,15 +678,19 @@ function renderKPIs() {
 
     document.getElementById('completionRate').innerHTML =
         completionRate + '%';
-    const completionDetail = document.getElementById('completionDetail');
 
-if (completionDetail) {
-    completionDetail.innerHTML =
-        `${totalAchieved} / ${totalTarget} farms`;
-}
+    // Completion detail
+    const completionDetail =
+        document.getElementById('completionDetail');
 
-    // Optional: update the label/status if the element exists
-    const daysLabel = document.getElementById('daysElapsedLabel');
+    if (completionDetail) {
+        completionDetail.innerHTML =
+            `${totalAchieved} / ${totalTarget} farms`;
+    }
+
+    // Project timing label
+    const daysLabel =
+        document.getElementById('daysElapsedLabel');
 
     if (daysLabel) {
         if (projectStatus === 'Ended') {
