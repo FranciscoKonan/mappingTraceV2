@@ -183,53 +183,71 @@ async function loadFullPage() {
 
 async function loadProjectEnumerators() {
     const projectId = getProjectIdFromUrl();
+
     const { data: members, error } = await supabaseClient
         .from('project_members')
         .select('user_id, role, status')
         .eq('project_id', projectId)
         .eq('role', 'enumerator')
         .eq('status', 'active');
+
     if (error) {
         console.error('Unable to load project enumerators:', error);
         projectEnumerators = [];
         return;
     }
-    const userIds = (members || []).map(m => m.user_id).filter(Boolean);
+
+    const userIds = (members || [])
+        .map(m => m.user_id)
+        .filter(Boolean);
+
     let profiles = [];
+
     if (userIds.length) {
-        const { data } = await supabaseClient
+        const { data, error: profileError } = await supabaseClient
             .from('user_profiles')
-            .select('id, first_name')
+            .select('id, email, full_name, first_name, last_name')
             .in('id', userIds);
+
+        if (profileError) {
+            console.error('Unable to load enumerator profiles:', profileError);
+        }
+
         profiles = data || [];
     }
-    const profileById = Object.fromEntries(profiles.map(p => [p.id, p]));
+
+    const profileById = Object.fromEntries(
+        profiles.map(p => [p.id, p])
+    );
+
     projectEnumerators = (members || []).map(member => {
         const profile = profileById[member.user_id] || {};
-const profileById = Object.fromEntries(
-    (profiles || []).map(p => [p.id, p])
-);
 
-projectEnumerators = (members || []).map(member => {
-    const profile = profileById[member.user_id] || {};
+        const name =
+            profile.full_name ||
+            [profile.first_name, profile.last_name]
+                .filter(Boolean)
+                .join(' ') ||
+            profile.email ||
+            member.user_id;
 
-    const name =
-        profile.full_name ||
-        [profile.first_name, profile.last_name]
-            .filter(Boolean)
-            .join(' ') ||
-        profile.email ||
-        member.user_id;
+        const email = profile.email || '';
 
-    const email = profile.email || '';
-
-    return {
-        user_id: member.user_id,
-        name,
-        email,
-        role: member.role
-    };
-});
+        return {
+            user_id: member.user_id,
+            name: name,
+            email: email,
+            role: member.role,
+            aliases: [...new Set([
+                name,
+                email,
+                profile.full_name,
+                profile.first_name,
+                profile.last_name
+            ].filter(Boolean))]
+        };
+    });
+}
 
 async function loadProjectSettings() {
     const projectId = getProjectIdFromUrl();
