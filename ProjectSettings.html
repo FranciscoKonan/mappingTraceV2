@@ -801,8 +801,13 @@ const values = chartDates.map(date => daily[date] || 0);
                 fill: true,
                 tension: 0,
 
-                pointRadius: 4,
-                pointHoverRadius: 6
+                pointRadius: function(context) {
+    return context.raw === 0 ? 0 : 4;
+},
+
+pointHoverRadius: function(context) {
+    return context.raw === 0 ? 0 : 6;
+}
             }]
         },
 
