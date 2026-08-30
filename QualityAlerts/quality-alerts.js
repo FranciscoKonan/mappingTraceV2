@@ -3244,23 +3244,28 @@ if (!canActOnFarm) {
 
 
   // ============================================================
-  // GLOBAL HANDLERS
-  // ============================================================
+// GLOBAL HANDLERS
+// ============================================================
 
-  window.openQualityReview =
-    openQualityReview;
+window.openQualityReview =
+  openQualityReview;
+
+window.closeQualityReview =
+  closeQualityReview;
+
+window.qualityDecision =
+  qualityDecision;
+
+window.locateIssue =
+  locateIssue;
 
 
-  window.closeQualityReview =
-    closeQualityReview;
-
-
-  window.qualityDecision =
-    qualityDecision;
-
-
-  window.locateIssue =
-    locateIssue;
-
+// TEMPORARY DEBUG
+window.__qcDebug = {
+  farms,
+  issues,
+  currentProject,
+  currentProjectUserRole
+};
 
 })();
