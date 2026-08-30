@@ -375,29 +375,113 @@ async function loadFarms() {
 }
 
 function getEnumeratorFarmStats(enumerator) {
-    const aliases = new Set((enumerator?.aliases || [enumerator?.name, enumerator?.email]).filter(Boolean).map(v => String(v).trim().toLowerCase()));
-    const farms = allFarms.filter(f => aliases.has(String(f.enumerator || '').trim().toLowerCase()));
-    return { achieved: farms.length, totalArea: farms.reduce((s, f) => s + (Number(f.area) || 0), 0) };
+    if (!enumerator) {
+        return {
+            achieved: 0,
+            totalArea: 0
+        };
+    }
+
+    // Primary identity: Supabase user ID
+    const userId = String(enumerator.user_id || '').trim();
+
+    // Legacy aliases are kept for older farm records
+    const aliases = new Set(
+        [
+            ...(enumerator.aliases || []),
+            enumerator.name,
+            enumerator.email
+        ]
+            .filter(Boolean)
+            .map(v => String(v).trim().toLowerCase())
+    );
+
+    const farms = allFarms.filter(farm => {
+        const farmEnumerator = String(farm.enumerator || '').trim();
+
+        if (!farmEnumerator) return false;
+
+        // Preferred match: farm stores the actual user UUID
+        if (userId && farmEnumerator === userId) {
+            return true;
+        }
+
+        // Legacy match: farm stores an enumerator name/email
+        return aliases.has(farmEnumerator.toLowerCase());
+    });
+
+    return {
+        achieved: farms.length,
+        totalArea: farms.reduce(
+            (sum, farm) => sum + (Number(farm.area) || 0),
+            0
+        )
+    };
 }
 
 async function loadDailyProgress() {
     const updates = [];
+
     for (const target of enumeratorTargets) {
-        if (target.is_virtual || !target.id || String(target.id).startsWith('virtual-')) continue;
-        const enumerator = projectEnumerators.find(e => e.user_id === target.user_id);
-        const stats = enumerator ? getEnumeratorFarmStats(enumerator) : getEnumeratorFarmStats({ name: target.enumerator_name });
-        if (target.achieved_farms !== stats.achieved || Number(target.area_total || 0) !== stats.totalArea) {
+
+        if (
+            target.is_virtual ||
+            !target.id ||
+            String(target.id).startsWith('virtual-')
+        ) {
+            continue;
+        }
+
+        const enumerator = projectEnumerators.find(
+            e => e.user_id === target.user_id
+        );
+
+        if (!enumerator) {
+            console.warn(
+                'Enumerator not found for target:',
+                target.user_id
+            );
+            continue;
+        }
+
+        const stats = getEnumeratorFarmStats(enumerator);
+
+        console.log(
+            'Enumerator progress:',
+            enumerator.name,
+            'User ID:',
+            enumerator.user_id,
+            'Achieved:',
+            stats.achieved
+        );
+
+        if (
+            Number(target.achieved_farms || 0) !== stats.achieved
+        ) {
             updates.push(
-    supabaseClient
-        .from('enumerator_targets')
-        .update({
-            achieved_farms: stats.achieved
-        })
-        .eq('id', target.id)
-);
+                supabaseClient
+                    .from('enumerator_targets')
+                    .update({
+                        achieved_farms: stats.achieved
+                    })
+                    .eq('id', target.id)
+            );
         }
     }
-    if (updates.length) await Promise.all(updates);
+
+    if (updates.length) {
+        const results = await Promise.all(updates);
+
+        results.forEach(result => {
+            if (result.error) {
+                console.error(
+                    'Failed to update enumerator progress:',
+                    result.error
+                );
+            }
+        });
+    }
+
     await loadEnumeratorTargets();
 }
 
