@@ -109,7 +109,7 @@
 const SUPABASE_URL = 'https://crvnohvudurqfukjpisv.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNydm5vaHZ1ZHVycWZ1a2pwaXN2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg0NTUxNzMsImV4cCI6MjA5NDAzMTE3M30.Qp8E57yAN4LnO4A-yirf-Z3QufGZw9OKjBfcQxG7fo8';
 
-let supabaseClient, currentUser, currentProject, allFarms = [], enumeratorTargets = [], projectSettings = null;
+let supabaseClient, currentUser, currentProject, allFarms = [], enumeratorTargets = [], projectEnumerators = [], projectSettings = null;
 let dailyTrendChart = null;
 
 function getProjectIdFromUrl() { 
@@ -174,10 +174,47 @@ async function checkOwnerAccess() {
 
 async function loadFullPage() {
     await loadProjectSettings();
+    await loadProjectEnumerators();
     await loadEnumeratorTargets();
     await loadFarms();
     await loadDailyProgress();
     renderFullPage();
+}
+
+async function loadProjectEnumerators() {
+    const projectId = getProjectIdFromUrl();
+    const { data: members, error } = await supabaseClient
+        .from('project_members')
+        .select('user_id, role, status')
+        .eq('project_id', projectId)
+        .eq('role', 'enumerator')
+        .eq('status', 'active');
+    if (error) {
+        console.error('Unable to load project enumerators:', error);
+        projectEnumerators = [];
+        return;
+    }
+    const userIds = (members || []).map(m => m.user_id).filter(Boolean);
+    let profiles = [];
+    if (userIds.length) {
+        const { data } = await supabaseClient
+            .from('user_profiles')
+            .select('id, first_name')
+            .in('id', userIds);
+        profiles = data || [];
+    }
+    const profileById = Object.fromEntries(profiles.map(p => [p.id, p]));
+    projectEnumerators = (members || []).map(member => {
+        const profile = profileById[member.user_id] || {};
+        const name = profile.first_name || member.user_id;
+        const email = '';
+        return {
+            user_id: member.user_id,
+            name,
+            email,
+            aliases: [...new Set([name].filter(Boolean))]
+        };
+    });
 }
 
 async function loadProjectSettings() {
@@ -221,223 +258,107 @@ async function saveProjectSettings() {
 
 async function loadEnumeratorTargets() {
     const projectId = getProjectIdFromUrl();
-
-    // Load existing targets
-    const { data: targets, error: targetsError } = await supabaseClient
+    const { data, error } = await supabaseClient
         .from('enumerator_targets')
         .select('*')
         .eq('project_id', projectId);
-
-    if (targetsError) {
-        console.error('Error loading enumerator targets:', targetsError);
+    if (error) {
+        console.error('Unable to load enumerator targets:', error);
         enumeratorTargets = [];
         return;
     }
-
-    enumeratorTargets = targets || [];
-
-    // Load active project members whose role is enumerator
-    const { data: members, error: membersError } = await supabaseClient
-        .from('project_members')
-        .select('user_id, role, status')
-        .eq('project_id', projectId)
-        .eq('role', 'enumerator')
-        .eq('status', 'active');
-
-    if (membersError) {
-        console.error('Error loading project enumerators:', membersError);
-        window.projectEnumerators = [];
-        return;
+    const targetsByUser = Object.fromEntries((data || []).filter(t => t.user_id).map(t => [t.user_id, t]));
+    const targets = [];
+    for (const enumerator of projectEnumerators) {
+        const stored = targetsByUser[enumerator.user_id];
+        targets.push(stored ? {
+            ...stored,
+            enumerator_name: enumerator.name,
+            enumerator_email: enumerator.email,
+            is_virtual: false
+        } : {
+            id: `virtual-${enumerator.user_id}`,
+            project_id: projectId,
+            user_id: enumerator.user_id,
+            enumerator_name: enumerator.name,
+            enumerator_email: enumerator.email,
+            target_farms: 0,
+            achieved_farms: 0,
+            area_total: 0,
+            status: 'active',
+            is_virtual: true
+        });
     }
-
-    // Load profiles for display names
-    const userIds = (members || []).map(m => m.user_id);
-
-    let profiles = [];
-
-    if (userIds.length > 0) {
-        const { data: profileData, error: profileError } = await supabaseClient
-            .from('user_profiles')
-            .select('id, first_name, last_name')
-            .in('id', userIds);
-
-        if (profileError) {
-            console.error('Error loading enumerator profiles:', profileError);
-        } else {
-            profiles = profileData || [];
-        }
+    // Preserve legacy rows until they are explicitly migrated.
+    for (const legacy of (data || []).filter(t => !t.user_id)) {
+        targets.push({ ...legacy, is_legacy: true, is_virtual: false });
     }
-
-    const profileMap = {};
-    profiles.forEach(p => {
-        profileMap[p.id] = {
-            first_name: p.first_name || '',
-            last_name: p.last_name || ''
-        };
-    });
-
-    window.projectEnumerators = (members || []).map(member => {
-        const profile = profileMap[member.user_id] || {};
-
-        const fullName = [profile.first_name, profile.last_name]
-            .filter(Boolean)
-            .join(' ')
-            .trim();
-
-        return {
-            user_id: member.user_id,
-            name: fullName || `Enumerator ${member.user_id.substring(0, 8)}`
-        };
-    });
+    enumeratorTargets = targets;
 }
 
 async function addEnumerator() {
-    const userSelect = document.getElementById('newEnumeratorUser');
-    const targetInput = document.getElementById('newEnumeratorTarget');
-
-    const userId = userSelect.value;
-    const target = parseInt(targetInput.value, 10);
-
-    if (!userId) {
-        alert('Please select an enumerator.');
-        return;
-    }
-
-    if (!Number.isInteger(target) || target < 1) {
-        alert('Target must be at least 1.');
-        return;
-    }
-
-    const selectedEnumerator = (window.projectEnumerators || [])
-        .find(e => e.user_id === userId);
-
-    if (!selectedEnumerator) {
-        alert('Selected enumerator could not be found.');
-        return;
-    }
-
+    const userId = document.getElementById('newEnumeratorUserId')?.value;
+    const target = parseInt(document.getElementById('newEnumeratorTarget').value);
+    if (!userId) { alert('Select an active project enumerator'); return; }
+    if (!Number.isFinite(target) || target < 1) { alert('Target must be at least 1'); return; }
     const projectId = getProjectIdFromUrl();
-
-    // Prevent duplicate target assignment
-    const existingTarget = enumeratorTargets.find(
-        t => t.user_id === userId
-    );
-
-    if (existingTarget) {
-        alert(
-            `${selectedEnumerator.name} already has a target. ` +
-            `Please update the existing target instead.`
-        );
-        return;
-    }
-
-    const { error } = await supabaseClient
-        .from('enumerator_targets')
-        .insert({
-            project_id: projectId,
-            user_id: userId,
-            enumerator_name: selectedEnumerator.name,
-            target_farms: target,
-            achieved_farms: 0,
-            status: 'active'
-        });
-
-    if (error) {
-        console.error('Error assigning enumerator target:', error);
-        alert('Error assigning target: ' + error.message);
-        return;
-    }
-
-    alert(
-        `Target assigned successfully to ${selectedEnumerator.name}.`
-    );
-
-    userSelect.value = '';
-    targetInput.value = '50';
-
+    const enumerator = projectEnumerators.find(e => e.user_id === userId);
+    if (!enumerator) { alert('Selected enumerator is no longer active in this project.'); return; }
+    const existing = enumeratorTargets.find(t => t.user_id === userId && !t.is_virtual);
+    const payload = { project_id: projectId, user_id: userId, enumerator_name: enumerator.name, target_farms: target };
+    const result = existing
+        ? await supabaseClient.from('enumerator_targets').update(payload).eq('id', existing.id)
+        : await supabaseClient.from('enumerator_targets').insert(payload);
+    if (result.error) { alert('Error: ' + result.error.message); return; }
+    document.getElementById('newEnumeratorUserId').value = '';
+    document.getElementById('newEnumeratorTarget').value = '50';
     await loadEnumeratorTargets();
     await loadFarms();
-    function renderEnumeratorSelector() {
-    const select = document.getElementById('newEnumeratorUser');
-
-    if (!select) return;
-
-    const enumerators = window.projectEnumerators || [];
-
-    if (enumerators.length === 0) {
-        select.innerHTML = `
-            <option value="">
-                No active enumerators found
-            </option>
-        `;
-        select.disabled = true;
-        return;
-    }
-
-    // Do not allow selecting someone who already has a target
-    const assignedUserIds = new Set(
-        enumeratorTargets
-            .filter(t => t.user_id)
-            .map(t => t.user_id)
-    );
-
-    const available = enumerators.filter(
-        e => !assignedUserIds.has(e.user_id)
-    );
-
-    if (available.length === 0) {
-        select.innerHTML = `
-            <option value="">
-                All enumerators already have targets
-            </option>
-        `;
-        select.disabled = true;
-        return;
-    }
-
-    select.disabled = false;
-
-    select.innerHTML = `
-        <option value="">Select an enumerator...</option>
-        ${available.map(e => `
-            <option value="${e.user_id}">
-                ${escapeHtml(e.name)}
-            </option>
-        `).join('')}
-    `;
-}
+    await loadDailyProgress();
     renderAll();
 }
+
 async function updateEnumeratorTarget(id, target) {
-    const { error } = await supabaseClient.from('enumerator_targets').update({ target_farms: target }).eq('id', id);
+    const value = parseInt(target);
+    if (!Number.isFinite(value) || value < 1) { alert('Target must be at least 1'); return; }
+    const { error } = await supabaseClient.from('enumerator_targets').update({ target_farms: value }).eq('id', id);
     if (!error) { await loadEnumeratorTargets(); renderAll(); }
+    else alert('Error: ' + error.message);
 }
 
 async function deleteEnumerator(id) {
-    if (!confirm('Remove this enumerator? This action cannot be undone.')) return;
-    await supabaseClient.from('enumerator_targets').delete().eq('id', id);
-    await loadEnumeratorTargets(); 
+    if (!confirm('Remove this enumerator target? The project member will remain an enumerator.')) return;
+    const { error } = await supabaseClient.from('enumerator_targets').delete().eq('id', id);
+    if (error) { alert('Error: ' + error.message); return; }
+    await loadEnumeratorTargets();
+    await loadDailyProgress();
     renderAll();
 }
 
 async function loadFarms() {
     const projectId = getProjectIdFromUrl();
-    const { data } = await supabaseClient.from('farms').select('*').eq('project_id', projectId);
+    const { data, error } = await supabaseClient.from('farms').select('*').eq('project_id', projectId);
+    if (error) console.error('Unable to load farms:', error);
     allFarms = data || [];
 }
 
+function getEnumeratorFarmStats(enumerator) {
+    const aliases = new Set((enumerator?.aliases || [enumerator?.name, enumerator?.email]).filter(Boolean).map(v => String(v).trim().toLowerCase()));
+    const farms = allFarms.filter(f => aliases.has(String(f.enumerator || '').trim().toLowerCase()));
+    return { achieved: farms.length, totalArea: farms.reduce((s, f) => s + (Number(f.area) || 0), 0) };
+}
+
 async function loadDailyProgress() {
+    const updates = [];
     for (const target of enumeratorTargets) {
-        const enumeratorFarms = allFarms.filter(f => f.enumerator === target.enumerator_name);
-        const achieved = enumeratorFarms.length;
-        const totalArea = enumeratorFarms.reduce((s, f) => s + (f.area || 0), 0);
-        if (target.achieved_farms !== achieved) {
-            await supabaseClient.from('enumerator_targets').update({ 
-                achieved_farms: achieved, 
-                area_total: totalArea 
-            }).eq('id', target.id);
+        if (target.is_virtual || !target.id || String(target.id).startsWith('virtual-')) continue;
+        const enumerator = projectEnumerators.find(e => e.user_id === target.user_id);
+        const stats = enumerator ? getEnumeratorFarmStats(enumerator) : getEnumeratorFarmStats({ name: target.enumerator_name });
+        if (target.achieved_farms !== stats.achieved || Number(target.area_total || 0) !== stats.totalArea) {
+            updates.push(supabaseClient.from('enumerator_targets').update({ achieved_farms: stats.achieved, area_total: stats.totalArea }).eq('id', target.id));
         }
     }
+    if (updates.length) await Promise.all(updates);
     await loadEnumeratorTargets();
 }
 
@@ -478,56 +399,16 @@ function renderFullPage() {
             </div>
         </div>
 
-<div id="enumeratorsTab" class="tab-content">
-    <div class="card">
-        <div class="card-header">
-            <h2>
-                <i class="fas fa-user-check"></i>
-                Assign Enumerator Target
-            </h2>
-        </div>
-
-        <div class="form-row">
-
-            <div class="form-group">
-                <label>Project Enumerator</label>
-
-                <select id="newEnumeratorUser" required>
-                    <option value="">Loading enumerators...</option>
-                </select>
-
-                <small style="display:block;margin-top:6px;color:#64748b;">
-                    Only active project members with the Enumerator role are shown.
-                </small>
+        <div id="enumeratorsTab" class="tab-content">
+            <div class="card">
+                <div class="card-header"><h2><i class="fas fa-user-plus"></i> Assign Enumerator Target</h2></div>
+                <p style="color:#64748b;margin:-8px 0 20px;">Enumerators come from active project members. Targets are linked to the member account, not a manually typed name.</p>
+                <div class="form-row">
+                    <div class="form-group"><label>Project Enumerator</label><select id="newEnumeratorUserId"><option value="">Select an active enumerator</option>${projectEnumerators.map(e => `<option value="${escapeHtml(e.user_id)}">${escapeHtml(e.name)}${e.email ? ` — ${escapeHtml(e.email)}` : ''}</option>`).join('')}</select></div>
+                    <div class="form-group"><label>Target Farms</label><input type="number" id="newEnumeratorTarget" placeholder="Target" value="50" min="1"></div>
+                    <div class="form-group" style="display: flex; align-items: flex-end;"><button class="btn-primary" onclick="addEnumerator()"><i class="fas fa-bullseye"></i> Assign Target</button></div>
+                </div>
             </div>
-
-            <div class="form-group">
-                <label>Target Farms</label>
-                <input
-                    type="number"
-                    id="newEnumeratorTarget"
-                    placeholder="Target"
-                    value="50"
-                    min="1"
-                    required
-                >
-            </div>
-
-            <div
-                class="form-group"
-                style="display:flex;align-items:flex-end;"
-            >
-                <button
-                    class="btn-primary"
-                    onclick="addEnumerator()"
-                >
-                    <i class="fas fa-plus"></i>
-                    Assign Target
-                </button>
-            </div>
-
-        </div>
-    </div>
             
             <div class="card">
                 <div class="card-header"><h2><i class="fas fa-list"></i> Enumerators List</h2></div>
@@ -567,55 +448,6 @@ function renderFullPage() {
 }
 
 function renderAll() {
-    function renderEnumeratorSelector() {
-    const select = document.getElementById('newEnumeratorUser');
-
-    if (!select) return;
-
-    const enumerators = window.projectEnumerators || [];
-
-    if (enumerators.length === 0) {
-        select.innerHTML = `
-            <option value="">
-                No active enumerators found
-            </option>
-        `;
-        select.disabled = true;
-        return;
-    }
-
-    const assignedUserIds = new Set(
-        enumeratorTargets
-            .filter(t => t.user_id)
-            .map(t => t.user_id)
-    );
-
-    const available = enumerators.filter(
-        e => !assignedUserIds.has(e.user_id)
-    );
-
-    if (available.length === 0) {
-        select.innerHTML = `
-            <option value="">
-                All enumerators already have targets
-            </option>
-        `;
-        select.disabled = true;
-        return;
-    }
-
-    select.disabled = false;
-
-    select.innerHTML = `
-        <option value="">Select an enumerator...</option>
-        ${available.map(e => `
-            <option value="${e.user_id}">
-                ${escapeHtml(e.name)}
-            </option>
-        `).join('')}
-    `;
-}
-    renderEnumeratorSelector();
     renderKPIs();
     renderPerformanceTable();
     renderEnumeratorsTable();
@@ -627,13 +459,17 @@ function renderAll() {
 function renderKPIs() {
     const totalFarms = allFarms.length;
     const totalArea = allFarms.reduce((s, f) => s + (f.area || 0), 0);
-    const totalTarget = enumeratorTargets.reduce((s, t) => s + t.target_farms, 0);
-    const totalAchieved = enumeratorTargets.reduce((s, t) => s + (t.achieved_farms || 0), 0);
-    const completionRate = totalTarget > 0 ? Math.round((totalAchieved / totalTarget) * 100) : 0;
-    
+    const totalTarget = enumeratorTargets.reduce((s, t) => s + (Number(t.target_farms) || 0), 0);
+    const totalAchieved = projectEnumerators.reduce((s, e) => s + getEnumeratorFarmStats(e).achieved, 0);
+    const completionRate = totalTarget > 0 ? Math.min(100, Math.round((totalAchieved / totalTarget) * 100)) : 0;
+
     let daysElapsed = 0;
     if (projectSettings?.start_date) {
-        daysElapsed = Math.max(0, Math.floor((new Date() - new Date(projectSettings.start_date)) / (1000 * 60 * 60 * 24)));
+        const start = new Date(`${projectSettings.start_date}T00:00:00`);
+        const end = projectSettings.end_date ? new Date(`${projectSettings.end_date}T23:59:59`) : null;
+        const today = new Date();
+        const effectiveToday = end ? new Date(Math.min(today.getTime(), end.getTime())) : today;
+        daysElapsed = Math.max(0, Math.floor((effectiveToday - start) / (1000 * 60 * 60 * 24)));
     }
     
     document.getElementById('totalFarms').innerHTML = totalFarms;
@@ -643,48 +479,42 @@ function renderKPIs() {
 }
 
 function renderPerformanceTable() {
-    const sorted = [...enumeratorTargets].sort((a, b) => (b.achieved_farms || 0) - (a.achieved_farms || 0));
-    document.getElementById('performanceTableBody').innerHTML = sorted.map(e => {
-        const percent = e.target_farms > 0 ? Math.min(100, Math.round(((e.achieved_farms || 0) / e.target_farms) * 100)) : 0;
-        const fillClass = percent >= 100 ? 'over' : (percent >= 50 ? '' : 'warning');
-        return `<tr>
-            <td><strong>${escapeHtml(e.enumerator_name)}</strong></td>
-            <td>${e.target_farms}</td>
-            <td>${e.achieved_farms || 0}</td>
-            <td style="width:150px"><div class="progress-bar"><div class="progress-fill ${fillClass}" style="width:${percent}%"></div></div><span style="font-size:11px">${percent}%</span></td>
-            <td>${(e.area_total || 0).toFixed(1)} ha</td>
-            <td><span class="status-badge ${e.status === 'active' ? 'active' : 'inactive'}">${e.status || 'active'}</span></td>
-        </tr>`;
-    }).join('');
+    const rows = projectEnumerators.map(e => {
+        const target = enumeratorTargets.find(t => t.user_id === e.user_id);
+        const stats = getEnumeratorFarmStats(e);
+        return { ...e, target: Number(target?.target_farms) || 0, achieved: stats.achieved, area: stats.totalArea };
+    }).sort((a, b) => b.achieved - a.achieved);
+    document.getElementById('performanceTableBody').innerHTML = rows.map(e => {
+        const percent = e.target > 0 ? Math.min(100, Math.round((e.achieved / e.target) * 100)) : 0;
+        const status = e.target === 0 ? 'Target not set' : percent >= 100 ? 'Completed' : percent >= 70 ? 'On Track' : 'Behind';
+        return `<tr><td><strong>${escapeHtml(e.name)}</strong><br><small style="color:#64748b">${escapeHtml(e.email || '')}</small></td><td>${e.target || '—'}</td><td>${e.achieved}</td><td><div class="progress-bar"><div class="progress-fill ${percent >= 100 ? 'over' : percent < 40 ? 'warning' : ''}" style="width:${percent}%"></div></div><small>${e.target ? percent + '%' : '—'}</small></td><td>${e.area.toFixed(2)}</td><td><span class="status-badge ${e.target && percent >= 70 ? 'active' : 'inactive'}">${status}</span></td></tr>`;
+    }).join('') || '<tr><td colspan="6" style="text-align:center;color:#64748b">No active project enumerators.</td></tr>';
 }
 
 function renderEnumeratorsTable() {
-    document.getElementById('enumeratorsTableBody').innerHTML = enumeratorTargets.map(e => {
-        const percent = e.target_farms > 0 ? Math.min(100, Math.round(((e.achieved_farms || 0) / e.target_farms) * 100)) : 0;
-        return `<tr>
-            <td><strong>${escapeHtml(e.enumerator_name)}</strong></td>
-            <td><input type="number" value="${e.target_farms}" style="width:80px;padding:6px;" onchange="updateEnumeratorTarget('${e.id}', this.value)"></td>
-            <td>${e.achieved_farms || 0}</td>
-            <td style="width:150px"><div class="progress-bar"><div class="progress-fill" style="width:${percent}%"></div></div></td>
-            <td>${(e.area_total || 0).toFixed(1)} ha</td>
-            <td><span class="status-badge ${e.status === 'active' ? 'active' : 'inactive'}">${e.status || 'active'}</span></td>
-            <td><button class="btn-danger" onclick="deleteEnumerator('${e.id}')"><i class="fas fa-trash"></i></button></td>
-        </tr>`;
+    const rows = projectEnumerators.map(e => {
+        const target = enumeratorTargets.find(t => t.user_id === e.user_id);
+        const stats = getEnumeratorFarmStats(e);
+        return { ...e, target, achieved: stats.achieved, area: stats.totalArea };
+    });
+    const htmlRows = rows.map(e => {
+        const target = e.target;
+        const targetFarms = Number(target?.target_farms) || 0;
+        const percent = targetFarms ? Math.min(100, Math.round((e.achieved / targetFarms) * 100)) : 0;
+        const status = targetFarms === 0 ? 'Target not set' : percent >= 100 ? 'Completed' : percent >= 70 ? 'On Track' : 'Behind';
+        return `<tr><td><strong>${escapeHtml(e.name)}</strong><br><small style="color:#64748b">${escapeHtml(e.email || '')}</small></td><td>${targetFarms || '—'}</td><td>${e.achieved}</td><td><div class="progress-bar"><div class="progress-fill ${percent >= 100 ? 'over' : percent < 40 ? 'warning' : ''}" style="width:${percent}%"></div></div><small>${targetFarms ? percent + '%' : '—'}</small></td><td>${e.area.toFixed(2)}</td><td><span class="status-badge ${targetFarms && percent >= 70 ? 'active' : 'inactive'}">${status}</span></td><td>${target && !target.is_virtual ? `<button class="btn-danger" onclick="deleteEnumerator('${escapeHtml(target.id)}')"><i class="fas fa-trash"></i> Remove Target</button>` : ''}</td></tr>`;
     }).join('');
+    const legacyRows = enumeratorTargets.filter(t => t.is_legacy).map(e => `<tr style="background:#fffaf0"><td><strong>${escapeHtml(e.enumerator_name)}</strong><br><small style="color:#b45309">Legacy target — not linked to a project member</small></td><td>${Number(e.target_farms) || 0}</td><td>${getEnumeratorFarmStats({name:e.enumerator_name}).achieved}</td><td>—</td><td>${getEnumeratorFarmStats({name:e.enumerator_name}).totalArea.toFixed(2)}</td><td><span class="status-badge inactive">Migration needed</span></td><td><button class="btn-danger" onclick="deleteEnumerator('${escapeHtml(e.id)}')">Remove</button></td></tr>`).join('');
+    document.getElementById('enumeratorsTableBody').innerHTML = (htmlRows + legacyRows) || '<tr><td colspan="7" style="text-align:center;color:#64748b">No project enumerators.</td></tr>';
 }
 
 function renderTopPerformers() {
-    const sorted = [...enumeratorTargets].sort((a, b) => (b.achieved_farms || 0) - (a.achieved_farms || 0)).slice(0, 3);
-    const medals = ['🥇', '🥈', '🥉'];
-    const colors = ['#FFD700', '#C0C0C0', '#CD7F32'];
-    document.getElementById('topPerformers').innerHTML = sorted.map((e, i) => `
-        <div style="flex:1;min-width:180px;background:linear-gradient(135deg,${colors[i]},${colors[i]}dd);border-radius:20px;padding:24px;text-align:center;color:white;">
-            <div style="font-size:48px;margin-bottom:12px;">${medals[i]}</div>
-            <div style="font-size:20px;font-weight:700">${escapeHtml(e.enumerator_name)}</div>
-            <div style="font-size:32px;font-weight:800;margin-top:12px">${e.achieved_farms || 0}</div>
-            <div style="font-size:13px;opacity:0.9">farms of ${e.target_farms} target</div>
-        </div>
-    `).join('');
+    const sorted = projectEnumerators.map(e => {
+        const target = enumeratorTargets.find(t => t.user_id === e.user_id);
+        const stats = getEnumeratorFarmStats(e);
+        return { ...e, target: Number(target?.target_farms) || 0, achieved: stats.achieved };
+    }).sort((a, b) => b.achieved - a.achieved).slice(0, 3);
+    document.getElementById('topPerformers').innerHTML = sorted.map((e, i) => `<div style="flex:1;min-width:200px;background:linear-gradient(135deg,#2c6e49,#4CAF50);color:white;padding:24px;border-radius:16px;text-align:center;"><div style="font-size:14px;opacity:0.9">#${i + 1}</div><div style="font-size:20px;font-weight:700">${escapeHtml(e.name)}</div><div style="font-size:32px;font-weight:800;margin-top:12px">${e.achieved}</div><div style="font-size:13px;opacity:0.9">${e.target ? `of ${e.target} target` : 'target not set'}</div></div>`).join('') || '<div style="color:#64748b">No active project enumerators.</div>';
 }
 
 function renderDailyTrendChart() {
@@ -706,14 +536,11 @@ function renderDailyTrendChart() {
 }
 
 function renderProjectSummary() {
-    const totalTarget = enumeratorTargets.reduce((s, t) => s + t.target_farms, 0);
-    const totalAchieved = enumeratorTargets.reduce((s, t) => s + (t.achieved_farms || 0), 0);
-    const activeEnumerators = enumeratorTargets.filter(e => e.status === 'active').length;
-    document.getElementById('projectSummary').innerHTML = `<div class="kpi-grid">
-        <div class="kpi-card"><div class="kpi-value">${enumeratorTargets.length}</div><div class="kpi-label">Total Enumerators</div></div>
-        <div class="kpi-card"><div class="kpi-value">${activeEnumerators}</div><div class="kpi-label">Active Enumerators</div></div>
-        <div class="kpi-card"><div class="kpi-value">${totalAchieved}/${totalTarget}</div><div class="kpi-label">Farms Achievement</div></div>
-    </div>`;
+    const totalTarget = enumeratorTargets.reduce((s, t) => s + (Number(t.target_farms) || 0), 0);
+    const totalAchieved = projectEnumerators.reduce((s, e) => s + getEnumeratorFarmStats(e).achieved, 0);
+    const activeEnumerators = projectEnumerators.length;
+    const configured = enumeratorTargets.filter(t => !t.is_virtual && !t.is_legacy).length;
+    document.getElementById('projectSummary').innerHTML = `<div class="kpi-grid"><div class="kpi-card"><div class="kpi-value">${activeEnumerators}</div><div class="kpi-label">Active Project Enumerators</div></div><div class="kpi-card"><div class="kpi-value">${configured}</div><div class="kpi-label">Targets Configured</div></div><div class="kpi-card"><div class="kpi-value">${totalAchieved}/${totalTarget || 0}</div><div class="kpi-label">Farms Achievement</div></div></div>`;
 }
 
 function switchTab(tab) {
