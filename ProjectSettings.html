@@ -221,32 +221,193 @@ async function saveProjectSettings() {
 
 async function loadEnumeratorTargets() {
     const projectId = getProjectIdFromUrl();
-    const { data } = await supabaseClient.from('enumerator_targets').select('*').eq('project_id', projectId);
-    enumeratorTargets = data || [];
+
+    // Load existing targets
+    const { data: targets, error: targetsError } = await supabaseClient
+        .from('enumerator_targets')
+        .select('*')
+        .eq('project_id', projectId);
+
+    if (targetsError) {
+        console.error('Error loading enumerator targets:', targetsError);
+        enumeratorTargets = [];
+        return;
+    }
+
+    enumeratorTargets = targets || [];
+
+    // Load active project members whose role is enumerator
+    const { data: members, error: membersError } = await supabaseClient
+        .from('project_members')
+        .select('user_id, role, status')
+        .eq('project_id', projectId)
+        .eq('role', 'enumerator')
+        .eq('status', 'active');
+
+    if (membersError) {
+        console.error('Error loading project enumerators:', membersError);
+        window.projectEnumerators = [];
+        return;
+    }
+
+    // Load profiles for display names
+    const userIds = (members || []).map(m => m.user_id);
+
+    let profiles = [];
+
+    if (userIds.length > 0) {
+        const { data: profileData, error: profileError } = await supabaseClient
+            .from('user_profiles')
+            .select('id, first_name, last_name')
+            .in('id', userIds);
+
+        if (profileError) {
+            console.error('Error loading enumerator profiles:', profileError);
+        } else {
+            profiles = profileData || [];
+        }
+    }
+
+    const profileMap = {};
+    profiles.forEach(p => {
+        profileMap[p.id] = {
+            first_name: p.first_name || '',
+            last_name: p.last_name || ''
+        };
+    });
+
+    window.projectEnumerators = (members || []).map(member => {
+        const profile = profileMap[member.user_id] || {};
+
+        const fullName = [profile.first_name, profile.last_name]
+            .filter(Boolean)
+            .join(' ')
+            .trim();
+
+        return {
+            user_id: member.user_id,
+            name: fullName || `Enumerator ${member.user_id.substring(0, 8)}`
+        };
+    });
 }
 
 async function addEnumerator() {
-    const name = document.getElementById('newEnumeratorName').value.trim();
-    const target = parseInt(document.getElementById('newEnumeratorTarget').value);
-    if (!name) { alert('Enter enumerator name'); return; }
-    if (target < 1) { alert('Target must be at least 1'); return; }
-    
-    const projectId = getProjectIdFromUrl();
-    const { error } = await supabaseClient.from('enumerator_targets').insert({ 
-        project_id: projectId, 
-        enumerator_name: name, 
-        target_farms: target 
-    });
-    if (error) { 
-        alert('Error: ' + error.message); 
-    } else { 
-        document.getElementById('newEnumeratorName').value = ''; 
-        await loadEnumeratorTargets(); 
-        await loadFarms(); 
-        renderAll(); 
-    }
-}
+    const userSelect = document.getElementById('newEnumeratorUser');
+    const targetInput = document.getElementById('newEnumeratorTarget');
 
+    const userId = userSelect.value;
+    const target = parseInt(targetInput.value, 10);
+
+    if (!userId) {
+        alert('Please select an enumerator.');
+        return;
+    }
+
+    if (!Number.isInteger(target) || target < 1) {
+        alert('Target must be at least 1.');
+        return;
+    }
+
+    const selectedEnumerator = (window.projectEnumerators || [])
+        .find(e => e.user_id === userId);
+
+    if (!selectedEnumerator) {
+        alert('Selected enumerator could not be found.');
+        return;
+    }
+
+    const projectId = getProjectIdFromUrl();
+
+    // Prevent duplicate target assignment
+    const existingTarget = enumeratorTargets.find(
+        t => t.user_id === userId
+    );
+
+    if (existingTarget) {
+        alert(
+            `${selectedEnumerator.name} already has a target. ` +
+            `Please update the existing target instead.`
+        );
+        return;
+    }
+
+    const { error } = await supabaseClient
+        .from('enumerator_targets')
+        .insert({
+            project_id: projectId,
+            user_id: userId,
+            enumerator_name: selectedEnumerator.name,
+            target_farms: target,
+            achieved_farms: 0,
+            status: 'active'
+        });
+
+    if (error) {
+        console.error('Error assigning enumerator target:', error);
+        alert('Error assigning target: ' + error.message);
+        return;
+    }
+
+    alert(
+        `Target assigned successfully to ${selectedEnumerator.name}.`
+    );
+
+    userSelect.value = '';
+    targetInput.value = '50';
+
+    await loadEnumeratorTargets();
+    await loadFarms();
+    function renderEnumeratorSelector() {
+    const select = document.getElementById('newEnumeratorUser');
+
+    if (!select) return;
+
+    const enumerators = window.projectEnumerators || [];
+
+    if (enumerators.length === 0) {
+        select.innerHTML = `
+            <option value="">
+                No active enumerators found
+            </option>
+        `;
+        select.disabled = true;
+        return;
+    }
+
+    // Do not allow selecting someone who already has a target
+    const assignedUserIds = new Set(
+        enumeratorTargets
+            .filter(t => t.user_id)
+            .map(t => t.user_id)
+    );
+
+    const available = enumerators.filter(
+        e => !assignedUserIds.has(e.user_id)
+    );
+
+    if (available.length === 0) {
+        select.innerHTML = `
+            <option value="">
+                All enumerators already have targets
+            </option>
+        `;
+        select.disabled = true;
+        return;
+    }
+
+    select.disabled = false;
+
+    select.innerHTML = `
+        <option value="">Select an enumerator...</option>
+        ${available.map(e => `
+            <option value="${e.user_id}">
+                ${escapeHtml(e.name)}
+            </option>
+        `).join('')}
+    `;
+}
+    renderAll();
+}
 async function updateEnumeratorTarget(id, target) {
     const { error } = await supabaseClient.from('enumerator_targets').update({ target_farms: target }).eq('id', id);
     if (!error) { await loadEnumeratorTargets(); renderAll(); }
@@ -317,15 +478,56 @@ function renderFullPage() {
             </div>
         </div>
 
-        <div id="enumeratorsTab" class="tab-content">
-            <div class="card">
-                <div class="card-header"><h2><i class="fas fa-user-plus"></i> Add Enumerator</h2></div>
-                <div class="form-row">
-                    <div class="form-group"><label>Enumerator Name</label><input type="text" id="newEnumeratorName" placeholder="Enter name"></div>
-                    <div class="form-group"><label>Target Farms</label><input type="number" id="newEnumeratorTarget" placeholder="Target" value="50"></div>
-                    <div class="form-group" style="display: flex; align-items: flex-end;"><button class="btn-primary" onclick="addEnumerator()"><i class="fas fa-plus"></i> Add Enumerator</button></div>
-                </div>
+<div id="enumeratorsTab" class="tab-content">
+    <div class="card">
+        <div class="card-header">
+            <h2>
+                <i class="fas fa-user-check"></i>
+                Assign Enumerator Target
+            </h2>
+        </div>
+
+        <div class="form-row">
+
+            <div class="form-group">
+                <label>Project Enumerator</label>
+
+                <select id="newEnumeratorUser" required>
+                    <option value="">Loading enumerators...</option>
+                </select>
+
+                <small style="display:block;margin-top:6px;color:#64748b;">
+                    Only active project members with the Enumerator role are shown.
+                </small>
             </div>
+
+            <div class="form-group">
+                <label>Target Farms</label>
+                <input
+                    type="number"
+                    id="newEnumeratorTarget"
+                    placeholder="Target"
+                    value="50"
+                    min="1"
+                    required
+                >
+            </div>
+
+            <div
+                class="form-group"
+                style="display:flex;align-items:flex-end;"
+            >
+                <button
+                    class="btn-primary"
+                    onclick="addEnumerator()"
+                >
+                    <i class="fas fa-plus"></i>
+                    Assign Target
+                </button>
+            </div>
+
+        </div>
+    </div>
             
             <div class="card">
                 <div class="card-header"><h2><i class="fas fa-list"></i> Enumerators List</h2></div>
@@ -365,6 +567,7 @@ function renderFullPage() {
 }
 
 function renderAll() {
+    renderEnumeratorSelector();
     renderKPIs();
     renderPerformanceTable();
     renderEnumeratorsTable();
