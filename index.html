@@ -6,6 +6,7 @@
     <title>MappingTrace V2 - Projects</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="language.css">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     
     <style>
@@ -309,6 +310,20 @@
             .projects-grid { grid-template-columns: 1fr; }
             .header { flex-direction: column; gap: 16px; text-align: center; }
         }
+    
+        .language-switcher {
+            display:flex; gap:4px; align-items:center; margin-left:12px;
+            background:rgba(255,255,255,.16); padding:4px; border-radius:999px;
+        }
+        .language-switcher button {
+            border:0; background:transparent; color:white; padding:6px 9px;
+            border-radius:999px; cursor:pointer; font-size:11px; font-weight:700;
+        }
+        .language-switcher button.active { background:white; color:#2c6e49; }
+        .project-card h3, .project-card p { line-height:1.45; }
+        @media (max-width:768px) {
+            .language-switcher { margin-left:0; }
+        }
     </style>
 </head>
 <body>
@@ -316,12 +331,16 @@
         <div class="header">
             <div class="logo">
                 <h1><i class="fas fa-map-marked-alt"></i> MappingTrace V2</h1>
-                <p>Multi-tenant Project Platform</p>
+                <p data-i18n="multiTenant">Multi-tenant Project Platform</p>
             </div>
             <div class="user-menu" id="userMenu">
                 <div class="user-avatar" id="userAvatar">JD</div>
                 <span id="userName">Loading...</span>
-                <button class="logout-btn" id="logoutBtn"><i class="fas fa-sign-out-alt"></i> Logout</button>
+                <div class="language-switcher" aria-label="Language">
+                    <button id="langEN" type="button" onclick="setProjectsLanguage('en')">EN</button>
+                    <button id="langFR" type="button" onclick="setProjectsLanguage('fr')">FR</button>
+                </div>
+                <button class="logout-btn" id="logoutBtn"><i class="fas fa-sign-out-alt"></i> <span data-i18n="logout">Logout</span></button>
             </div>
         </div>
         
@@ -331,7 +350,7 @@
         </div>
         
         <div class="projects-grid" id="projectsGrid">
-            <div class="loading"><i class="fas fa-spinner fa-spin"></i> Loading your projects...</div>
+            <div class="loading"><i class="fas fa-spinner fa-spin"></i> <span id="loadingProjectsText"></span></div>
         </div>
     </div>
     
@@ -344,16 +363,16 @@
             </div>
             <form id="createProjectForm">
                 <div class="form-group">
-                    <label>Project Name</label>
-                    <input type="text" id="projectName" placeholder="e.g., Coffee Farm Monitoring" required>
+                    <label data-i18n="projectName">Project Name</label>
+                    <input type="text" id="projectName" placeholder="e.g., Coffee Farm Monitoring" data-i18n-placeholder="projectNamePlaceholder" required>
                 </div>
                 <div class="form-group">
-                    <label>Description</label>
-                    <textarea id="projectDescription" rows="3" placeholder="Describe your project..."></textarea>
+                    <label data-i18n="description">Description</label>
+                    <textarea id="projectDescription" rows="3" placeholder="Describe your project..." data-i18n-placeholder="descriptionPlaceholder"></textarea>
                 </div>
                 <div class="modal-buttons">
-                    <button type="button" class="btn-secondary" onclick="closeModal()">Cancel</button>
-                    <button type="submit" class="btn-primary">Create Project</button>
+                    <button type="button" class="btn-secondary" onclick="closeModal()"><span data-i18n="cancel">Cancel</span></button>
+                    <button type="submit" class="btn-primary"><span data-i18n="createProject">Create Project</span></button>
                 </div>
             </form>
         </div>
@@ -407,20 +426,20 @@
             if (!hasProjects) {
                 // User has NO projects - show helpful message with options
                 infoMessage.style.display = 'block';
-                infoText.innerHTML = 'You don\'t have access to any projects yet. You can <strong>create a new project</strong> or <strong>request access</strong> to an existing project.';
+                infoText.textContent = projectT('noProjects');
                 
                 projectsGrid.innerHTML = `
                     <div class="project-card create-card" onclick="openModal()">
                         <i class="fas fa-plus-circle"></i>
-                        <h3>Create Your First Project</h3>
-                        <p>Start by creating a new project as an Owner</p>
-                        <button class="create-btn">Create Project</button>
+                        <h3>${projectT("createFirstProject")}</h3>
+                        <p>${projectT("createFirstProjectDesc")}</p>
+                        <button class="create-btn"><span data-i18n="createProject">Create Project</span></button>
                     </div>
                     <div class="project-card request-card" onclick="goToRequestAccess()">
                         <i class="fas fa-key"></i>
-                        <h3>Request Access</h3>
-                        <p>Request access to an existing project</p>
-                        <button class="request-btn">Request Access</button>
+                        <h3>${projectT("requestAccess")}</h3>
+                        <p>${projectT("requestAccessDesc")}</p>
+                        <button class="request-btn">${projectT("requestAccess")}</button>
                     </div>
                 `;
                 return;
@@ -433,7 +452,13 @@
             for (const membership of memberships) {
                 const project = membership.projects;
                 const role = membership.role;
-                const roleDisplay = role.replace('_', ' ').toUpperCase();
+                const roleDisplay = ({
+                    owner: projectT('roleOwner'),
+                    manager: projectT('roleManager'),
+                    validator: projectT('roleValidator'),
+                    field_officer: projectT('roleFieldOfficer'),
+                    viewer: projectT('roleViewer')
+                })[String(role).toLowerCase()] || String(role).replace('_', ' ').toUpperCase();
                 
                 const { count } = await supabaseClient
                     .from('farms')
@@ -449,23 +474,23 @@
                             <i class="fas ${isArchived ? 'fa-box-archive' : 'fa-folder-open'}"></i>
                         </div>
                         <div class="project-name">${escapeHtml(project.name)}</div>
-                        <div class="project-description">${escapeHtml(project.description || 'No description')}</div>
+                        <div class="project-description">${escapeHtml(project.description || projectT('noDescription'))}</div>
                         <div class="project-stats">
-                            <span><i class="fas fa-tractor"></i> ${count || 0} farms</span>
+                            <span><i class="fas fa-tractor"></i> ${count || 0} ${projectT("farms")}</span>
                         </div>
                         <div class="project-role ${role}">${roleDisplay}</div>
                         <div class="project-status ${isArchived ? 'archived' : 'active'}">
                             <i class="fas ${isArchived ? 'fa-box-archive' : 'fa-circle-check'}"></i>
-                            ${isArchived ? 'Archived' : 'Active'}
+                            ${isArchived ? projectT("archived") : projectT("active")}
                         </div>
                         ${isProjectOwner ? `
                             <div class="project-actions" onclick="event.stopPropagation()">
                                 ${isArchived
                                     ? `<button class="project-action-btn restore-btn" onclick="restoreProject('${project.id}', event)">
-                                        <i class="fas fa-box-open"></i> Restore
+                                        <i class="fas fa-box-open"></i> ${projectT("restore")}
                                        </button>`
                                     : `<button class="project-action-btn archive-btn" onclick="archiveProject('${project.id}', event)">
-                                        <i class="fas fa-box-archive"></i> Archive
+                                        <i class="fas fa-box-archive"></i> ${projectT("archive")}
                                        </button>`
                                 }
                             </div>
@@ -480,9 +505,9 @@
                 html += `
                     <div class="project-card create-card" onclick="openModal()">
                         <i class="fas fa-plus-circle"></i>
-                        <h3>Create New Project</h3>
-                        <p>Start another project</p>
-                        <button class="create-btn">Create Project</button>
+                        <h3><span data-i18n="createNewProject">Create New Project</span></h3>
+                        <p>${projectT("startAnotherProject")}</p>
+                        <button class="create-btn"><span data-i18n="createProject">Create Project</span></button>
                     </div>
                 `;
             }
@@ -492,9 +517,9 @@
                 html += `
                     <div class="project-card request-card" onclick="goToRequestAccess()">
                         <i class="fas fa-key"></i>
-                        <h3>Request More Access</h3>
-                        <p>Request access to additional projects</p>
-                        <button class="request-btn">Request Access</button>
+                        <h3>${projectT("requestMoreAccess")}</h3>
+                        <p>${projectT("requestAdditionalDesc")}</p>
+                        <button class="request-btn">${projectT("requestAccess")}</button>
                     </div>
                 `;
             }
@@ -505,10 +530,7 @@
         async function archiveProject(projectId, event) {
             if (event) event.stopPropagation();
 
-            if (!confirm(
-                'Archive this project?\n\n' +
-                'Historical data will be preserved, but operational changes will be blocked until the project is restored.'
-            )) return;
+            if (!confirm(projectT('archiveConfirm'))) return;
 
             try {
                 const { error } = await supabaseClient.rpc('archive_project', {
@@ -517,21 +539,18 @@
 
                 if (error) throw error;
 
-                alert('Project archived successfully.');
+                alert(projectT('archiveSuccess'));
                 await loadProjects();
             } catch (error) {
                 console.error('Archive project error:', error);
-                alert('Unable to archive project: ' + error.message);
+                alert(projectT('archiveError') + error.message);
             }
         }
 
         async function restoreProject(projectId, event) {
             if (event) event.stopPropagation();
 
-            if (!confirm(
-                'Restore this project?\n\n' +
-                'Operational access will be enabled again according to the project roles.'
-            )) return;
+            if (!confirm(projectT('restoreConfirm'))) return;
 
             try {
                 const { error } = await supabaseClient.rpc('restore_project', {
@@ -540,11 +559,11 @@
 
                 if (error) throw error;
 
-                alert('Project restored successfully.');
+                alert(projectT('restoreSuccess'));
                 await loadProjects();
             } catch (error) {
                 console.error('Restore project error:', error);
-                alert('Unable to restore project: ' + error.message);
+                alert(projectT('restoreError') + error.message);
             }
         }
 
@@ -574,7 +593,7 @@
             
             const btn = e.target.querySelector('button[type="submit"]');
             btn.disabled = true;
-            btn.textContent = 'Creating...';
+            btn.textContent = projectT('creating');
             
             try {
                 const { data: project, error: projectError } =
@@ -585,15 +604,15 @@
 
                 if (projectError) throw projectError;
                 
-                alert('Project created successfully!');
+                alert(projectT('createdSuccess'));
                 closeModal();
                 await loadProjects();
                 
             } catch (error) {
-                alert('Error: ' + error.message);
+                alert(projectT('error') + error.message);
             } finally {
                 btn.disabled = false;
-                btn.textContent = 'Create Project';
+                btn.textContent = projectT('createProject');
             }
         });
         
@@ -615,6 +634,11 @@
         window.archiveProject = archiveProject;
         window.restoreProject = restoreProject;
         
+        document.addEventListener('DOMContentLoaded', () => {
+            applyProjectsLanguage();
+            const loading = document.getElementById('loadingProjectsText');
+            if (loading) loading.textContent = projectT('loadingProjects');
+        });
         init();
     </script>
 </body>
