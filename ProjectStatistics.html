@@ -759,11 +759,27 @@ function updateQualityStatus(filtered) {
 }
 
 function getFilteredSubmissions() {
+    // Submission analytics must follow the same farm selection as the dashboard.
+    // This prevents global/project-wide submissions from appearing when an
+    // Enumerator or Cooperative filter is active.
     let filtered = [...allSubmissions];
+    const selectedFarms = getFilteredFarms();
+    const selectedFarmIds = new Set(selectedFarms.map(f => String(f.id)));
+
+    filtered = filtered.filter(s => selectedFarmIds.has(String(s.farm_id)));
+
     const startDate = document.getElementById('startDate').value;
     const endDate = document.getElementById('endDate').value;
-    if (startDate) filtered = filtered.filter(s => new Date(s.created_at) >= new Date(`${startDate}T00:00:00`));
-    if (endDate) filtered = filtered.filter(s => new Date(s.created_at) <= new Date(`${endDate}T23:59:59.999`));
+
+    if (startDate) {
+        const start = new Date(`${startDate}T00:00:00`);
+        filtered = filtered.filter(s => new Date(s.created_at) >= start);
+    }
+    if (endDate) {
+        const end = new Date(`${endDate}T23:59:59.999`);
+        filtered = filtered.filter(s => new Date(s.created_at) <= end);
+    }
+
     return filtered;
 }
 
