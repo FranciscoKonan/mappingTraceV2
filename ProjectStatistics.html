@@ -716,6 +716,15 @@ function updateEnumeratorCooperativeChart(filtered) {
     enumeratorCooperativeChart = new Chart(ctx, { type: 'bar', data: { labels: enumerators, datasets }, options: { responsive: true, maintainAspectRatio: true, scales: { x: { stacked: true }, y: { stacked: true, title: { display: true, text: 'Number of Farms' } } } } });
 }
 
+function escapeHtml(value) {
+    return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
 function updateGanttChart(filtered) {
     /*
      * This is an activity timeline, not a true Gantt.
