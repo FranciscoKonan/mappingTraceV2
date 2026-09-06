@@ -384,7 +384,7 @@
                 createFirstToken:"Create your first invitation token to share with team members.",
                 shareTokens:"Share these tokens with users. They can redeem them at the Redeem Invitation page.",
                 uses:"Uses", expires:"Expires", created:"Created", activeStatus:"Active", expired:"Expired",
-                revoke:"Revoke", copy:"Copy", invitationTokensTitle:"Invitation Tokens",
+                revoke:"Revoke", copy:"Copy", invitationTokensTitle:"Invitation Tokens", revoked:"Revoked", never:"Never", noReason:"No reason provided", requestRoleTitle:"Access Requests", requestAccessDescription:"Invitation token access request", approve:"Approve", deny:"Deny", requests:"Requests", errorLoadingRequests:"Error Loading Requests", retry:"Retry", approving:"Approving...", denying:"Denying...",
                 createToken:"Create Token", requestRoleUpgradeTitle:"Request Role Upgrade", owner:"Owner", superManager:"Super Manager", enumerator:"Enumerator"
             },
             fr: {
@@ -432,7 +432,7 @@
                 createFirstToken:"Créez votre premier jeton d'invitation à partager avec les membres de l'équipe.",
                 shareTokens:"Partagez ces jetons avec les utilisateurs. Ils peuvent les utiliser sur la page d'invitation.",
                 uses:"Utilisations", expires:"Expire", created:"Créé", activeStatus:"Actif", expired:"Expiré",
-                revoke:"Révoquer", copy:"Copier", invitationTokensTitle:"Jetons d'invitation",
+                revoke:"Révoquer", copy:"Copier", invitationTokensTitle:"Jetons d'invitation", revoked:"Révoqué", never:"Jamais", noReason:"Aucun motif fourni", requestRoleTitle:"Demandes d'accès", requestAccessDescription:"Demande d'accès par jeton d'invitation", approve:"Approuver", deny:"Refuser", requests:"Demandes", errorLoadingRequests:"Erreur lors du chargement des demandes", retry:"Réessayer", approving:"Approbation...", denying:"Refus...",
                 createToken:"Créer un jeton", requestRoleUpgradeTitle:"Demander une évolution de rôle", owner:"Propriétaire", superManager:"Super Manager", enumerator:"Enquêteur"
             }
         };
@@ -1166,45 +1166,49 @@
             let html = `
                 <div class="dashboard-card">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;">
-                        <h3><i class="fas fa-ticket-alt"></i> Invitation Tokens</h3>
-                        <button onclick="openTokenModal()" class="btn-primary"><i class="fas fa-plus"></i> Create Token</button>
+                        <h3><i class="fas fa-ticket-alt"></i> ${dmT("invitationTokensTitle")}</h3>
+                        <button onclick="openTokenModal()" class="btn-primary"><i class="fas fa-plus"></i> ${dmT("createToken")}</button>
                     </div>
                     <p style="color: #64748b; margin-bottom: 16px; font-size: 13px;">
-                        <i class="fas fa-info-circle"></i> Share these tokens with users. They can redeem them at the <strong>Redeem Invitation</strong> page.
+                        <i class="fas fa-info-circle"></i> ${dmT("shareTokens")}
                     </p>
             `;
             
             if (!tokens || tokens.length === 0) {
-                html += `<div class="empty-state"><i class="fas fa-ticket-alt"></i><h3>No Tokens Yet</h3><p>Create your first invitation token to share with team members.</p></div>`;
+                html += `<div class="empty-state"><i class="fas fa-ticket-alt"></i><h3>${dmT("noTokensYet")}</h3><p>${dmT("createFirstToken")}</p></div>`;
             } else {
                 html += `<div class="tokens-list">`;
                 for (const token of tokens) {
-                    const expiresAt = token.expires_at ? new Date(token.expires_at).toLocaleDateString() : 'Never';
-                    const status = token.used_count >= token.max_uses ? 'Expired' : (token.expires_at && new Date(token.expires_at) < new Date() ? 'Expired' : 'Active');
+                    const lang = localStorage.getItem('mappingtrace_language') || 'en';
+                    const expiresAt = token.expires_at ? new Date(token.expires_at).toLocaleDateString(lang === 'fr' ? 'fr-FR' : 'en-US') : dmT('never');
+                    const statusKey = token.status === 'revoked' ? 'revoked' : (token.used_count >= token.max_uses || (token.expires_at && new Date(token.expires_at) < new Date()) ? 'expired' : 'activeStatus');
+                    const status = dmT(statusKey);
+                    const roleLabel = dmT(token.role, token.role);
+                    const createdAt = new Date(token.created_at).toLocaleString(lang === 'fr' ? 'fr-FR' : 'en-US');
                     
                     html += `
                         <div class="token-card">
                             <div class="token-header">
                                 <div>
-                                    <span class="role-badge ${token.role}">${token.role}</span>
-                                    <span class="role-badge" style="background: ${status === 'Active' ? '#dcfce7' : '#fee2e2'}; color: ${status === 'Active' ? '#166534' : '#991b1b'}">
+                                    <span class="role-badge ${token.role}">${roleLabel}</span>
+                                    <span class="role-badge" style="background: ${statusKey === 'activeStatus' ? '#dcfce7' : '#fee2e2'}; color: ${statusKey === 'activeStatus' ? '#166534' : '#991b1b'}">
                                         ${status}
                                     </span>
                                 </div>
                                 <div>
-                                    <span style="font-size: 12px; color: #64748b;">Uses: ${token.used_count}/${token.max_uses || '∞'}</span>
-                                    <span style="font-size: 12px; color: #64748b; margin-left: 12px;">Expires: ${expiresAt}</span>
+                                    <span style="font-size: 12px; color: #64748b;">${dmT("uses")}: ${token.used_count}/${token.max_uses || '∞'}</span>
+                                    <span style="font-size: 12px; color: #64748b; margin-left: 12px;">${dmT("expires")}: ${expiresAt}</span>
                                 </div>
                             </div>
                             <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-top: 12px;">
                                 <div class="token-value">${token.token}</div>
                                 <div>
-                                    <button onclick="copyToken('${token.token}')" class="btn-secondary" style="margin-right: 8px;"><i class="fas fa-copy"></i> Copy</button>
-                                    <button onclick="revokeToken('${token.id}')" class="btn-danger"><i class="fas fa-ban"></i> Revoke</button>
+                                    <button onclick="copyToken('${token.token}')" class="btn-secondary" style="margin-right: 8px;"><i class="fas fa-copy"></i> ${dmT("copy")}</button>
+                                    ${statusKey === 'activeStatus' ? `<button onclick="revokeToken('${token.id}')" class="btn-danger"><i class="fas fa-ban"></i> ${dmT("revoke")}</button>` : ''}
                                 </div>
                             </div>
                             <div style="margin-top: 12px; font-size: 12px; color: #64748b;">
-                                <i class="fas fa-calendar"></i> Created: ${new Date(token.created_at).toLocaleString()}
+                                <i class="fas fa-calendar"></i> ${dmT("created")}: ${createdAt}
                             </div>
                         </div>
                     `;
@@ -1331,7 +1335,7 @@
                     }
                 }
                 
-                let html = `<div class="dashboard-card"><h3><i class="fas fa-bell"></i> Role Upgrade Requests (${requests.length})</h3><div class="requests-list">`;
+                let html = `<div class="dashboard-card"><h3><i class="fas fa-bell"></i> ${dmT("requestRoleTitle")} (${requests.length})</h3><div class="requests-list">`;
                 
                 for (const request of requests) {
                     const profile = userProfiles[request.requester_id];
@@ -1349,14 +1353,14 @@
                                         <div class="user-email-text">${escapeHtml(email)}</div>
                                     </div>
                                 </div>
-                                <div class="request-role-badge" style="background: #fef3c7; color: #92400e; padding: 4px 12px; border-radius: 20px;">Requests: ${request.requested_role}</div>
+                                <div class="request-role-badge" style="background: #fef3c7; color: #92400e; padding: 4px 12px; border-radius: 20px;">${dmT("requests")}: ${dmT(request.requested_role, request.requested_role)}</div>
                             </div>
                             <div style="background: #f8fafc; padding: 12px; border-radius: 8px; margin: 12px 0;">
-                                <i class="fas fa-comment"></i> ${escapeHtml(request.reason || 'No reason provided')}
+                                <i class="fas fa-comment"></i> ${escapeHtml(request.reason || dmT('noReason'))}
                             </div>
                             <div style="display: flex; gap: 10px;">
-                                <button onclick="approveRequest('${request.id}', '${request.requester_id}', '${request.requested_role}', this)" class="btn-success">Approve</button>
-                                <button onclick="denyRequest('${request.id}', this)" class="btn-danger">Deny</button>
+                                <button onclick="approveRequest('${request.id}', '${request.requester_id}', '${request.requested_role}', this)" class="btn-success">${dmT("approve")}</button>
+                                <button onclick="denyRequest('${request.id}', this)" class="btn-danger">${dmT("deny")}</button>
                             </div>
                         </div>
                     `;
@@ -1366,7 +1370,7 @@
                 document.getElementById('pageContent').innerHTML = html;
                 
             } catch (error) {
-                document.getElementById('pageContent').innerHTML = `<div class="dashboard-card"><h3>Error Loading Requests</h3><p>${error.message}</p><button onclick="loadRequestsPage()" class="btn-primary">Retry</button></div>`;
+                document.getElementById('pageContent').innerHTML = `<div class="dashboard-card"><h3>${dmT("errorLoadingRequests")}</h3><p>${escapeHtml(error.message)}</p><button onclick="loadRequestsPage()" class="btn-primary">${dmT("retry")}</button></div>`;
             }
         }
         
@@ -1450,8 +1454,8 @@
         // ============================================
         
         window.approveRequest = async function(requestId, userId, role, buttonElement) {
-            if (!confirm(`Approve this user's request for ${role} role?`)) return;
-            if (buttonElement) { buttonElement.disabled = true; buttonElement.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Approving...'; }
+            if (!confirm(`${dmT('approve')} ${dmT('requestRoleTitle').toLowerCase()} ${dmT(role, role)} ?`)) return;
+            if (buttonElement) { buttonElement.disabled = true; buttonElement.innerHTML = '<i class="fas fa-spinner fa-spin"></i> ' + dmT('approving'); }
             
             try {
                 const { data: existingActiveMember } = await supabaseClient
@@ -1488,18 +1492,18 @@
                 await loadRequestsPage();
                 
             } catch (error) { alert('Error: ' + error.message); }
-            finally { if (buttonElement) { buttonElement.disabled = false; buttonElement.innerHTML = 'Approve'; } }
+            finally { if (buttonElement) { buttonElement.disabled = false; buttonElement.innerHTML = dmT('approve'); } }
         };
         
         window.denyRequest = async function(requestId, buttonElement) {
-            if (!confirm('Deny this request?')) return;
-            if (buttonElement) { buttonElement.disabled = true; buttonElement.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Denying...'; }
+            if (!confirm(`${dmT('deny')} cette demande ?`)) return;
+            if (buttonElement) { buttonElement.disabled = true; buttonElement.innerHTML = '<i class="fas fa-spinner fa-spin"></i> ' + dmT('denying'); }
             try {
                 await supabaseClient.from('access_requests').update({ status: 'denied', reviewed_by: currentUser.id, reviewed_at: new Date().toISOString() }).eq('id', requestId);
                 alert('Request denied');
                 await loadRequestsPage();
             } catch (error) { alert('Error: ' + error.message); }
-            finally { if (buttonElement) { buttonElement.disabled = false; buttonElement.innerHTML = 'Deny'; } }
+            finally { if (buttonElement) { buttonElement.disabled = false; buttonElement.innerHTML = dmT('deny'); } }
         };
         
         window.goBack = function() { window.location.href = 'index.html'; };
