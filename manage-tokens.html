@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Manage Invitation Codes | MappingTrace</title>
+    <link rel="stylesheet" href="language.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -149,27 +150,53 @@
         .role-manager { background: #dbeafe; }
         .role-field_officer { background: #e0e7ff; }
         .role-validator { background: #fef3c7; }
+
+        .header-actions { display:flex; align-items:center; gap:10px; }
+        .page-title { flex:1; min-width:240px; }
+        .language-switcher { display:flex; gap:4px; background:#e2e8f0; padding:3px; border-radius:8px; }
+        .lang-btn { border:0; background:transparent; padding:6px 9px; border-radius:6px; font-size:12px; font-weight:700; cursor:pointer; }
+        .lang-btn.active { background:white; box-shadow:0 1px 2px rgba(0,0,0,.08); }
+        .status-active { color:#166534; font-weight:700; }
+        .status-expired { color:#b45309; font-weight:700; }
+        .status-revoked { color:#b91c1c; font-weight:700; }
+        .status-used { color:#475569; font-weight:700; }
+        .token-actions { display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-top:10px; }
+        .copy-btn { margin-top:0; }
+        .revoke-btn { width:100%; padding:8px; background:#fee2e2; color:#b91c1c; border:0; border-radius:6px; cursor:pointer; font-weight:600; }
+        .revoke-btn:hover { background:#fecaca; }
+        @media(max-width:600px) {
+            .header-actions { width:100%; justify-content:space-between; }
+            .header-actions .btn { flex:1; }
+            .token-actions { grid-template-columns:1fr; }
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="card">
             <div class="header">
-                <h2><i class="fas fa-ticket-alt"></i> Invitation Codes Manager</h2>
-                <button class="btn btn-primary" onclick="openCreateModal()">
-                    <i class="fas fa-plus"></i> Create New Code
+                <div class="page-title">
+                    <h2><i class="fas fa-ticket-alt"></i> <span data-i18n="invitation_codes_manager">Invitation Codes Manager</span></h2>
+                </div>
+                <div class="header-actions">
+                    <div class="language-switcher" role="group" aria-label="Language">
+                        <button type="button" class="lang-btn" data-lang="en" onclick="setInvitationLanguage('en')">EN</button>
+                        <button type="button" class="lang-btn" data-lang="fr" onclick="setInvitationLanguage('fr')">FR</button>
+                    </div>
+                    <button class="btn btn-primary" onclick="openCreateModal()">
+                    <i class="fas fa-plus"></i> <span data-i18n="create_new_code">Create New Code</span>
                 </button>
             </div>
             
             <div id="projectSelect" class="form-group">
-                <label>Select Project</label>
+                <label><span data-i18n="select_project">Select Project</span></label>
                 <select id="projectSelectInput" onchange="loadTokens()">
-                    <option value="">Loading projects...</option>
+                    <option value=""><span data-i18n="loading_projects">Loading projects...</span></option>
                 </select>
             </div>
             
             <div id="tokensList" class="token-grid">
-                <p>Select a project to see invitation codes</p>
+                <p><span data-i18n="select_project_to_see_codes">Select a project to see invitation codes</span></p>
             </div>
         </div>
     </div>
@@ -177,27 +204,37 @@
     <!-- Create Token Modal -->
     <div id="createModal" class="modal">
         <div class="modal-content">
-            <h3 style="margin-bottom: 20px;">Create Invitation Code</h3>
+            <h3 style="margin-bottom: 20px;"><span data-i18n="create_invitation_code">Create Invitation Code</span></h3>
             <div class="form-group">
-                <label>Role</label>
-                <select id="newRole">
-                    <option value="viewer">Viewer (can only view)</option>
-                    <option value="field_officer">Field Officer (can add/edit)</option>
-                    <option value="validator">Validator (can approve)</option>
-                    <option value="manager">Manager (can manage team)</option>
+                <label><span data-i18n="role">Role</span></label>
+                <select id="new<span data-i18n="role">Role</span>">
+                    <option value="viewer"><span data-i18n="viewer_only">Viewer (can only view)</span></option>
+                    <option value="field_officer"><span data-i18n="field_officer_add_edit">Field Officer (can add/edit)</span></option>
+                    <option value="validator"><span data-i18n="validator_approve">Validator (can approve)</span></option>
+                    <option value="manager"><span data-i18n="manager_manage_team">Manager (can manage team)</span></option>
                 </select>
             </div>
             <div class="form-group">
-                <label>Custom Code (optional, leave blank for auto)</label>
-                <input type="text" id="customCode" placeholder="e.g., TEAM2024" maxlength="20">
+                <label><span data-i18n="custom_code_optional">Custom Code (optional, leave blank for auto)</span></label>
+                <input type="text" id="customCode" placeholder="e.g., TEAM2024" data-i18n-placeholder="custom_code_placeholder" maxlength="20">
             </div>
             <div class="form-group">
-                <label>Max Uses</label>
+                <label><span data-i18n="max_uses">Max Uses</span></label>
                 <input type="number" id="maxUses" value="10" min="1">
             </div>
+            <div class="form-group">
+                <label data-i18n="expiration">Expiration</label>
+                <select id="expiresIn">
+                    <option value="7" data-i18n="expires_7_days">7 days</option>
+                    <option value="30" data-i18n="expires_30_days">30 days</option>
+                    <option value="90" data-i18n="expires_90_days">90 days</option>
+                    <option value="0" data-i18n="expires_never">Never</option>
+                </select>
+            </div>
+
             <div style="display: flex; gap: 10px; margin-top: 20px;">
-                <button class="btn btn-secondary" onclick="closeCreateModal()">Cancel</button>
-                <button class="btn btn-primary" onclick="createToken()">Create Code</button>
+                <button class="btn btn-secondary" onclick="closeCreateModal()"><span data-i18n="cancel">Cancel</span></button>
+                <button class="btn btn-primary" onclick="createToken()"><span data-i18n="create_code">Create Code</span></button>
             </div>
         </div>
     </div>
@@ -214,25 +251,184 @@
             let currentProjectId = null;
             let projects = [];
             
+            const I18N = {
+                en: {
+                    invitation_codes_manager: 'Invitation Codes Manager',
+                    create_new_code: 'Create New Code',
+                    select_project: 'Select Project',
+                    loading_projects: 'Loading projects...',
+                    select_project_to_see_codes: 'Select a project to see invitation codes',
+                    create_invitation_code: 'Create Invitation Code',
+                    role: 'Role',
+                    custom_code_optional: 'Custom Code (optional, leave blank for auto)',
+                    custom_code_placeholder: 'e.g., TEAM2024',
+                    max_uses: 'Max Uses',
+                    expiration: 'Expiration',
+                    expires_7_days: '7 days',
+                    expires_30_days: '30 days',
+                    expires_90_days: '90 days',
+                    expires_never: 'Never',
+                    cancel: 'Cancel',
+                    create_code: 'Create Code',
+                    copy_code: 'Copy Code',
+                    share_link: 'Share Link',
+                    revoke: 'Revoke',
+                    viewer_only: 'Viewer (can only view)',
+                    field_officer_add_edit: 'Field Officer (can add/edit)',
+                    validator_approve: 'Validator (can approve)',
+                    manager_manage_team: 'Manager (can manage team)',
+                    no_projects: "You don't manage any projects",
+                    owner_manager_required: 'You need to be a project owner or manager to create invitation codes',
+                    no_codes: 'No invitation codes yet. Click "Create New Code" to get started.',
+                    error_loading_projects: 'Error loading projects',
+                    error_loading_tokens: 'Error loading tokens',
+                    select_project_first: 'Please select a project first',
+                    copied_code: 'Code "{token}" copied! Share it with users.',
+                    invitation_message_copied: 'Invitation message copied! Share it with users.',
+                    created_successfully: 'Code "{token}" created successfully!',
+                    create_error: 'Error creating code: {error}',
+                    revoke_confirm: 'Revoke invitation code "{token}"?',
+                    revoked_successfully: 'Code "{token}" revoked.',
+                    revoke_error: 'Error revoking code: {error}',
+                    active: 'Active',
+                    expired: 'Expired',
+                    revoked: 'Revoked',
+                    fully_used: 'Fully used',
+                    uses: 'Uses',
+                    expires: 'Expires',
+                    never: 'Never',
+                    share_message: 'Join my project on MappingTrace! Use this invitation code: {token}\n\nGo to: {url}'
+                },
+                fr: {
+                    invitation_codes_manager: 'Gestion des codes d’invitation',
+                    create_new_code: 'Créer un nouveau code',
+                    select_project: 'Sélectionner un projet',
+                    loading_projects: 'Chargement des projets...',
+                    select_project_to_see_codes: 'Sélectionnez un projet pour voir les codes d’invitation',
+                    create_invitation_code: 'Créer un code d’invitation',
+                    role: 'Rôle',
+                    custom_code_optional: 'Code personnalisé (facultatif, laisser vide pour générer automatiquement)',
+                    custom_code_placeholder: 'ex. : TEAM2024',
+                    max_uses: 'Nombre maximal d’utilisations',
+                    expiration: 'Expiration',
+                    expires_7_days: '7 jours',
+                    expires_30_days: '30 jours',
+                    expires_90_days: '90 jours',
+                    expires_never: 'Jamais',
+                    cancel: 'Annuler',
+                    create_code: 'Créer le code',
+                    copy_code: 'Copier le code',
+                    share_link: 'Partager le lien',
+                    revoke: 'Révoquer',
+                    viewer_only: 'Viewer (lecture seule)',
+                    field_officer_add_edit: 'Field Officer (ajout/modification)',
+                    validator_approve: 'Validator (validation)',
+                    manager_manage_team: 'Manager (gestion de l’équipe)',
+                    no_projects: 'Vous ne gérez aucun projet',
+                    owner_manager_required: 'Vous devez être propriétaire ou manager d’un projet pour créer des codes d’invitation',
+                    no_codes: 'Aucun code d’invitation. Cliquez sur « Créer un nouveau code » pour commencer.',
+                    error_loading_projects: 'Erreur lors du chargement des projets',
+                    error_loading_tokens: 'Erreur lors du chargement des codes',
+                    select_project_first: 'Veuillez d’abord sélectionner un projet',
+                    copied_code: 'Code « {token} » copié ! Vous pouvez le partager.',
+                    invitation_message_copied: 'Message d’invitation copié ! Vous pouvez le partager.',
+                    created_successfully: 'Code « {token} » créé avec succès !',
+                    create_error: 'Erreur lors de la création du code : {error}',
+                    revoke_confirm: 'Révoquer le code d’invitation « {token} » ?',
+                    revoked_successfully: 'Code « {token} » révoqué.',
+                    revoke_error: 'Erreur lors de la révocation du code : {error}',
+                    active: 'Actif',
+                    expired: 'Expiré',
+                    revoked: 'Révoqué',
+                    fully_used: 'Épuisé',
+                    uses: 'Utilisations',
+                    expires: 'Expire',
+                    never: 'Jamais',
+                    share_message: 'Rejoignez mon projet sur MappingTrace ! Utilisez ce code d’invitation : {token}\n\nAccédez à : {url}'
+                }
+            };
+
+            let language = localStorage.getItem('mappingtrace_language') || 'en';
+
+            function t(key, vars = {}) {
+                let value = I18N[language]?.[key] ?? I18N.en[key] ?? key;
+                Object.entries(vars).forEach(([k, v]) => {
+                    value = value.replaceAll(`{${k}}`, String(v));
+                });
+                return value;
+            }
+
+            function applyInvitationLanguage() {
+                document.documentElement.lang = language;
+                document.querySelectorAll('[data-i18n]').forEach(el => {
+                    const key = el.dataset.i18n;
+                    if (I18N[language]?.[key]) el.textContent = I18N[language][key];
+                });
+                document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+                    const key = el.dataset.i18nPlaceholder;
+                    if (I18N[language]?.[key]) el.placeholder = I18N[language][key];
+                });
+                document.querySelectorAll('.lang-btn').forEach(btn => {
+                    btn.classList.toggle('active', btn.dataset.lang === language);
+                });
+                if (currentProjectId) loadTokens();
+            }
+
+            window.setInvitationLanguage = function(lang) {
+                if (!I18N[lang]) return;
+                language = lang;
+                localStorage.setItem('mappingtrace_language', lang);
+                applyInvitationLanguage();
+            };
+
             function showToast(msg, type) {
                 const toast = document.getElementById('toast');
-                toast.innerHTML = `<div class="toast toast-${type}"><i class="fas ${type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle'}"></i> ${msg}</div>`;
+                toast.innerHTML = `<div class="toast toast-${type}">
+                    <i class="fas ${type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle'}"></i>
+                    ${escapeHtml(msg)}
+                </div>`;
                 setTimeout(() => toast.innerHTML = '', 3000);
             }
-            
+
+            function escapeHtml(value) {
+                return String(value ?? '')
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&#039;');
+            }
+
+            function tokenStatus(token) {
+                if (token.status === 'revoked') return { key: 'revoked', className: 'status-revoked' };
+                if (token.expires_at && new Date(token.expires_at) < new Date()) {
+                    return { key: 'expired', className: 'status-expired' };
+                }
+                if (token.max_uses && (token.used_count || 0) >= token.max_uses) {
+                    return { key: 'fully_used', className: 'status-used' };
+                }
+                return { key: 'active', className: 'status-active' };
+            }
+
+            function formatExpiry(value) {
+                if (!value) return t('never');
+                return new Date(value).toLocaleDateString(language === 'fr' ? 'fr-FR' : 'en-GB');
+            }
+
             async function init() {
                 supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-                
+
                 const { data: { session } } = await supabase.auth.getSession();
                 if (!session) {
                     window.location.href = 'login.html';
                     return;
                 }
+
                 currentUser = session.user;
-                
+                applyInvitationLanguage();
                 await loadProjects();
             }
-            
+
             async function loadProjects() {
                 const { data: memberProjects, error } = await supabase
                     .from('project_members')
@@ -240,130 +436,186 @@
                     .eq('user_id', currentUser.id)
                     .in('role', ['owner', 'manager'])
                     .eq('status', 'active');
-                
+
                 if (error) {
-                    showToast('Error loading projects', 'error');
+                    showToast(t('error_loading_projects'), 'error');
                     return;
                 }
-                
+
                 projects = memberProjects || [];
                 const select = document.getElementById('projectSelectInput');
-                
+
                 if (projects.length === 0) {
-                    select.innerHTML = '<option value="">You don\'t manage any projects</option>';
-                    showToast('You need to be a project owner or manager to create invitation codes', 'error');
+                    select.innerHTML = `<option value="">${escapeHtml(t('no_projects'))}</option>`;
+                    showToast(t('owner_manager_required'), 'error');
                     return;
                 }
-                
-                select.innerHTML = '<option value="">Select a project...</option>' + 
-                    projects.map(p => `<option value="${p.project_id}">${p.projects.name} (${p.role})</option>`).join('');
-                
+
+                select.innerHTML = `<option value="">${escapeHtml(t('select_project'))}...</option>` +
+                    projects.map(p => `<option value="${escapeHtml(p.project_id)}">${escapeHtml(p.projects?.name || '')} (${escapeHtml(p.role)})</option>`).join('');
+
                 select.onchange = () => {
                     currentProjectId = select.value;
                     if (currentProjectId) loadTokens();
+                    else document.getElementById('tokensList').innerHTML =
+                        `<p>${escapeHtml(t('select_project_to_see_codes'))}</p>`;
                 };
             }
-            
+
             async function loadTokens() {
                 if (!currentProjectId) return;
-                
+
                 const { data: tokens, error } = await supabase
                     .from('invitation_tokens')
-                    .select('*')
-                    .eq('project_id', currentProjectId);
-                
+                    .select('id, token, role, used_count, max_uses, status, expires_at, created_at')
+                    .eq('project_id', currentProjectId)
+                    .order('created_at', { ascending: false });
+
                 if (error) {
-                    showToast('Error loading tokens', 'error');
+                    showToast(t('error_loading_tokens'), 'error');
                     return;
                 }
-                
+
                 const container = document.getElementById('tokensList');
-                
+
                 if (!tokens || tokens.length === 0) {
-                    container.innerHTML = '<p style="color: #64748b;">No invitation codes yet. Click "Create New Code" to get started.</p>';
+                    container.innerHTML = `<p style="color:#64748b;">${escapeHtml(t('no_codes'))}</p>`;
                     return;
                 }
-                
-                container.innerHTML = tokens.map(token => `
-                    <div class="token-card">
-                        <div class="token-code">${token.token}</div>
-                        <div class="token-info">
-                            <span><span class="role-badge role-${token.role}">${token.role}</span></span>
-                            <span>Uses: ${token.used_count || 0}/${token.max_uses || '∞'}</span>
-                            <span>${token.status}</span>
+
+                container.innerHTML = tokens.map(token => {
+                    const status = tokenStatus(token);
+                    const canRevoke = token.status === 'active' && status.key !== 'expired' &&
+                        !(token.max_uses && (token.used_count || 0) >= token.max_uses);
+
+                    return `
+                        <div class="token-card">
+                            <div class="token-code">${escapeHtml(token.token)}</div>
+                            <div class="token-info">
+                                <span><span class="role-badge role-${escapeHtml(token.role)}">${escapeHtml(token.role)}</span></span>
+                                <span>${escapeHtml(t('uses'))}: ${token.used_count || 0}/${token.max_uses || '∞'}</span>
+                                <span class="${status.className}">${escapeHtml(t(status.key))}</span>
+                            </div>
+                            <div class="token-info">
+                                <span>${escapeHtml(t('expires'))}: ${escapeHtml(formatExpiry(token.expires_at))}</span>
+                            </div>
+                            <div class="token-actions">
+                                <button class="copy-btn" onclick="copyToken('${escapeHtml(token.token)}')">
+                                    <i class="fas fa-copy"></i> ${escapeHtml(t('copy_code'))}
+                                </button>
+                                <button class="copy-btn" style="background:#dcfce7;" onclick="shareToken('${escapeHtml(token.token)}')">
+                                    <i class="fas fa-share-alt"></i> ${escapeHtml(t('share_link'))}
+                                </button>
+                            </div>
+                            ${canRevoke ? `
+                                <button class="revoke-btn" style="margin-top:6px;" onclick="revokeToken('${escapeHtml(token.id)}','${escapeHtml(token.token)}')">
+                                    <i class="fas fa-ban"></i> ${escapeHtml(t('revoke'))}
+                                </button>` : ''}
                         </div>
-                        <button class="copy-btn" onclick="copyToken('${token.token}')">
-                            <i class="fas fa-copy"></i> Copy Code
-                        </button>
-                        <button class="copy-btn" style="margin-top: 5px; background: #dcfce7;" onclick="shareToken('${token.token}')">
-                            <i class="fas fa-share-alt"></i> Share Link
-                        </button>
-                    </div>
-                `).join('');
+                    `;
+                }).join('');
             }
-            
-            window.copyToken = function(token) {
-                navigator.clipboard.writeText(token);
-                showToast(`Code "${token}" copied! Share it with users.`, 'success');
+
+            window.copyToken = async function(token) {
+                await navigator.clipboard.writeText(token);
+                showToast(t('copied_code', { token }), 'success');
             };
-            
-            window.shareToken = function(token) {
-                const redeemUrl = `${window.location.origin}/redeem.html`;
-                const text = `Join my project on MappingTrace! Use this invitation code: ${token}\n\nGo to: ${redeemUrl}`;
-                navigator.clipboard.writeText(text);
-                showToast(`Invitation message copied! Share it with users.`, 'success');
+
+            window.shareToken = async function(token) {
+                const redeemUrl = `${window.location.origin}/request-access.html?token=${encodeURIComponent(token)}`;
+                const text = t('share_message', { token, url: redeemUrl });
+                await navigator.clipboard.writeText(text);
+                showToast(t('invitation_message_copied'), 'success');
             };
-            
+
+            window.revokeToken = async function(id, token) {
+                if (!confirm(t('revoke_confirm', { token }))) return;
+
+                const { error } = await supabase
+                    .from('invitation_tokens')
+                    .update({ status: 'revoked', updated_at: new Date().toISOString() })
+                    .eq('id', id)
+                    .eq('project_id', currentProjectId);
+
+                if (error) {
+                    showToast(t('revoke_error', { error: error.message }), 'error');
+                    return;
+                }
+
+                showToast(t('revoked_successfully', { token }), 'success');
+                await loadTokens();
+            };
+
             window.openCreateModal = function() {
                 if (!currentProjectId) {
-                    showToast('Please select a project first', 'error');
+                    showToast(t('select_project_first'), 'error');
                     return;
                 }
                 document.getElementById('createModal').classList.add('active');
             };
-            
+
             window.closeCreateModal = function() {
                 document.getElementById('createModal').classList.remove('active');
                 document.getElementById('customCode').value = '';
                 document.getElementById('newRole').value = 'viewer';
                 document.getElementById('maxUses').value = '10';
+                document.getElementById('expiresIn').value = '7';
             };
-            
+
             window.createToken = async function() {
                 const role = document.getElementById('newRole').value;
                 const customCode = document.getElementById('customCode').value.trim().toUpperCase();
-                const maxUses = parseInt(document.getElementById('maxUses').value);
-                
+                const maxUses = parseInt(document.getElementById('maxUses').value, 10);
+
+                if (!Number.isInteger(maxUses) || maxUses < 1) {
+                    showToast(language === 'fr' ? 'Le nombre maximal d’utilisations doit être au moins 1.' :
+                        'Max Uses must be at least 1.', 'error');
+                    return;
+                }
+
+                // Use secure server-side generation for automatic codes.
                 let token = customCode;
                 if (!token) {
-                    // Generate random 8-character code
-                    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-                    token = Array(8).fill().map(() => chars[Math.floor(Math.random() * chars.length)]).join('');
+                    const { data: generatedToken, error: genError } =
+                        await supabase.rpc('generate_unique_token');
+
+                    if (genError || !generatedToken) {
+                        showToast(language === 'fr' ? 'Impossible de générer le code.' :
+                            'Unable to generate invitation code.', 'error');
+                        return;
+                    }
+                    token = String(generatedToken).toUpperCase();
                 }
-                
+
+                const expiresIn = parseInt(document.getElementById('expiresIn').value, 10);
+                const expiresAt = expiresIn > 0
+                    ? new Date(Date.now() + expiresIn * 24 * 60 * 60 * 1000).toISOString()
+                    : null;
+
                 const { error } = await supabase
                     .from('invitation_tokens')
                     .insert({
                         project_id: currentProjectId,
-                        token: token,
-                        role: role,
+                        token,
+                        role,
                         granted_by: currentUser.id,
                         max_uses: maxUses,
                         used_count: 0,
+                        expires_at: expiresAt,
                         status: 'active',
                         created_at: new Date().toISOString()
                     });
-                
+
                 if (error) {
-                    showToast('Error creating code: ' + error.message, 'error');
+                    showToast(t('create_error', { error: error.message }), 'error');
                     return;
                 }
-                
-                showToast(`Code "${token}" created successfully!`, 'success');
+
+                showToast(t('created_successfully', { token }), 'success');
                 closeCreateModal();
-                loadTokens();
+                await loadTokens();
             };
-            
+
             init();
         })();
     </script>
