@@ -91,7 +91,7 @@
         .workflow-card { background: white; border-radius: 16px; padding: 18px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); border-left: 4px solid #2c6e49; }
         .workflow-card .count { font-size: 30px; font-weight: 800; color: #1a1a2e; }
         .workflow-card .label { font-size: 12px; color: #64748b; margin-top: 5px; line-height: 1.35; }
-        .quality-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 32px; }
+        .quality-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 16px; margin-bottom: 32px; }
         .quality-card { background: white; border-radius: 16px; padding: 18px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
         .quality-card .quality-value { font-size: 28px; font-weight: 800; color: #1a1a2e; }
         .quality-card .quality-label { font-size: 12px; color: #64748b; margin-top: 5px; }
@@ -286,11 +286,15 @@
 
     <div class="quality-grid">
         <div class="quality-card">
-            <div class="quality-value" id="qualityPassed">0</div>
+            <div class="quality-value" id="qualityAssessed">0 / 0</div>
+            <div class="quality-label">Quality Assessed</div>
+        </div>
+        <div class="quality-card">
+            <div class="quality-value" id="qualityPassed">0 / 0</div>
             <div class="quality-label">Quality Passed</div>
         </div>
         <div class="quality-card">
-            <div class="quality-value" id="qualityIssues">0</div>
+            <div class="quality-value" id="qualityIssues">0 / 0</div>
             <div class="quality-label">Issues Detected</div>
         </div>
         <div class="quality-card">
@@ -298,8 +302,12 @@
             <div class="quality-label">Critical Issues</div>
         </div>
         <div class="quality-card">
-            <div class="quality-value" id="qualityGeometry">0</div>
+            <div class="quality-value" id="qualityGeometry">0 / 0</div>
             <div class="quality-label">Geometry Valid</div>
+        </div>
+        <div class="quality-card">
+            <div class="quality-value" id="qualityPassRate">0%</div>
+            <div class="quality-label">Quality Pass Rate</div>
         </div>
     </div>
 
@@ -631,13 +639,13 @@ function updateWorkflowStatus(filtered) {
 ========================================================= */
 
 function updateQualityStatus(filtered) {
-    const farmIds = new Set(
-        filtered.map(f => String(f.id))
-    );
+    const farmIds = new Set(filtered.map(f => String(f.id)));
 
     const quality = allQuality.filter(q =>
         farmIds.has(String(q.farm_id))
     );
+
+    const assessed = quality.length;
 
     const qualityPassed = quality.filter(q =>
         String(q.quality_status || '').toLowerCase() === 'passed'
@@ -656,19 +664,27 @@ function updateQualityStatus(filtered) {
         q.empty_geometry !== true
     ).length;
 
+    const farmTotal = filtered.length;
+    const passRate = assessed > 0 ? (qualityPassed / assessed) * 100 : 0;
+
+    document.getElementById('qualityAssessed').textContent =
+        `${assessed} / ${farmTotal}`;
+
     document.getElementById('qualityPassed').textContent =
-        qualityPassed;
+        `${qualityPassed} / ${assessed}`;
 
     document.getElementById('qualityIssues').textContent =
-        qualityIssues;
+        `${qualityIssues} / ${assessed}`;
 
     document.getElementById('qualityCritical').textContent =
         qualityCritical;
 
     document.getElementById('qualityGeometry').textContent =
-        geometryValid;
-}
+        `${geometryValid} / ${assessed}`;
 
+    document.getElementById('qualityPassRate').textContent =
+        `${passRate.toFixed(1)}%`;
+}
 
 function getFilteredSubmissions() {
     let filtered = [...allSubmissions];
