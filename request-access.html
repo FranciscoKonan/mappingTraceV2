@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Request Access | MappingTrace</title>
+    <link rel="stylesheet" href="language.css">
     
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -38,6 +39,24 @@
             text-align: center;
         }
         
+        .language-switcher {
+            display: flex;
+            justify-content: flex-end;
+            gap: 4px;
+            margin-bottom: 12px;
+        }
+        .lang-btn {
+            border: 0;
+            background: rgba(255,255,255,.18);
+            color: white;
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+        .lang-btn.active { background: white; color: #2c6e49; }
+
         .header i {
             font-size: 56px;
             margin-bottom: 15px;
@@ -279,8 +298,8 @@
         <div class="card">
             <div class="header">
                 <i class="fas fa-ticket-alt"></i>
-                <h1>Request Project Access</h1>
-                <p>Enter your invitation token to request access</p>
+                <h1 data-i18n="request_project_access">Request Project Access</h1>
+                <p data-i18n="enter_token_request">Enter your invitation token to request access</p>
             </div>
             <div class="body">
                 <div id="userInfo" class="user-info">
@@ -299,11 +318,11 @@
                 <div id="mainContent" style="display: none;">
                     <div class="info-box">
                         <i class="fas fa-info-circle"></i> 
-                        Enter the token provided by the project owner. Your request will be sent for approval.
+                        <span data-i18n="token_owner_approval">Enter the token provided by the project owner. Your request will be sent for approval.</span>
                     </div>
                     
                     <div id="knownTokens" class="demo-token-list">
-                        <strong style="width:100%; margin-bottom:5px;">Known tokens (click to use):</strong>
+                        <strong style="width:100%; margin-bottom:5px;"><span data-i18n="known_tokens">Known tokens (click to use):</span></strong>
                         <span class="demo-token" onclick="setToken('MANAG64b1')">MANAG64b1</span>
                         <span class="demo-token" onclick="setToken('COFFEE1')">COFFEE1</span>
                         <span class="demo-token" onclick="setToken('TRACE1')">TRACE1</span>
@@ -313,16 +332,16 @@
                     </div>
                     
                     <div class="form-group">
-                        <label><i class="fas fa-qrcode"></i> Invitation Token</label>
-                        <input type="text" id="tokenInput" class="token-input" placeholder="e.g., MANAG64b1" autocomplete="off">
+                        <label><i class="fas fa-qrcode"></i> <span data-i18n="invitation_token">Invitation Token</span></label>
+                        <input type="text" id="tokenInput" class="token-input" placeholder="e.g., MANAG64b1" data-i18n-placeholder="token_placeholder" autocomplete="off">
                     </div>
                     
                     <button id="requestBtn" class="btn-primary">
-                        <i class="fas fa-paper-plane"></i> Submit Access Request
+                        <i class="fas fa-paper-plane"></i> <span data-i18n="submit_access_request">Submit Access Request</span>
                     </button>
                     
                     <button onclick="window.location.href='index.html'" class="btn-secondary">
-                        <i class="fas fa-home"></i> Go to Dashboard
+                        <i class="fas fa-home"></i> <span data-i18n="go_dashboard">Go to Dashboard</span>
                     </button>
                 </div>
                 
@@ -330,7 +349,7 @@
             </div>
         </div>
         <div class="back-link">
-            <a href="login.html">← Back to Login</a>
+            <a href="login.html"><span data-i18n="back_login">← Back to Login</span></a>
         </div>
     </div>
     
@@ -344,176 +363,272 @@
             let supabase = null;
             let currentUser = null;
             
+            const I18N = {
+                en: {
+                    request_project_access: 'Request Project Access',
+                    enter_token_request: 'Enter your invitation token to request access',
+                    token_owner_approval: 'Enter the token provided by the project owner. Your request will be sent for approval.',
+                    known_tokens: 'Known tokens (click to use):',
+                    invitation_token: 'Invitation Token',
+                    submit_access_request: 'Submit Access Request',
+                    go_dashboard: 'Go to Dashboard',
+                    back_login: '← Back to Login',
+                    request_submitted: 'Request Submitted!',
+                    manager_review: 'The project manager will review your request.',
+                    notified_approved: 'You will be notified once approved.',
+                    request_failed: 'Request Failed',
+                    try_again: 'Try Again',
+                    token_placeholder: 'e.g., MANAG64b1',
+                    loading: 'Loading...',
+                    error_loading_page: 'Error loading page. Please refresh.',
+                    please_enter_token: 'Please enter an invitation token',
+                    selected: 'Selected: {token}',
+                    submitting: 'Submitting...',
+                    request_sent: 'Your request to join {project} as {role} has been sent.',
+                    already_pending: 'You already have a pending request for "{project}".',
+                    already_member: 'You are already a member of "{project}" as {role}.',
+                    token_expired: 'Invitation token has expired',
+                    token_revoked: 'Invitation token has been revoked',
+                    token_maxed: 'Invitation token has reached its maximum number of uses',
+                    token_invalid: 'Invalid or unavailable invitation token'
+                },
+                fr: {
+                    request_project_access: 'Demander l’accès au projet',
+                    enter_token_request: 'Saisissez votre code d’invitation pour demander l’accès',
+                    token_owner_approval: 'Saisissez le code fourni par le propriétaire du projet. Votre demande sera envoyée pour approbation.',
+                    known_tokens: 'Codes connus (cliquez pour utiliser) :',
+                    invitation_token: 'Code d’invitation',
+                    submit_access_request: 'Envoyer la demande d’accès',
+                    go_dashboard: 'Accéder au tableau de bord',
+                    back_login: '← Retour à la connexion',
+                    request_submitted: 'Demande envoyée !',
+                    manager_review: 'Le responsable du projet examinera votre demande.',
+                    notified_approved: 'Vous serez informé une fois la demande approuvée.',
+                    request_failed: 'Échec de la demande',
+                    try_again: 'Réessayer',
+                    token_placeholder: 'ex. : MANAG64b1',
+                    loading: 'Chargement...',
+                    error_loading_page: 'Erreur lors du chargement. Veuillez actualiser la page.',
+                    please_enter_token: 'Veuillez saisir un code d’invitation',
+                    selected: 'Sélectionné : {token}',
+                    submitting: 'Envoi...',
+                    request_sent: 'Votre demande pour rejoindre {project} en tant que {role} a été envoyée.',
+                    already_pending: 'Vous avez déjà une demande en attente pour « {project} ».',
+                    already_member: 'Vous êtes déjà membre de « {project} » en tant que {role}.',
+                    token_expired: 'Le code d’invitation a expiré',
+                    token_revoked: 'Le code d’invitation a été révoqué',
+                    token_maxed: 'Le code d’invitation a atteint son nombre maximal d’utilisations',
+                    token_invalid: 'Code d’invitation invalide ou indisponible'
+                }
+            };
+
+            let language = localStorage.getItem('mappingtrace_language') || 'en';
+
+            function t(key, vars = {}) {
+                let value = I18N[language]?.[key] ?? I18N.en[key] ?? key;
+                Object.entries(vars).forEach(([k, v]) => {
+                    value = value.replaceAll(`{${k}}`, String(v));
+                });
+                return value;
+            }
+
+            function escapeHtml(value) {
+                return String(value ?? '')
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&#039;');
+            }
+
+            function applyRequestLanguage() {
+                document.documentElement.lang = language;
+                document.querySelectorAll('[data-i18n]').forEach(el => {
+                    const key = el.dataset.i18n;
+                    if (I18N[language]?.[key]) el.textContent = I18N[language][key];
+                });
+                document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+                    const key = el.dataset.i18nPlaceholder;
+                    if (I18N[language]?.[key]) el.placeholder = I18N[language][key];
+                });
+                document.querySelectorAll('.lang-btn').forEach(btn => {
+                    btn.classList.toggle('active', btn.dataset.lang === language);
+                });
+            }
+
+            window.setRequestLanguage = function(lang) {
+                if (!I18N[lang]) return;
+                language = lang;
+                localStorage.setItem('mappingtrace_language', lang);
+                applyRequestLanguage();
+            };
+
             function showToast(message, type) {
                 const container = document.getElementById('toastContainer');
                 const toast = document.createElement('div');
                 toast.className = `toast toast-${type}`;
-                toast.innerHTML = `<i class="fas ${type === 'success' ? 'fa-check-circle' : type === 'error' ? 'fa-exclamation-circle' : 'fa-info-circle'}"></i> ${message}`;
+                toast.innerHTML =
+                    `<i class="fas ${type === 'success' ? 'fa-check-circle' : type === 'error' ? 'fa-exclamation-circle' : 'fa-info-circle'}"></i> ${escapeHtml(message)}`;
                 container.appendChild(toast);
                 setTimeout(() => toast.remove(), 4000);
             }
-            
+
             async function init() {
                 supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-                
+                applyRequestLanguage();
+
                 try {
                     const { data: { session }, error: sessionError } = await supabase.auth.getSession();
                     if (sessionError) throw sessionError;
+
                     if (!session) {
                         window.location.href = 'login.html';
                         return;
                     }
+
                     currentUser = session.user;
-                    
                     await loadUser();
-                    
+
+                    // Accept token from shared invitation URL.
+                    const params = new URLSearchParams(window.location.search);
+                    const urlToken = (params.get('token') || '').trim().toUpperCase();
+                    if (urlToken) {
+                        document.getElementById('tokenInput').value = urlToken;
+                    }
+
                     document.getElementById('loadingDiv').style.display = 'none';
                     document.getElementById('mainContent').style.display = 'block';
                 } catch (error) {
                     console.error('Init error:', error);
-                    showToast('Error loading page. Please refresh.', 'error');
+                    showToast(t('error_loading_page'), 'error');
                 }
             }
-            
+
             async function loadUser() {
                 const { data: profile, error } = await supabase
                     .from('user_profiles')
                     .select('email, first_name')
                     .eq('id', currentUser.id)
                     .maybeSingle();
-                
+
                 if (error) console.error('Profile error:', error);
-                
-                const email = profile?.email || currentUser.email;
+
+                const email = profile?.email || currentUser.email || '';
                 const firstName = profile?.first_name || '';
+
                 document.getElementById('userEmail').textContent = email;
                 document.getElementById('userName').textContent = firstName || email.split('@')[0];
-                document.getElementById('userAvatar').textContent = (firstName.charAt(0) || email.charAt(0)).toUpperCase();
+                document.getElementById('userAvatar').textContent =
+                    (firstName.charAt(0) || email.charAt(0) || '?').toUpperCase();
             }
-            
+
             window.setToken = function(token) {
                 document.getElementById('tokenInput').value = token;
-                showToast(`Selected: ${token}`, 'success');
+                showToast(t('selected', { token }), 'success');
             };
-            
-                   async function submitRequest() {
-            const tokenInput = document.getElementById('tokenInput').value.trim();
-        
-            if (!tokenInput) {
-                showToast('Please enter an invitation token', 'error');
-                return;
-            }
-        
-            const requestBtn = document.getElementById('requestBtn');
-            requestBtn.disabled = true;
-            requestBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Submitting...';
-            document.getElementById('resultDiv').style.display = 'none';
-        
-            try {
-                console.log('Submitting invitation token request:', tokenInput);
-        
-                // Secure server-side token validation + access request creation
-                const { data, error } = await supabase.rpc(
-                    'request_access_with_invitation_token',
-                    {
-                        p_token: tokenInput
-                    }
-                );
-        
-                if (error) {
-                    console.error('Invitation request error:', error);
-                    throw new Error(error.message);
+
+            async function submitRequest() {
+                const tokenInput = document.getElementById('tokenInput').value.trim().toUpperCase();
+
+                if (!tokenInput) {
+                    showToast(t('please_enter_token'), 'error');
+                    return;
                 }
-        
-                const result = typeof data === 'string'
-                    ? JSON.parse(data)
-                    : data;
-        
-                if (!result || !result.success) {
-                    throw new Error('Unable to submit access request');
-                }
-        
-                // Show success
-                document.getElementById('mainContent').style.display = 'none';
-        
-                document.getElementById('resultDiv').innerHTML = `
-                    <div class="success-box">
-                        <i class="fas fa-paper-plane"></i>
-        
-                        <h3>Request Submitted!</h3>
-        
-                        <p style="margin: 15px 0;">
-                            Your request to join
-                            <strong>${escapeHtml(result.project_name)}</strong>
-                            as
-                            <strong>${escapeHtml(
-                                result.role.replace('_', ' ').toUpperCase()
-                            )}</strong>
-                            has been sent.
-                        </p>
-        
-                        <div style="background: #f0fdf4; padding: 15px; border-radius: 8px; margin-top: 15px;">
-                            <i class="fas fa-clock"></i>
-                            The project manager will review your request.
-                            You will be notified once approved.
-                        </div>
-        
-                        <button
-                            onclick="window.location.href='index.html'"
-                            class="btn-primary"
-                            style="margin-top: 20px;"
-                        >
-                            <i class="fas fa-home"></i> Go to Dashboard
-                        </button>
-                    </div>
-                `;
-        
-                document.getElementById('resultDiv').style.display = 'block';
-        
-                showToast(
-                    `Request submitted for ${result.project_name}!`,
-                    'success'
-                );
-        
-            } catch (error) {
-                console.error('Request error:', error);
-        
-                showToast(error.message, 'error');
-        
-                document.getElementById('resultDiv').innerHTML = `
-                    <div class="error-box">
-                        <i class="fas fa-exclamation-triangle"></i>
-        
-                        <h3 style="margin-bottom: 10px;">
-                            Request Failed
-                        </h3>
-        
-                        <p>${escapeHtml(error.message)}</p>
-        
-                        <button
-                            onclick="location.reload()"
-                            class="btn-secondary"
-                            style="margin-top: 15px;"
-                        >
-                            <i class="fas fa-redo"></i> Try Again
-                        </button>
-                    </div>
-                `;
-        
-                document.getElementById('resultDiv').style.display = 'block';
-        
-            } finally {
-                requestBtn.disabled = false;
+
+                const requestBtn = document.getElementById('requestBtn');
+                requestBtn.disabled = true;
                 requestBtn.innerHTML =
-                    '<i class="fas fa-paper-plane"></i> Submit Access Request';
+                    `<i class="fas fa-spinner fa-spin"></i> ${escapeHtml(t('submitting'))}`;
+                document.getElementById('resultDiv').style.display = 'none';
+
+                try {
+                    // Secure server-side validation + access request creation.
+                    // The browser does not read invitation_tokens or modify project_members.
+                    const { data, error } = await supabase.rpc(
+                        'request_access_with_invitation_token',
+                        { p_token: tokenInput }
+                    );
+
+                    if (error) throw error;
+
+                    const result = Array.isArray(data) ? data[0] : data;
+
+                    if (!result?.success) {
+                        const code = result?.error_code || '';
+                        if (code === 'already_pending') {
+                            throw new Error(t('already_pending', {
+                                project: result.project_name || ''
+                            }));
+                        }
+                        if (code === 'already_member') {
+                            throw new Error(t('already_member', {
+                                project: result.project_name || '',
+                                role: result.existing_role || ''
+                            }));
+                        }
+                        if (code === 'expired') throw new Error(t('token_expired'));
+                        if (code === 'revoked') throw new Error(t('token_revoked'));
+                        if (code === 'max_uses') throw new Error(t('token_maxed'));
+                        throw new Error(result?.message || t('token_invalid'));
+                    }
+
+                    const projectName = result.project_name || '';
+                    const role = String(result.role || '')
+                        .replaceAll('_', ' ')
+                        .toUpperCase();
+
+                    document.getElementById('mainContent').style.display = 'none';
+
+                    document.getElementById('resultDiv').innerHTML = `
+                        <div class="success-box">
+                            <i class="fas fa-paper-plane"></i>
+                            <h3>${escapeHtml(t('request_submitted'))}</h3>
+                            <p style="margin:15px 0;">
+                                ${escapeHtml(t('request_sent', {
+                                    project: projectName,
+                                    role
+                                }))}
+                            </p>
+                            <div style="background:#f0fdf4;padding:15px;border-radius:8px;margin-top:15px;">
+                                <i class="fas fa-clock"></i>
+                                ${escapeHtml(t('manager_review'))}<br>
+                                ${escapeHtml(t('notified_approved'))}
+                            </div>
+                            <button onclick="window.location.href='index.html'"
+                                class="btn-primary" style="margin-top:20px;">
+                                <i class="fas fa-home"></i> ${escapeHtml(t('go_dashboard'))}
+                            </button>
+                        </div>
+                    `;
+
+                    document.getElementById('resultDiv').style.display = 'block';
+                    showToast(t('request_submitted'), 'success');
+
+                } catch (error) {
+                    console.error('Request error:', error);
+                    const message = error?.message || t('token_invalid');
+
+                    showToast(message, 'error');
+
+                    document.getElementById('resultDiv').innerHTML = `
+                        <div class="error-box">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            <h3 style="margin-bottom:10px;">${escapeHtml(t('request_failed'))}</h3>
+                            <p>${escapeHtml(message)}</p>
+                            <button onclick="location.reload()" class="btn-secondary" style="margin-top:15px;">
+                                <i class="fas fa-redo"></i> ${escapeHtml(t('try_again'))}
+                            </button>
+                        </div>
+                    `;
+                    document.getElementById('resultDiv').style.display = 'block';
+
+                } finally {
+                    requestBtn.disabled = false;
+                    requestBtn.innerHTML =
+                        `<i class="fas fa-paper-plane"></i> ${escapeHtml(t('submit_access_request'))}`;
+                }
             }
-        }
-            
-            function escapeHtml(str) {
-                if (!str) return '';
-                return str.replace(/[&<>]/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[m] || m));
-            }
-            
+
             // Event listeners
             document.getElementById('requestBtn').addEventListener('click', submitRequest);
             document.getElementById('tokenInput').addEventListener('keypress', (e) => {
