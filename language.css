@@ -1,0 +1,75 @@
+/* ============================================================
+   MappingTrace - Global Language Switcher
+   ============================================================ */
+
+.mappingtrace-language-switcher {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: 12px;
+    padding: 4px 7px;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.08);
+    white-space: nowrap;
+    z-index: 1000;
+}
+
+.mappingtrace-language-switcher .language-option {
+    appearance: none;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    padding: 4px 7px;
+    border-radius: 5px;
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.mappingtrace-language-switcher .language-option:hover {
+    background: rgba(255, 255, 255, 0.12);
+}
+
+.mappingtrace-language-switcher .language-option.active {
+    background: #ffffff;
+    color: #17324d;
+}
+
+.mappingtrace-language-switcher .language-separator {
+    opacity: 0.45;
+    font-size: 12px;
+}
+
+/* If the header has a light background */
+header.light-theme .mappingtrace-language-switcher,
+.header.light-theme .mappingtrace-language-switcher {
+    border-color: rgba(0, 0, 0, 0.15);
+    background: rgba(0, 0, 0, 0.04);
+}
+
+header.light-theme .mappingtrace-language-switcher .language-option,
+.header.light-theme .mappingtrace-language-switcher .language-option {
+    color: #17324d;
+}
+
+header.light-theme .mappingtrace-language-switcher .language-option.active,
+.header.light-theme .mappingtrace-language-switcher .language-option.active {
+    background: #17324d;
+    color: #ffffff;
+}
+
+/* Mobile */
+@media (max-width: 768px) {
+    .mappingtrace-language-switcher {
+        margin-left: 6px;
+        padding: 3px 5px;
+    }
+
+    .mappingtrace-language-switcher .language-option {
+        padding: 4px 6px;
+        font-size: 11px;
+    }
+}
