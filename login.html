@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link rel="stylesheet" href="language.css">
     
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -36,6 +37,17 @@
             to { opacity: 1; transform: translateY(0); }
         }
         
+
+        .login-language-switcher {
+            display:flex; justify-content:flex-end; align-items:center; gap:6px;
+            padding:10px 16px 0; color:#64748b; font-size:12px; font-weight:700;
+        }
+        .login-lang-btn {
+            border:0; background:transparent; color:#64748b; cursor:pointer;
+            font-weight:700; font-size:12px; padding:4px 6px; border-radius:5px;
+        }
+        .login-lang-btn:hover { background:#f1f5f9; }
+        .login-lang-btn.active { background:#2c6e49; color:white; }
         .auth-header {
             background: linear-gradient(135deg, #2c6e49 0%, #4CAF50 100%);
             color: white;
@@ -159,42 +171,47 @@
 </head>
 <body>
     <div class="auth-container">
+        <div class="login-language-switcher" aria-label="Language selection">
+            <button type="button" class="login-lang-btn" data-language="en">EN</button>
+            <span>|</span>
+            <button type="button" class="login-lang-btn" data-language="fr">FR</button>
+        </div>
         <div class="auth-header">
             <i class="fas fa-map-marked-alt"></i>
-            <h1>Welcome Back</h1>
-            <p>Sign in to your account</p>
+            <h1 data-i18n="Welcome Back">Welcome Back</h1>
+            <p data-i18n="Sign in to your account">Sign in to your account</p>
         </div>
         
         <div class="auth-body">
             <form id="loginForm">
                 <div class="form-group">
-                    <label><i class="fas fa-envelope"></i> Email Address</label>
+                    <label><i class="fas fa-envelope"></i> <span data-i18n="Email Address">Email Address</span></label>
                     <input type="email" id="email" placeholder="john@example.com" autocomplete="email" required>
                 </div>
                 
                 <div class="form-group">
-                    <label><i class="fas fa-lock"></i> Password</label>
+                    <label><i class="fas fa-lock"></i> <span data-i18n="Password">Password</span></label>
                     <div class="password-field">
-                        <input type="password" id="password" placeholder="Enter your password" autocomplete="current-password" required>
+                        <input type="password" id="password" placeholder="Enter your password" data-i18n-placeholder="Enter your password" autocomplete="current-password" required>
                         <i class="fas fa-eye password-toggle" onclick="togglePassword()"></i>
                     </div>
                 </div>
                 
                 <div class="forgot-link">
-                    <a href="forgot-password.html">Forgot password?</a>
+                    <a href="forgot-password.html" data-i18n="Forgot password?">Forgot password?</a>
                 </div>
                 
                 <button type="submit" class="auth-btn" id="loginBtn">
-                    <i class="fas fa-sign-in-alt"></i> Sign In
+                    <i class="fas fa-sign-in-alt"></i> <span data-i18n="Sign In">Sign In</span>
                 </button>
             </form>
             
             <div class="auth-footer">
-                <p>Don't have an account? <a href="register.html">Create account</a></p>
+                <p><span data-i18n="Don't have an account?">Don't have an account?</span> <a href="register.html" data-i18n="Create account">Create account</a></p>
             </div>
             <div class="auth-footer" style="margin-top: 12px; padding-top: 0; border-top: none;">
                 <p style="font-size: 12px; color: #94a3b8;">
-                    <i class="fas fa-shield-alt"></i> Secure login powered by Supabase
+                    <i class="fas fa-shield-alt"></i> <span data-i18n="Secure login powered by Supabase">Secure login powered by Supabase</span>
                 </p>
             </div>
         </div>
@@ -263,12 +280,12 @@
             const loginBtn = document.getElementById('loginBtn');
             
             if (!email || !password) {
-                showNotification('Please enter both email and password', 'warning');
+                showNotification(t('Please enter both email and password'), 'warning');
                 return;
             }
             
             loginBtn.disabled = true;
-            loginBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Signing in...';
+            loginBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> ' + t('Signing in...');
             
             try {
                 if (!supabaseClient) {
@@ -296,7 +313,7 @@
                         role: role
                     }));
                     
-                    showNotification('Login successful! Redirecting...', 'success');
+                    showNotification(t('Login successful! Redirecting...'), 'success');
                     
                     setTimeout(() => { 
                         window.location.href = 'index.html'; 
@@ -307,17 +324,99 @@
                 
                 let errorMessage = error.message;
                 if (errorMessage === 'Invalid login credentials') {
-                    errorMessage = 'Invalid email or password. Please try again.';
+                    errorMessage = t('Invalid email or password. Please try again.');
                 } else if (errorMessage.includes('Email not confirmed')) {
-                    errorMessage = 'Please verify your email address before logging in. Check your inbox.';
+                    errorMessage = t('Please verify your email address before logging in. Check your inbox.');
                 }
                 
                 showNotification(errorMessage, 'error');
                 loginBtn.disabled = false;
-                loginBtn.innerHTML = '<i class="fas fa-sign-in-alt"></i> Sign In';
+                loginBtn.innerHTML = '<i class="fas fa-sign-in-alt"></i> <span data-i18n="Sign In">Sign In</span>';
             }
         }
         
+        const LOGIN_TRANSLATIONS = {
+            en: {
+                'Welcome Back':'Welcome Back',
+                'Sign in to your account':'Sign in to your account',
+                'Email Address':'Email Address',
+                'Password':'Password',
+                'Enter your password':'Enter your password',
+                'Forgot password?':'Forgot password?',
+                'Sign In':'Sign In',
+                "Don't have an account?":"Don't have an account?",
+                'Create account':'Create account',
+                'Secure login powered by Supabase':'Secure login powered by Supabase',
+                'Please enter both email and password':'Please enter both email and password',
+                'Signing in...':'Signing in...',
+                'Login successful! Redirecting...':'Login successful! Redirecting...',
+                'Invalid email or password. Please try again.':'Invalid email or password. Please try again.',
+                'Please verify your email address before logging in. Check your inbox.':'Please verify your email address before logging in. Check your inbox.',
+                'Email confirmed! You can now log in.':'Email confirmed! You can now log in.',
+                'Account created! Please check your email to confirm your account.':'Account created! Please check your email to confirm your account.'
+            },
+            fr: {
+                'Welcome Back':'Bienvenue',
+                'Sign in to your account':'Connectez-vous à votre compte',
+                'Email Address':'Adresse e-mail',
+                'Password':'Mot de passe',
+                'Enter your password':'Saisissez votre mot de passe',
+                'Forgot password?':'Mot de passe oublié ?',
+                'Sign In':'Se connecter',
+                "Don't have an account?":"Vous n'avez pas de compte ?",
+                'Create account':'Créer un compte',
+                'Secure login powered by Supabase':'Connexion sécurisée avec Supabase',
+                'Please enter both email and password':'Veuillez saisir votre adresse e-mail et votre mot de passe',
+                'Signing in...':'Connexion en cours...',
+                'Login successful! Redirecting...':'Connexion réussie ! Redirection...',
+                'Invalid email or password. Please try again.':'Adresse e-mail ou mot de passe incorrect. Veuillez réessayer.',
+                'Please verify your email address before logging in. Check your inbox.':'Veuillez vérifier votre adresse e-mail avant de vous connecter. Consultez votre boîte de réception.',
+                'Email confirmed! You can now log in.':'E-mail confirmé ! Vous pouvez maintenant vous connecter.',
+                'Account created! Please check your email to confirm your account.':'Compte créé ! Consultez votre boîte de réception pour confirmer votre compte.'
+            }
+        };
+
+        function currentLoginLanguage() {
+            return localStorage.getItem('mappingtrace_language') === 'fr' ? 'fr' : 'en';
+        }
+
+        function t(key) {
+            const lang = currentLoginLanguage();
+            return LOGIN_TRANSLATIONS[lang]?.[key] || LOGIN_TRANSLATIONS.en[key] || key;
+        }
+
+        function applyLoginLanguage() {
+            const lang = currentLoginLanguage();
+            document.documentElement.lang = lang;
+
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                const key = el.getAttribute('data-i18n');
+                el.textContent = t(key);
+            });
+
+            document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+                const key = el.getAttribute('data-i18n-placeholder');
+                el.placeholder = t(key);
+            });
+
+            document.querySelectorAll('.login-lang-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.language === lang);
+            });
+        }
+
+        function setLoginLanguage(lang) {
+            if (lang !== 'en' && lang !== 'fr') return;
+            localStorage.setItem('mappingtrace_language', lang);
+            applyLoginLanguage();
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            document.querySelectorAll('.login-lang-btn').forEach(btn => {
+                btn.addEventListener('click', () => setLoginLanguage(btn.dataset.language));
+            });
+            applyLoginLanguage();
+        });
+
         // Initialize Supabase and set up event listeners
         function init() {
             supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -325,13 +424,13 @@
             // Check for email confirmation redirect
             const urlParams = new URLSearchParams(window.location.search);
             if (urlParams.get('confirmed') === 'true') {
-                showNotification('Email confirmed! You can now log in.', 'success');
+                showNotification(t('Email confirmed! You can now log in.'), 'success');
             } else if (urlParams.get('registered') === 'true') {
                 const email = urlParams.get('email');
                 if (email) {
                     document.getElementById('email').value = email;
                 }
-                showNotification('Account created! Please check your email to confirm your account.', 'info');
+                showNotification(t('Account created! Please check your email to confirm your account.'), 'info');
             }
             
             // Set up form submit handler
