@@ -378,7 +378,7 @@
                 teamManagementTitle:"Team Management", roleHelpOwner:"As Owner, you can change the role of non-owner members. Super Manager is an oversight role and does not receive operational farm-editing permissions.",
                 roleHelpManager:"Managers can manage eligible lower-level members. Super Managers have oversight access but cannot manage the project team.",
                 teamUser:"User", email:"Email", role:"Role", addedBy:"Added By", addedDate:"Added Date", actions:"Actions",
-                unknownUser:"Unknown User", noEmail:"No email", you:"(You)", system:"System", remove:"Remove",
+                unknownUser:"Unknown User", noEmail:"No email", unknown:"Unknown", you:"(You)", youPlain:"You", system:"System", remove:"Remove", unableLoadTeam:"Unable to load team members", changeRoleFor:"Change role for",
                 noPendingRequests:"No Pending Requests", requestsProcessed:"All role upgrade requests have been processed.",
                 viewTeamMembers:"View Team Members", noTokensYet:"No Tokens Yet",
                 createFirstToken:"Create your first invitation token to share with team members.",
@@ -986,8 +986,8 @@
             if (membersError) {
                 document.getElementById('pageContent').innerHTML = `
                     <div class="dashboard-card">
-                        <h3><i class="fas fa-users"></i> Team Management</h3>
-                        <p style="color:#dc2626;">Unable to load team members: ${escapeHtml(membersError.message)}</p>
+                        <h3><i class="fas fa-users"></i> ${dmT('teamManagementTitle', 'Team Management')}</h3>
+                        <p style="color:#dc2626;">${dmT('unableLoadTeam', 'Unable to load team members')}: ${escapeHtml(membersError.message)}</p>
                     </div>`;
                 return;
             }
@@ -1010,32 +1010,32 @@
             const isManager = currentUserRole === 'manager';
 
             const manageableRoles = [
-                ['super_manager', 'Super Manager'],
-                ['manager', 'Manager'],
-                ['validator', 'Validator'],
-                ['field_officer', 'Field Officer'],
-                ['enumerator', 'Enumerator'],
-                ['viewer', 'Viewer']
+                ['super_manager', dmT('superManager', 'Super Manager')],
+                ['manager', dmT('manager', 'Manager')],
+                ['validator', dmT('validator', 'Validator')],
+                ['field_officer', dmT('fieldOfficer', 'Field Officer')],
+                ['enumerator', dmT('enumerator', 'Enumerator')],
+                ['viewer', dmT('viewer', 'Viewer')]
             ];
 
             let html = `
                 <div class="dashboard-card">
-                    <h3><i class="fas fa-users"></i> Team Management (${members?.length || 0})</h3>
+                    <h3><i class="fas fa-users"></i> ${dmT('teamManagementTitle', 'Team Management')} (${members?.length || 0})</h3>
                     <p class="role-help">
                         ${isOwner
-                            ? 'As Owner, you can change the role of non-owner members. Super Manager is an oversight role and does not receive operational farm-editing permissions.'
-                            : 'Managers can manage eligible lower-level members. Super Managers have oversight access but cannot manage the project team.'}
+                            ? dmT('roleHelpOwner', 'As Owner, you can change the role of non-owner members. Super Manager is an oversight role and does not receive operational farm-editing permissions.')
+                            : dmT('roleHelpManager', 'Managers can manage eligible lower-level members. Super Managers have oversight access but cannot manage the project team.')}
                     </p>
                     <div style="overflow-x: auto;">
                         <table class="team-table">
                             <thead>
                                 <tr>
-                                    <th>User</th>
-                                    <th>Email</th>
-                                    <th>Role</th>
-                                    <th>Added By</th>
-                                    <th>Added Date</th>
-                                    <th>Actions</th>
+                                    <th>${dmT('teamUser', 'User')}</th>
+                                    <th>${dmT('email', 'Email')}</th>
+                                    <th>${dmT('role', 'Role')}</th>
+                                    <th>${dmT('addedBy', 'Added By')}</th>
+                                    <th>${dmT('addedDate', 'Added Date')}</th>
+                                    <th>${dmT('actions', 'Actions')}</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -1043,11 +1043,11 @@
 
             for (const member of members || []) {
                 const profile = userProfiles[member.user_id];
-                const fullName = profile?.full_name || profile?.first_name || 'Unknown User';
-                const email = profile?.email || 'No email';
+                const fullName = profile?.full_name || profile?.first_name || dmT('unknownUser', 'Unknown User');
+                const email = profile?.email || dmT('noEmail', 'No email');
                 const avatarInitial = (fullName.charAt(0) || 'U').toUpperCase();
                 const isCurrentUser = member.user_id === currentUser.id;
-                const addedDate = member.granted_at ? new Date(member.granted_at).toLocaleDateString() : 'Unknown';
+                const addedDate = member.granted_at ? new Date(member.granted_at).toLocaleDateString(document.documentElement.lang || 'en') : dmT('unknown', 'Unknown');
 
                 const ownerCanManage =
                     isOwner &&
@@ -1061,14 +1061,14 @@
 
                 const canManage = ownerCanManage || managerCanManage;
 
-                let roleCell = `<span class="role-badge ${escapeHtml(member.role)}">${escapeHtml(member.role.replace('_', ' '))}</span>`;
+                let roleCell = `<span class="role-badge ${escapeHtml(member.role)}">${escapeHtml(dmT(member.role === 'field_officer' ? 'fieldOfficer' : member.role === 'super_manager' ? 'superManager' : member.role, member.role.replace('_', ' ')))}</span>`;
 
                 if (ownerCanManage) {
                     roleCell = `
                         <select
                             class="role-select"
                             id="role-select-${member.user_id}"
-                            aria-label="Change role for ${escapeHtml(fullName)}"
+                            aria-label="${dmT('changeRoleFor', 'Change role for')} ${escapeHtml(fullName)}"
                             onchange="changeMemberRole('${member.user_id}', this.value)">
                             ${manageableRoles.map(([value, label]) =>
                                 `<option value="${value}" ${member.role === value ? 'selected' : ''}>${label}</option>`
@@ -1079,7 +1079,7 @@
                 const actions = `
                     ${canManage && !isCurrentUser
                         ? `<button onclick="revokeUser('${member.user_id}')" class="btn-danger">
-                               <i class="fas fa-user-minus"></i> Remove
+                               <i class="fas fa-user-minus"></i> ${dmT('remove', 'Remove')}
                            </button>`
                         : ''}
                 `;
@@ -1091,13 +1091,13 @@
                                 <div class="user-avatar-small">${avatarInitial}</div>
                                 <div class="user-info-text">
                                     <div class="user-name-text">${escapeHtml(fullName)}</div>
-                                    ${isCurrentUser ? '<span style="font-size:10px;color:#2c6e49;">(You)</span>' : ''}
+                                    ${isCurrentUser ? '<span style="font-size:10px;color:#2c6e49;">' + dmT('you', '(You)') + '</span>' : ''}
                                 </div>
                             </div>
                         </td>
                         <td class="user-email-text">${escapeHtml(email)}</td>
                         <td>${roleCell}</td>
-                        <td>${member.granted_by === currentUser.id ? 'You' : 'System'}</td>
+                        <td>${member.granted_by === currentUser.id ? dmT('youPlain', 'You') : dmT('system', 'System')}</td>
                         <td>${addedDate}</td>
                         <td>${actions}</td>
                     </tr>`;
@@ -1335,8 +1335,8 @@
                 
                 for (const request of requests) {
                     const profile = userProfiles[request.requester_id];
-                    const fullName = profile?.full_name || profile?.first_name || 'Unknown User';
-                    const email = profile?.email || 'No email';
+                    const fullName = profile?.full_name || profile?.first_name || dmT('unknownUser', 'Unknown User');
+                    const email = profile?.email || dmT('noEmail', 'No email');
                     const avatarInitial = (fullName.charAt(0) || 'U').toUpperCase();
                     
                     html += `
