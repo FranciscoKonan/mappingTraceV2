@@ -350,6 +350,8 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 let supabaseClient, currentUser, currentProject, allFarms = [];
 let allSubmissions = [];
 let projectEnumerators = [];
+let allAssignments = [];
+let farmEnumeratorMap = {};
 let enumeratorDisplayMap = {};
 let allQuality = [];
 let enumeratorChart, cooperativePieChart, timelineChart, enumeratorCooperativeChart = null;
@@ -472,6 +474,41 @@ async function loadStatistics() {
         }
     }
 
+    // Current active farm-to-enumerator assignments are authoritative.
+    let assignments = [];
+    let assignmentsError = null;
+
+    if (enumeratorIds.length) {
+        const result = await supabaseClient
+            .from('farm_assignments')
+            .select('farm_id, user_id, assigned_at, status')
+            .eq('project_id', projectId)
+            .eq('status', 'active')
+            .in('user_id', enumeratorIds);
+
+        assignments = result.data;
+        assignmentsError = result.error;
+    }
+
+    if (assignmentsError) {
+        console.warn('Farm assignment loading failed:', assignmentsError);
+        allAssignments = [];
+    } else {
+        allAssignments = assignments || [];
+    }
+
+    // If multiple active rows exist for a farm, use the most recently assigned enumerator.
+    farmEnumeratorMap = {};
+    allAssignments
+        .filter(a => a.farm_id && a.user_id)
+        .sort((a, b) => new Date(b.assigned_at || 0) - new Date(a.assigned_at || 0))
+        .forEach(a => {
+            const farmId = String(a.farm_id);
+            if (!farmEnumeratorMap[farmId]) {
+                farmEnumeratorMap[farmId] = String(a.user_id);
+            }
+        });
+
     /*
      * Quality data is stored separately from farms.
      * Load it for the current project so Workflow and
@@ -514,25 +551,45 @@ function friendlyNameFromEmail(email) {
 }
 
 function getEnumeratorDisplayName(farm) {
-    const value = String(farm?.enumerator || '').trim();
-
-    if (!value || value.toLowerCase() === 'null') {
-        return 'Unknown';
+    const assignedUserId = farmEnumeratorMap[String(farm?.id)];
+    if (assignedUserId) {
+        return (
+            enumeratorDisplayMap[assignedUserId] ||
+            enumeratorDisplayMap[String(assignedUserId).toLowerCase()] ||
+            'Unknown'
+        );
     }
-
-    return (
-        enumeratorDisplayMap[value] ||
-        enumeratorDisplayMap[value.toLowerCase()] ||
-        value
-    );
+    return 'Unassigned';
 }
+
+function getFarmCooperative(farm) {
+    const value = String(farm?.cooperative || '').trim();
+    return value || 'Unassigned';
+}
+
 
 function populateFilters() {
-    const enumerators = [...new Set(allFarms.map(getEnumeratorDisplayName).filter(e => e && e !== 'Unknown'))];
-    const cooperatives = [...new Set(allFarms.map(f => f.cooperative).filter(c => c && c !== 'null'))];
-    document.getElementById('enumeratorFilter').innerHTML = '<option value="all">All Enumerators</option>' + enumerators.map(e => `<option value="${e}">${e}</option>`).join('');
-    document.getElementById('cooperativeFilter').innerHTML = '<option value="all">All Cooperatives</option>' + cooperatives.map(c => `<option value="${c}">${c}</option>`).join('');
+    const enumerators = [...new Set(
+        allFarms.map(getEnumeratorDisplayName)
+    )].filter(e => e && e !== 'Unknown').sort((a,b) => a.localeCompare(b));
+
+    const cooperatives = [...new Set(
+        allFarms.map(getFarmCooperative)
+    )].filter(c => c && c !== 'Unassigned').sort((a,b) => a.localeCompare(b));
+
+    document.getElementById('enumeratorFilter').innerHTML =
+        '<option value="all">All Enumerators</option>' +
+        enumerators.map(e =>
+            `<option value="${escapeHtml(e)}">${escapeHtml(e)}</option>`
+        ).join('');
+
+    document.getElementById('cooperativeFilter').innerHTML =
+        '<option value="all">All Cooperatives</option>' +
+        cooperatives.map(c =>
+            `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`
+        ).join('');
 }
+
 
 function getFilteredFarms() {
     let filtered = [...allFarms];
@@ -541,7 +598,7 @@ function getFilteredFarms() {
     const startDate = document.getElementById('startDate').value;
     const endDate = document.getElementById('endDate').value;
     if (enumerator !== 'all') filtered = filtered.filter(f => getEnumeratorDisplayName(f) === enumerator);
-    if (cooperative !== 'all') filtered = filtered.filter(f => f.cooperative === cooperative);
+    if (cooperative !== 'all') filtered = filtered.filter(f => getFarmCooperative(f) === cooperative);
     if (startDate) filtered = filtered.filter(f => new Date(f.created_at) >= new Date(startDate));
     if (endDate) filtered = filtered.filter(f => new Date(f.created_at) <= new Date(`${endDate}T23:59:59.999`));
     return filtered;
@@ -705,7 +762,7 @@ function updateEnumeratorChart(filtered) {
 
 function updateCooperativePieChart(filtered) {
     const areas = {};
-    filtered.forEach(f => { const name = f.cooperative || 'Unknown'; areas[name] = (areas[name] || 0) + (f.area || 0); });
+    filtered.forEach(f => { const name = getFarmCooperative(f); areas[name] = (areas[name] || 0) + (f.area || 0); });
     const ctx = document.getElementById('cooperativePieChart').getContext('2d');
     if (cooperativePieChart) cooperativePieChart.destroy();
     cooperativePieChart = new Chart(ctx, { type: 'pie', data: { labels: Object.keys(areas), datasets: [{ data: Object.values(areas), backgroundColor: ['#2c6e49', '#4CAF50', '#8BC34A', '#CDDC39', '#FFC107', '#FF9800'] }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { tooltip: { callbacks: { label: (ctx) => `${ctx.label}: ${ctx.raw.toFixed(1)} ha` } } } } });
@@ -726,12 +783,12 @@ function updateEnumeratorCooperativeChart(filtered) {
     const matrix = {};
     filtered.forEach(f => {
         const enumName = getEnumeratorDisplayName(f);
-        const coopName = f.cooperative || 'Unknown';
+        const coopName = getFarmCooperative(f);
         if (!matrix[enumName]) matrix[enumName] = {};
         matrix[enumName][coopName] = (matrix[enumName][coopName] || 0) + 1;
     });
     const enumerators = Object.keys(matrix);
-    const cooperatives = [...new Set(filtered.map(f => f.cooperative || 'Unknown'))];
+    const cooperatives = [...new Set(filtered.map(getFarmCooperative))];
     const datasets = cooperatives.map((coop, i) => ({ label: coop, data: enumerators.map(e => matrix[e][coop] || 0), backgroundColor: `hsl(${i * 360 / cooperatives.length}, 70%, 55%)` }));
     const ctx = document.getElementById('enumeratorCooperativeCanvas').getContext('2d');
     if (enumeratorCooperativeChart) enumeratorCooperativeChart.destroy();
@@ -913,7 +970,7 @@ function resetFilters() {
 function exportStatistics() {
     const filtered = getFilteredFarms();
     let csv = 'Farmer Name,Enumerator,Cooperative,Area (ha),Status,Workflow State,Date\n';
-    filtered.forEach(f => csv += `"${f.farmer_name || ''}","${getEnumeratorDisplayName(f)}","${f.cooperative || ''}",${Number(f.area ?? f.area_ha ?? 0)},"${f.status || ''}","${f.workflow_state || ''}",${new Date(f.created_at).toLocaleDateString()}\n`);
+    filtered.forEach(f => csv += `"${f.farmer_name || ''}","${getEnumeratorDisplayName(f)}","${getFarmCooperative(f)}",${Number(f.area ?? f.area_ha ?? 0)},"${f.status || ''}","${f.workflow_state || ''}",${new Date(f.created_at).toLocaleDateString()}\n`);
     const blob = new Blob([csv], { type: 'text/csv' }), url = URL.createObjectURL(blob), a = document.createElement('a');
     a.href = url; a.download = `statistics_${currentProject?.name || 'project'}.csv`; a.click(); URL.revokeObjectURL(url);
 }
