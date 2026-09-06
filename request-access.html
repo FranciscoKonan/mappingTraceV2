@@ -396,168 +396,118 @@
                 showToast(`Selected: ${token}`, 'success');
             };
             
-            async function submitRequest() {
-                const tokenInput = document.getElementById('tokenInput').value.trim();
-                
-                if (!tokenInput) {
-                    showToast('Please enter an invitation token', 'error');
-                    return;
-                }
-                
-                const requestBtn = document.getElementById('requestBtn');
-                requestBtn.disabled = true;
-                requestBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Submitting...';
-                document.getElementById('resultDiv').style.display = 'none';
-                
-                try {
-                    console.log('Looking for token:', tokenInput);
-                    
-                    // Try multiple approaches to find the token
-                    let tokenData = null;
-                    
-                    // Approach 1: Direct query by token (case sensitive)
-                    let { data: directMatch, error: directError } = await supabase
-                        .from('invitation_tokens')
-                        .select('*')
-                        .eq('token', tokenInput)
-                        .eq('status', 'active')
-                        .maybeSingle();
-                    
-                    if (directMatch) {
-                        tokenData = directMatch;
-                        console.log('Found via direct match');
-                    }
-                    
-                    // Approach 2: If not found, get all tokens and search manually
-                    if (!tokenData) {
-                        console.log('Direct match failed, fetching all tokens...');
-                        const { data: allTokens, error: allError } = await supabase
-                            .from('invitation_tokens')
-                            .select('*')
-                            .eq('status', 'active');
-                        
-                        if (allError) {
-                            console.error('Error fetching all tokens:', allError);
-                            throw new Error(`Database error: ${allError.message}`);
-                        }
-                        
-                        console.log('All active tokens:', allTokens);
-                        
-                        if (allTokens && allTokens.length > 0) {
-                            tokenData = allTokens.find(t => 
-                                t.token.toLowerCase() === tokenInput.toLowerCase()
-                            );
-                            if (tokenData) {
-                                console.log('Found via case-insensitive search:', tokenData);
-                            }
-                        }
-                    }
-                    
-                    if (!tokenData) {
-                        throw new Error(`Token "${tokenInput}" not found. Please check the token and try again.`);
-                    }
-                    
-                    console.log('Token validated:', tokenData);
-                    
-                    // Get project details
-                    const { data: project, error: projectError } = await supabase
-                        .from('projects')
-                        .select('name')
-                        .eq('id', tokenData.project_id)
-                        .single();
-                    
-                    if (projectError) {
-                        console.error('Project error:', projectError);
-                        throw new Error('Project not found');
-                    }
-                    
-                    // Check if already a member
-                    const { data: existingMember } = await supabase
-                        .from('project_members')
-                        .select('status')
-                        .eq('project_id', tokenData.project_id)
-                        .eq('user_id', currentUser.id)
-                        .maybeSingle();
-                    
-                    if (existingMember && existingMember.status === 'active') {
-                        throw new Error(`You already have access to "${project.name}"`);
-                    }
-                    
-                    // Check for existing pending request
-                    const { data: pendingRequest } = await supabase
-                        .from('access_requests')
-                        .select('id')
-                        .eq('project_id', tokenData.project_id)
-                        .eq('requester_id', currentUser.id)
-                        .eq('status', 'pending')
-                        .maybeSingle();
-                    
-                    if (pendingRequest) {
-                        throw new Error(`You already have a pending request for "${project.name}"`);
-                    }
-                    
-                    // Create access request
-                    const { error: insertError } = await supabase
-                        .from('access_requests')
-                        .insert({
-                            project_id: tokenData.project_id,
-                            requester_id: currentUser.id,
-                            requested_role: tokenData.role,
-                            reason: `Requesting access via token: ${tokenInput}`,
-                            status: 'pending',
-                            created_at: new Date().toISOString()
-                        });
-                    
-                    if (insertError) {
-                        console.error('Insert error:', insertError);
-                        throw new Error(`Failed to create request: ${insertError.message}`);
-                    }
-                    
-                    // Update token usage count
-                    await supabase
-                        .from('invitation_tokens')
-                        .update({ used_count: (tokenData.used_count || 0) + 1 })
-                        .eq('id', tokenData.id);
-                    
-                    // Show success
-                    document.getElementById('mainContent').style.display = 'none';
-                    document.getElementById('resultDiv').innerHTML = `
-                        <div class="success-box">
-                            <i class="fas fa-paper-plane"></i>
-                            <h3>Request Submitted!</h3>
-                            <p style="margin: 15px 0;">Your request to join <strong>${escapeHtml(project.name)}</strong> as <strong>${tokenData.role.replace('_', ' ').toUpperCase()}</strong> has been sent.</p>
-                            <div style="background: #f0fdf4; padding: 15px; border-radius: 8px; margin-top: 15px;">
-                                <i class="fas fa-clock"></i> 
-                                The project manager will review your request. You will be notified once approved.
-                            </div>
-                            <button onclick="window.location.href='index.html'" class="btn-primary" style="margin-top: 20px;">
-                                <i class="fas fa-home"></i> Go to Dashboard
-                            </button>
-                        </div>
-                    `;
-                    document.getElementById('resultDiv').style.display = 'block';
-                    showToast(`Request submitted for ${project.name}!`, 'success');
-                    
-                } catch (error) {
-                    console.error('Request error:', error);
-                    showToast(error.message, 'error');
-                    
-                    document.getElementById('resultDiv').innerHTML = `
-                        <div class="error-box">
-                            <i class="fas fa-exclamation-triangle"></i>
-                            <h3 style="margin-bottom: 10px;">Request Failed</h3>
-                            <p>${escapeHtml(error.message)}</p>
-                            <button onclick="location.reload()" class="btn-secondary" style="margin-top: 15px;">
-                                <i class="fas fa-redo"></i> Try Again
-                            </button>
-                        </div>
-                    `;
-                    document.getElementById('resultDiv').style.display = 'block';
-                } finally {
-                    requestBtn.disabled = false;
-                    requestBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Submit Access Request';
-                }
+                   async function submitRequest() {
+            const tokenInput = document.getElementById('tokenInput').value.trim();
+        
+            if (!tokenInput) {
+                showToast('Please enter an invitation token', 'error');
+                return;
             }
+        
+            const requestBtn = document.getElementById('requestBtn');
+            requestBtn.disabled = true;
+            requestBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Submitting...';
+            document.getElementById('resultDiv').style.display = 'none';
+        
+            try {
+                console.log('Submitting invitation token request:', tokenInput);
+        
+                // Secure server-side token validation + access request creation
+                const { data, error } = await supabase.rpc(
+                    'request_access_with_invitation_token',
+                    {
+                        p_token: tokenInput
+                    }
+                );
+        
+                if (error) {
+                    console.error('Invitation request error:', error);
+                    throw new Error(error.message);
+                }
+        
+                const result = typeof data === 'string'
+                    ? JSON.parse(data)
+                    : data;
+        
+                if (!result || !result.success) {
+                    throw new Error('Unable to submit access request');
+                }
+        
+                // Show success
+                document.getElementById('mainContent').style.display = 'none';
+        
+                document.getElementById('resultDiv').innerHTML = `
+                    <div class="success-box">
+                        <i class="fas fa-paper-plane"></i>
+        
+                        <h3>Request Submitted!</h3>
+        
+                        <p style="margin: 15px 0;">
+                            Your request to join
+                            <strong>${escapeHtml(result.project_name)}</strong>
+                            as
+                            <strong>${escapeHtml(
+                                result.role.replace('_', ' ').toUpperCase()
+                            )}</strong>
+                            has been sent.
+                        </p>
+        
+                        <div style="background: #f0fdf4; padding: 15px; border-radius: 8px; margin-top: 15px;">
+                            <i class="fas fa-clock"></i>
+                            The project manager will review your request.
+                            You will be notified once approved.
+                        </div>
+        
+                        <button
+                            onclick="window.location.href='index.html'"
+                            class="btn-primary"
+                            style="margin-top: 20px;"
+                        >
+                            <i class="fas fa-home"></i> Go to Dashboard
+                        </button>
+                    </div>
+                `;
+        
+                document.getElementById('resultDiv').style.display = 'block';
+        
+                showToast(
+                    `Request submitted for ${result.project_name}!`,
+                    'success'
+                );
+        
+            } catch (error) {
+                console.error('Request error:', error);
+        
+                showToast(error.message, 'error');
+        
+                document.getElementById('resultDiv').innerHTML = `
+                    <div class="error-box">
+                        <i class="fas fa-exclamation-triangle"></i>
+        
+                        <h3 style="margin-bottom: 10px;">
+                            Request Failed
+                        </h3>
+        
+                        <p>${escapeHtml(error.message)}</p>
+        
+                        <button
+                            onclick="location.reload()"
+                            class="btn-secondary"
+                            style="margin-top: 15px;"
+                        >
+                            <i class="fas fa-redo"></i> Try Again
+                        </button>
+                    </div>
+                `;
+        
+                document.getElementById('resultDiv').style.display = 'block';
+        
+            } finally {
+                requestBtn.disabled = false;
+                requestBtn.innerHTML =
+                    '<i class="fas fa-paper-plane"></i> Submit Access Request';
+            }
+        }
             
             function escapeHtml(str) {
                 if (!str) return '';
