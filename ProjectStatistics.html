@@ -83,6 +83,26 @@
         .export-btn { background: white; border: 1px solid #e2e8f0; padding: 10px 20px; border-radius: 10px; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: all 0.2s; }
         .export-btn:hover { background: #f8fafc; border-color: #2c6e49; }
         
+
+        /* Workflow & Quality */
+        .section-title { font-size: 18px; font-weight: 700; color: #334155; margin: 32px 0 16px; display: flex; align-items: center; gap: 10px; }
+        .section-title i { color: #2c6e49; }
+        .workflow-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 14px; margin-bottom: 24px; }
+        .workflow-card { background: white; border-radius: 16px; padding: 18px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); border-left: 4px solid #2c6e49; }
+        .workflow-card .count { font-size: 30px; font-weight: 800; color: #1a1a2e; }
+        .workflow-card .label { font-size: 12px; color: #64748b; margin-top: 5px; line-height: 1.35; }
+        .quality-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 32px; }
+        .quality-card { background: white; border-radius: 16px; padding: 18px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+        .quality-card .quality-value { font-size: 28px; font-weight: 800; color: #1a1a2e; }
+        .quality-card .quality-label { font-size: 12px; color: #64748b; margin-top: 5px; }
+        @media (max-width: 1100px) {
+            .workflow-grid { grid-template-columns: repeat(3, 1fr); }
+            .quality-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+        @media (max-width: 600px) {
+            .workflow-grid, .quality-grid { grid-template-columns: 1fr; }
+        }
+
         .loading-spinner { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 24px 32px; border-radius: 20px; box-shadow: 0 20px 40px rgba(0,0,0,0.2); z-index: 10000; display: flex; align-items: center; gap: 16px; }
         .user-avatar { width: 40px; height: 40px; background: linear-gradient(135deg, #2c6e49, #4CAF50); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; }
         .role-badge { background: #e2e8f0; padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 600; margin-left: 10px; }
@@ -131,7 +151,7 @@
             </div>
             <div class="period-stat">
                 <div class="value" id="completionPercent">0%</div>
-                <div class="label">Completion</div>
+                <div class="label">Timeline</div>
             </div>
         </div>
     </div>
@@ -198,6 +218,61 @@
         </div>
     </div>
 
+    <!-- Workflow & Quality -->
+    <div class="section-title">
+        <i class="fas fa-route"></i> Workflow Status
+    </div>
+
+    <div class="workflow-grid">
+        <div class="workflow-card">
+            <div class="count" id="workflowEnumeratorReview">0</div>
+            <div class="label">Enumerator Review</div>
+        </div>
+        <div class="workflow-card">
+            <div class="count" id="workflowFieldOfficer">0</div>
+            <div class="label">Field Officer Review</div>
+        </div>
+        <div class="workflow-card">
+            <div class="count" id="workflowGIS">0</div>
+            <div class="label">GIS Compliance</div>
+        </div>
+        <div class="workflow-card">
+            <div class="count" id="workflowCorrection">0</div>
+            <div class="label">Correction Required</div>
+        </div>
+        <div class="workflow-card">
+            <div class="count" id="workflowFinal">0</div>
+            <div class="label">Final Validation</div>
+        </div>
+        <div class="workflow-card">
+            <div class="count" id="workflowValidated">0</div>
+            <div class="label">Validated</div>
+        </div>
+    </div>
+
+    <div class="section-title">
+        <i class="fas fa-shield-halved"></i> Quality & Compliance
+    </div>
+
+    <div class="quality-grid">
+        <div class="quality-card">
+            <div class="quality-value" id="qualityPassed">0</div>
+            <div class="quality-label">Quality Passed</div>
+        </div>
+        <div class="quality-card">
+            <div class="quality-value" id="qualityIssues">0</div>
+            <div class="quality-label">Issues Detected</div>
+        </div>
+        <div class="quality-card">
+            <div class="quality-value" id="qualityCritical">0</div>
+            <div class="quality-label">Critical Issues</div>
+        </div>
+        <div class="quality-card">
+            <div class="quality-value" id="qualityGeometry">0</div>
+            <div class="quality-label">Geometry Valid</div>
+        </div>
+    </div>
+
     <!-- Charts Grid -->
     <div class="stats-grid">
         <div class="stat-card">
@@ -216,7 +291,7 @@
 
     <div class="stats-grid">
         <div class="stat-card">
-            <h3><i class="fas fa-chart-bar"></i> Enumerator Performance by Cooperative</h3>
+            <h3><i class="fas fa-chart-bar"></i> Mapped Farms by Enumerator &amp; Cooperative</h3>
             <div class="chart-container" style="height: 350px;"><canvas id="enumeratorCooperativeCanvas"></canvas></div>
         </div>
         <div class="stat-card">
@@ -238,6 +313,7 @@ let supabaseClient, currentUser, currentProject, allFarms = [];
 let allSubmissions = [];
 let projectEnumerators = [];
 let enumeratorDisplayMap = {};
+let allQuality = [];
 let enumeratorChart, cooperativePieChart, timelineChart, enumeratorCooperativeChart = null;
 
 function getProjectIdFromUrl() {
