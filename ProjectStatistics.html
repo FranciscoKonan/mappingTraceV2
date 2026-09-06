@@ -201,7 +201,7 @@
     <!-- Charts Grid -->
     <div class="stats-grid">
         <div class="stat-card">
-            <h3><i class="fas fa-chart-bar"></i> Submissions by Enumerator</h3>
+            <h3><i class="fas fa-chart-bar"></i> Mapped Farms by Enumerator</h3>
             <div class="chart-container"><canvas id="enumeratorChart"></canvas></div>
         </div>
         <div class="stat-card">
@@ -336,8 +336,18 @@ async function loadStatistics() {
             (profiles || []).forEach(profile => {
                 const fullName = [profile.first_name, profile.last_name]
                     .filter(Boolean).join(' ').trim();
-                enumeratorDisplayMap[String(profile.id)] =
-                    fullName || profile.email || String(profile.id);
+                const displayName = fullName || friendlyNameFromEmail(profile.email) || String(profile.id);
+                const profileId = String(profile.id).trim();
+                const profileEmail = String(profile.email || '').trim().toLowerCase();
+
+                // Resolve UUID -> display name
+                if (profileId) enumeratorDisplayMap[profileId] = displayName;
+
+                // Resolve email -> display name
+                if (profileEmail) enumeratorDisplayMap[profileEmail] = displayName;
+
+                // Also resolve the display name itself (case-insensitive)
+                enumeratorDisplayMap[displayName.trim().toLowerCase()] = displayName;
             });
         }
     }
@@ -347,10 +357,34 @@ async function loadStatistics() {
     showLoading(false);
 }
 
+function friendlyNameFromEmail(email) {
+    const value = String(email || '').trim();
+    if (!value || !value.includes('@')) return '';
+
+    const localPart = value.split('@')[0];
+    if (!localPart) return '';
+
+    return localPart
+        .replace(/[._-]+/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .split(' ')
+        .map(word => word ? word.charAt(0).toUpperCase() + word.slice(1) : '')
+        .join(' ');
+}
+
 function getEnumeratorDisplayName(farm) {
     const value = String(farm?.enumerator || '').trim();
-    if (!value || value.toLowerCase() === 'null') return 'Unknown';
-    return enumeratorDisplayMap[value] || value;
+
+    if (!value || value.toLowerCase() === 'null') {
+        return 'Unknown';
+    }
+
+    return (
+        enumeratorDisplayMap[value] ||
+        enumeratorDisplayMap[value.toLowerCase()] ||
+        value
+    );
 }
 
 function populateFilters() {
@@ -427,7 +461,7 @@ function updateEnumeratorChart(filtered) {
     filtered.forEach(f => { const name = getEnumeratorDisplayName(f); counts[name] = (counts[name] || 0) + 1; });
     const ctx = document.getElementById('enumeratorChart').getContext('2d');
     if (enumeratorChart) enumeratorChart.destroy();
-    enumeratorChart = new Chart(ctx, { type: 'bar', data: { labels: Object.keys(counts), datasets: [{ label: 'Submissions', data: Object.values(counts), backgroundColor: '#2c6e49', borderRadius: 8 }] }, options: { responsive: true, maintainAspectRatio: false } });
+    enumeratorChart = new Chart(ctx, { type: 'bar', data: { labels: Object.keys(counts), datasets: [{ label: 'Mapped Farms', data: Object.values(counts), backgroundColor: '#2c6e49', borderRadius: 8 }] }, options: { responsive: true, maintainAspectRatio: false } });
 }
 
 function updateCooperativePieChart(filtered) {
