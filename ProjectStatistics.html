@@ -109,19 +109,25 @@
         .activity-stat strong { display:block; font-size:18px; color:#1a1a2e; }
         .activity-stat span { font-size:11px; color:#64748b; }
         .activity-container { overflow-x:auto; margin-top:16px; border:1px solid #e2e8f0; border-radius:12px; }
-        .activity-chart { min-width:900px; }
-        .activity-header, .activity-row { display:grid; grid-template-columns:220px 70px 90px minmax(500px,1fr); align-items:center; }
+        .activity-chart { min-width:980px; }
+        .activity-header, .activity-row { display:grid; grid-template-columns:220px 70px 90px minmax(600px,1fr); align-items:center; }
         .activity-header { background:#f8fafc; font-size:12px; font-weight:700; color:#475569; }
         .activity-header > div, .activity-row > div { padding:12px 14px; }
-        .activity-row { border-top:1px solid #e2e8f0; min-height:58px; }
+        .activity-row { border-top:1px solid #e2e8f0; min-height:62px; }
         .activity-row:hover { background:#f8fafc; }
         .activity-name { font-weight:600; color:#1a1a2e; }
         .activity-meta { font-size:11px; color:#64748b; margin-top:3px; }
-        .activity-track { position:relative; height:36px; background:repeating-linear-gradient(to right,#f8fafc 0,#f8fafc calc(20% - 1px),#e2e8f0 calc(20% - 1px),#e2e8f0 20%); border-radius:8px; }
-        .activity-dot { position:absolute; top:9px; width:18px; height:18px; border-radius:50%; background:#2c6e49; border:3px solid white; box-shadow:0 1px 4px rgba(0,0,0,.18); transform:translateX(-50%); cursor:pointer; z-index:2; }
-        .activity-dot:hover { transform:translateX(-50%) scale(1.2); }
-        .activity-line { position:absolute; top:17px; height:2px; background:#9fb7a8; z-index:1; }
-        .activity-axis { display:flex; justify-content:space-between; font-size:10px; color:#64748b; margin-top:6px; }
+        .activity-track { position:relative; height:40px; background:#f8fafc; border-radius:8px; overflow:visible; }
+        .activity-gridline { position:absolute; top:0; bottom:0; width:1px; background:#dbe3ea; z-index:0; }
+        .activity-line { position:absolute; top:19px; height:2px; background:#a7b8ae; z-index:1; pointer-events:none; }
+        .activity-dot { position:absolute; top:10px; width:18px; height:18px; border-radius:50%; background:#2c6e49; border:3px solid white; box-shadow:0 1px 4px rgba(0,0,0,.18); transform:translateX(-50%); cursor:pointer; z-index:3; }
+        .activity-dot:hover { transform:translateX(-50%) scale(1.18); }
+        .activity-dot.has-count::after { content:attr(data-count); position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); color:white; font-size:9px; font-weight:700; }
+        .activity-axis-wrap { position:relative; height:30px; margin-top:6px; }
+        .activity-axis-label { position:absolute; top:0; transform:translateX(-50%); white-space:nowrap; font-size:10px; color:#64748b; font-weight:600; }
+        .activity-axis-label.first { transform:none; }
+        .activity-axis-label.last { transform:translateX(-100%); }
+        .activity-axis-title { font-size:11px; color:#64748b; margin-top:2px; font-weight:600; }
 
         .loading-spinner { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 24px 32px; border-radius: 20px; box-shadow: 0 20px 40px rgba(0,0,0,0.2); z-index: 10000; display: flex; align-items: center; gap: 16px; }
         .user-avatar { width: 40px; height: 40px; background: linear-gradient(135deg, #2c6e49, #4CAF50); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; }
@@ -726,41 +732,34 @@ function escapeHtml(value) {
 }
 
 function updateGanttChart(filtered) {
-    /*
-     * This is an activity timeline, not a true Gantt.
-     * Each dot represents an actual mapping date.
-     * We do not imply continuous activity between first and last records.
-     */
+    // Actual mapping activity: one dot = one calendar day with at least one mapped farm.
+    // This is deliberately not a continuous Gantt bar.
     const activity = {};
 
+    const localDayKey = (date) => {
+        const d = new Date(date);
+        if (isNaN(d.getTime())) return null;
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
+    };
+
     filtered.forEach(f => {
+        const dayKey = localDayKey(f.created_at);
+        if (!dayKey) return;
+
         const name = getEnumeratorDisplayName(f);
-        const date = new Date(f.created_at);
-
-        if (isNaN(date)) return;
-
-        const dayKey = date.toISOString().slice(0, 10);
-
-        if (!activity[name]) {
-            activity[name] = {};
-        }
-
-        activity[name][dayKey] =
-            (activity[name][dayKey] || 0) + 1;
+        if (!activity[name]) activity[name] = {};
+        activity[name][dayKey] = (activity[name][dayKey] || 0) + 1;
     });
 
-    const names = Object.keys(activity).sort((a, b) =>
-        a.localeCompare(b)
-    );
+    const names = Object.keys(activity).sort((a, b) => a.localeCompare(b));
+    const allDayKeys = [...new Set(
+        names.flatMap(name => Object.keys(activity[name]))
+    )].sort();
 
-    const allDayKeys = [
-        ...new Set(
-            names.flatMap(name => Object.keys(activity[name]))
-        )
-    ].sort();
-
-    const container =
-        document.getElementById('ganttContainer');
+    const container = document.getElementById('ganttContainer');
 
     if (!names.length || !allDayKeys.length) {
         container.innerHTML =
@@ -768,155 +767,118 @@ function updateGanttChart(filtered) {
         return;
     }
 
-    const firstDate =
-        new Date(`${allDayKeys[0]}T00:00:00`);
+    const firstDate = new Date(`${allDayKeys[0]}T00:00:00`);
+    const lastDate = new Date(`${allDayKeys[allDayKeys.length - 1]}T00:00:00`);
+    const totalSpan = Math.max(1, lastDate.getTime() - firstDate.getTime());
 
-    const lastDate =
-        new Date(`${allDayKeys[allDayKeys.length - 1]}T00:00:00`);
+    const formatDate = d => d.toLocaleDateString(undefined, {
+        day: '2-digit', month: 'short', year: 'numeric'
+    });
 
-    const totalSpan =
-        Math.max(1, lastDate - firstDate);
+    // Five fixed reference points make the time scale readable even when
+    // the project covers several months.
+    const axisPoints = [0, 25, 50, 75, 100].map(pct => {
+        const d = new Date(firstDate.getTime() + totalSpan * pct / 100);
+        return { pct, label: formatDate(d) };
+    });
 
-    const totalFarms = filtered.length;
-    const totalActiveDays = allDayKeys.length;
+    const axisHtml = `
+        <div class="activity-axis-wrap">
+            ${axisPoints.map((p, i) => `
+                <span class="activity-axis-label ${i === 0 ? 'first' : ''} ${i === axisPoints.length - 1 ? 'last' : ''}"
+                      style="left:${p.pct}%">${p.label}</span>
+            `).join('')}
+        </div>
+    `;
 
     let html = `
         <div class="activity-chart">
-
             <div class="activity-header">
                 <div>Enumerator</div>
                 <div>Farms</div>
                 <div>Active Days</div>
                 <div>
-                    Activity
-                    <div class="activity-axis">
-                        <span>${firstDate.toLocaleDateString()}</span>
-                        <span>${lastDate.toLocaleDateString()}</span>
-                    </div>
+                    <div>Activity</div>
+                    ${axisHtml}
                 </div>
             </div>
     `;
 
     names.forEach(name => {
         const days = activity[name];
+        const dayKeys = Object.keys(days).sort();
+        const farmCount = Object.values(days).reduce((sum, count) => sum + count, 0);
+        const activeDays = dayKeys.length;
 
-        const farmCount =
-            Object.values(days).reduce(
-                (sum, count) => sum + count,
-                0
-            );
-
-        const activeDays =
-            Object.keys(days).length;
-
-        const dayKeys =
-            Object.keys(days).sort();
+        const gridlines = [0, 25, 50, 75, 100].map(pct =>
+            `<span class="activity-gridline" style="left:${pct}%"></span>`
+        ).join('');
 
         let lines = '';
-
         for (let i = 0; i < dayKeys.length - 1; i++) {
-            const a =
-                new Date(`${dayKeys[i]}T00:00:00`);
-
-            const b =
-                new Date(`${dayKeys[i + 1]}T00:00:00`);
-
-            const left =
-                ((a - firstDate) / totalSpan) * 100;
-
-            const width =
-                ((b - a) / totalSpan) * 100;
-
-            lines += `
-                <span
-                    class="activity-line"
-                    style="left:${left}%;width:${width}%;"
-                ></span>
-            `;
+            const a = new Date(`${dayKeys[i]}T00:00:00`);
+            const b = new Date(`${dayKeys[i + 1]}T00:00:00`);
+            const left = ((a.getTime() - firstDate.getTime()) / totalSpan) * 100;
+            const width = ((b.getTime() - a.getTime()) / totalSpan) * 100;
+            lines += `<span class="activity-line" style="left:${left}%;width:${width}%;"></span>`;
         }
 
         const dots = dayKeys.map(dayKey => {
-            const date =
-                new Date(`${dayKey}T00:00:00`);
-
-            const position =
-                ((date - firstDate) / totalSpan) * 100;
-
+            const date = new Date(`${dayKey}T00:00:00`);
+            const position = Math.max(0, Math.min(100,
+                ((date.getTime() - firstDate.getTime()) / totalSpan) * 100
+            ));
             const count = days[dayKey];
+            const countClass = count > 1 ? ' has-count' : '';
+            const title = `${name} — ${count} farm${count === 1 ? '' : 's'} on ${formatDate(date)}`;
 
             return `
-                <span
-                    class="activity-dot"
-                    style="left:${position}%;"
-                    title="${escapeHtml(name)} — ${count} farm${count === 1 ? '' : 's'} on ${date.toLocaleDateString()}"
-                ></span>
+                <span class="activity-dot${countClass}"
+                      style="left:${position}%;"
+                      data-count="${count > 1 ? count : ''}"
+                      title="${escapeHtml(title)}"
+                      aria-label="${escapeHtml(title)}"></span>
             `;
         }).join('');
 
-        const firstLabel =
-            new Date(`${dayKeys[0]}T00:00:00`)
-                .toLocaleDateString();
-
-        const lastLabel =
-            new Date(`${dayKeys[dayKeys.length - 1]}T00:00:00`)
-                .toLocaleDateString();
-
-        const range =
-            firstLabel === lastLabel
-                ? firstLabel
-                : `${firstLabel} → ${lastLabel}`;
+        const firstLabel = formatDate(new Date(`${dayKeys[0]}T00:00:00`));
+        const lastLabel = formatDate(new Date(`${dayKeys[dayKeys.length - 1]}T00:00:00`));
+        const range = firstLabel === lastLabel ? firstLabel : `${firstLabel} → ${lastLabel}`;
 
         html += `
             <div class="activity-row">
-
                 <div>
-                    <div class="activity-name">
-                        ${escapeHtml(name)}
-                    </div>
-                    <div class="activity-meta">
-                        ${range}
-                    </div>
+                    <div class="activity-name">${escapeHtml(name)}</div>
+                    <div class="activity-meta">${range}</div>
                 </div>
-
-                <div>
-                    <strong>${farmCount}</strong>
-                </div>
-
-                <div>
-                    <strong>${activeDays}</strong>
-                </div>
-
+                <div><strong>${farmCount}</strong></div>
+                <div><strong>${activeDays}</strong></div>
                 <div>
                     <div class="activity-track">
+                        ${gridlines}
                         ${lines}
                         ${dots}
                     </div>
                 </div>
-
             </div>
         `;
     });
 
     html += `
         </div>
-
         <div class="activity-summary">
-
             <div class="activity-stat">
-                <strong>${totalFarms}</strong>
+                <strong>${filtered.length}</strong>
                 <span>Mapped farms</span>
             </div>
-
             <div class="activity-stat">
                 <strong>${names.length}</strong>
                 <span>Enumerators shown</span>
             </div>
-
             <div class="activity-stat">
-                <strong>${totalActiveDays}</strong>
+                <strong>${allDayKeys.length}</strong>
                 <span>Mapping days</span>
             </div>
-
         </div>
     `;
 
