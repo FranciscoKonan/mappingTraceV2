@@ -321,7 +321,7 @@
             <div class="chart-container"><canvas id="enumeratorChart"></canvas></div>
         </div>
         <div class="stat-card">
-            <h3><i class="fas fa-chart-pie"></i> Area by Cooperative</h3>
+            <h3><i class="fas fa-chart-pie"></i> Area by Cooperative (ha)</h3>
             <div class="chart-container"><canvas id="cooperativePieChart"></canvas></div>
         </div>
         <div class="stat-card">
@@ -777,10 +777,67 @@ function updateEnumeratorChart(filtered) {
 
 function updateCooperativePieChart(filtered) {
     const areas = {};
-    filtered.forEach(f => { const name = getFarmCooperative(f); areas[name] = (areas[name] || 0) + (f.area || 0); });
+
+    filtered.forEach(f => {
+        const name = getFarmCooperative(f) || 'Unspecified';
+        areas[name] = (areas[name] || 0) + Number(f.area || 0);
+    });
+
+    // Rank cooperatives from largest to smallest area.
+    const ranked = Object.entries(areas)
+        .sort((a, b) => b[1] - a[1]);
+
+    const labels = ranked.map(([name]) => name);
+    const values = ranked.map(([, area]) => Number(area.toFixed(2)));
+
     const ctx = document.getElementById('cooperativePieChart').getContext('2d');
     if (cooperativePieChart) cooperativePieChart.destroy();
-    cooperativePieChart = new Chart(ctx, { type: 'pie', data: { labels: Object.keys(areas), datasets: [{ data: Object.values(areas), backgroundColor: ['#2c6e49', '#4CAF50', '#8BC34A', '#CDDC39', '#FFC107', '#FF9800'] }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { tooltip: { callbacks: { label: (ctx) => `${ctx.label}: ${ctx.raw.toFixed(1)} ha` } } } } });
+
+    cooperativePieChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels,
+            datasets: [{
+                label: 'Area (ha)',
+                data: values,
+                backgroundColor: '#2c6e49',
+                borderRadius: 6,
+                barThickness: 22
+            }]
+        },
+        options: {
+            indexAxis: 'y',
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    callbacks: {
+                        label: (ctx) => ` ${Number(ctx.parsed.x || 0).toFixed(1)} ha`
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'Area (ha)'
+                    },
+                    ticks: {
+                        callback: (value) => `${value} ha`
+                    }
+                },
+                y: {
+                    ticks: {
+                        autoSkip: false
+                    }
+                }
+            }
+        }
+    });
 }
 
 function updateTimelineChart(filtered) {
