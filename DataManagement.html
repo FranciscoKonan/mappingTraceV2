@@ -262,13 +262,13 @@
                 <button type="button" data-lang="en" onclick="setPageLanguage('en')" style="border:1px solid #dbe3ea;background:white;border-radius:7px;padding:5px 8px;cursor:pointer;font-weight:600;">EN</button>
                 <button type="button" data-lang="fr" onclick="setPageLanguage('fr')" style="border:1px solid #dbe3ea;background:white;border-radius:7px;padding:5px 8px;cursor:pointer;font-weight:600;">FR</button>
             </div>
-            <button class="back-btn" id="backBtn"><i class="fas fa-arrow-left"></i> All Projects</button>
-            <span class="project-name" id="projectName" data-i18n="loading">Loading...</span>
+            <button class="back-btn" id="backBtn"><i class="fas fa-arrow-left"></i> <span data-i18n="allProjects">All Projects</span></button>
+            <span class="project-name" id="projectName">Loading...</span>
             <span class="role-badge" id="roleBadge"></span>
         </div>
         <div class="user-info">
             <div class="project-selector-container hidden" id="projectSelectorContainer">
-                <label><i class="fas fa-folder-open"></i> Project:</label>
+                <label><i class="fas fa-folder-open"></i> <span data-i18n="project">Project</span>:</label>
                 <div class="custom-dropdown" id="customDropdown">
                     <div class="dropdown-selected" id="dropdownSelected">
                         <span id="selectedProjectName">Loading...</span>
@@ -283,8 +283,8 @@
                 </div>
             </div>
             <div class="user-avatar" id="userAvatar">JD</div>
-            <span id="userName" data-i18n="user">User</span>
-            <button id="logoutBtn" style="background:none;border:none;cursor:pointer;font-size:18px;"><i class="fas fa-sign-out-alt"></i></button>
+            <span id="userName">User</span>
+            <button id="logoutBtn" aria-label="Logout" title="Logout" style="background:none;border:none;cursor:pointer;font-size:18px;"><i class="fas fa-sign-out-alt"></i></button>
         </div>
     </div>
     
@@ -457,18 +457,6 @@
             document.querySelectorAll('[data-lang]').forEach(btn => {
                 btn.style.opacity = btn.dataset.lang === lang ? '1' : '0.55';
             });
-            if (typeof loadDataManagement === 'function' && currentProject) {
-                Promise.resolve(loadDataManagement()).then(() => {
-                    document.querySelectorAll('[data-i18n]').forEach(el => {
-                        const key = el.getAttribute('data-i18n');
-                        if (DATA_MANAGEMENT_I18N[lang]?.[key] !== undefined) el.textContent = DATA_MANAGEMENT_I18N[lang][key];
-                    });
-                    document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
-                        const key = el.getAttribute('data-i18n-placeholder');
-                        if (DATA_MANAGEMENT_I18N[lang]?.[key] !== undefined) el.placeholder = DATA_MANAGEMENT_I18N[lang][key];
-                    });
-                }).catch(() => {});
-            }
         }
 
         function setPageLanguage(lang) { applyPageLanguage(lang); }
