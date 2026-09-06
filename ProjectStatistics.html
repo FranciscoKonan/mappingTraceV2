@@ -285,7 +285,7 @@
     </div>
 
     <div id="assignmentCoverageNote" style="margin:10px 0 0; font-size:12px; color:#64748b;">
-        Current active Enumerator assignments are tracked separately from mapping attribution.
+        Mapping attribution uses the recorded mapper; current assignments are tracked separately.
     </div>
     <div class="quality-grid">
         <div class="quality-card">
@@ -554,15 +554,27 @@ function friendlyNameFromEmail(email) {
 }
 
 function getEnumeratorDisplayName(farm) {
-    const assignedUserId = farmEnumeratorMap[String(farm?.id)];
-    if (assignedUserId) {
-        return (
-            enumeratorDisplayMap[assignedUserId] ||
-            enumeratorDisplayMap[String(assignedUserId).toLowerCase()] ||
-            'Unknown'
-        );
-    }
-    return 'Unassigned';
+    // Mapping attribution comes from farms.enumerator.
+    // farm_assignments is reserved for current operational assignment,
+    // which is a different concept from who mapped/submitted the farm.
+    const raw = String(farm?.enumerator || '').trim();
+    if (!raw) return 'Unassigned';
+
+    // Legacy UUID values are resolved to the active project's profile name.
+    const byId = enumeratorDisplayMap[raw];
+    if (byId) return byId;
+
+    const byLower = enumeratorDisplayMap[raw.toLowerCase()];
+    if (byLower) return byLower;
+
+    // Existing textual mapper names are normalized for whitespace/case.
+    const normalized = raw.replace(/\s+/g, ' ').trim();
+    const normalizedMapped = enumeratorDisplayMap[normalized.toLowerCase()];
+    if (normalizedMapped) return normalizedMapped;
+
+    // Preserve a valid historical name rather than incorrectly labeling it
+    // as "Unassigned".
+    return normalized;
 }
 
 function getFarmCooperative(farm) {
