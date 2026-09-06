@@ -234,203 +234,1282 @@
 const SUPABASE_URL = 'https://crvnohvudurqfukjpisv.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNydm5vaHZ1ZHVycWZ1a2pwaXN2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg0NTUxNzMsImV4cCI6MjA5NDAzMTE3M30.Qp8E57yAN4LnO4A-yirf-Z3QufGZw9OKjBfcQxG7fo8';
 
-let supabaseClient, currentUser, currentProject, allFarms = [];
-let enumeratorChart, cooperativePieChart, timelineChart, enumeratorCooperativeChart = null;
+let supabaseClient;
+let currentUser;
+let currentProject;
+
+let allFarms = [];
+let allSubmissions = [];
+let projectEnumerators = [];
+
+let enumeratorChart = null;
+let cooperativePieChart = null;
+let timelineChart = null;
+let enumeratorCooperativeChart = null;
+
+
+/* =========================================================
+   PROJECT
+========================================================= */
 
 function getProjectIdFromUrl() {
     const urlParams = new URLSearchParams(window.location.search);
     return urlParams.get('project');
 }
 
+
+/* =========================================================
+   INITIALIZATION
+========================================================= */
+
 async function init() {
-    supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-    await loadUser();
-    await loadProject();
-    await loadStatistics();
-}
+    try {
+        supabaseClient = window.supabase.createClient(
+            SUPABASE_URL,
+            SUPABASE_ANON_KEY
+        );
 
-async function loadUser() {
-    const { data: { session } } = await supabaseClient.auth.getSession();
-    if (!session) { window.location.href = 'login.html'; return; }
-    currentUser = session.user;
-    const { data: profile } = await supabaseClient.from('user_profiles').select('first_name, email').eq('id', currentUser.id).maybeSingle();
-    const firstName = profile?.first_name || '';
-    document.getElementById('userName').textContent = firstName || currentUser.email.split('@')[0];
-    document.getElementById('userAvatar').textContent = (firstName.charAt(0) || currentUser.email.charAt(0)).toUpperCase();
-}
+        await loadUser();
+        await loadProject();
+        await loadStatistics();
 
-async function loadProject() {
-    const projectId = getProjectIdFromUrl();
-    if (!projectId) { window.location.href = 'Dashboard.html'; return; }
-    const { data: project } = await supabaseClient.from('projects').select('*').eq('id', projectId).single();
-    if (project) {
-        currentProject = project;
-        document.getElementById('projectName').textContent = project.name;
-        updatePeriodBanner(project);
+    } catch (error) {
+        console.error('Initialization error:', error);
+        showLoading(false);
+        alert('Unable to load project analytics.');
     }
 }
 
-function updatePeriodBanner(project) {
-    const startDate = new Date(project.created_at);
-    const today = new Date();
-    const endDate = project.end_date ? new Date(project.end_date) : new Date(startDate.getTime() + 90 * 24 * 60 * 60 * 1000);
-    
-    const elapsed = Math.max(0, Math.floor((today - startDate) / (1000 * 60 * 60 * 24)));
-    const total = Math.max(1, Math.floor((endDate - startDate) / (1000 * 60 * 60 * 24)));
-    const remaining = Math.max(0, total - elapsed);
-    const percent = Math.min(100, Math.floor((elapsed / total) * 100));
-    
-    document.getElementById('periodRange').innerHTML = `${startDate.toLocaleDateString()} - ${endDate.toLocaleDateString()}`;
-    document.getElementById('periodDuration').innerHTML = `${total} days total project duration`;
-    document.getElementById('elapsedDays').innerHTML = elapsed;
-    document.getElementById('remainingDays').innerHTML = remaining;
-    document.getElementById('completionPercent').innerHTML = `${percent}%`;
+
+/* =========================================================
+   USER
+========================================================= */
+
+async function loadUser() {
+    const {
+        data: { session }
+    } = await supabaseClient.auth.getSession();
+
+    if (!session) {
+        window.location.href = 'login.html';
+        return;
+    }
+
+    currentUser = session.user;
+
+    const { data: profile } = await supabaseClient
+        .from('user_profiles')
+        .select('first_name, email')
+        .eq('id', currentUser.id)
+        .maybeSingle();
+
+    const firstName = profile?.first_name || '';
+
+    document.getElementById('userName').textContent =
+        firstName || currentUser.email.split('@')[0];
+
+    document.getElementById('userAvatar').textContent =
+        (firstName.charAt(0) || currentUser.email.charAt(0)).toUpperCase();
 }
+
+
+/* =========================================================
+   PROJECT
+========================================================= */
+
+async function loadProject() {
+
+    const projectId = getProjectIdFromUrl();
+
+    if (!projectId) {
+        window.location.href = 'Dashboard.html';
+        return;
+    }
+
+    const { data: project, error } = await supabaseClient
+        .from('projects')
+        .select('*')
+        .eq('id', projectId)
+        .single();
+
+    if (error) {
+        console.error('Project loading error:', error);
+        throw error;
+    }
+
+    if (!project) {
+        throw new Error('Project not found.');
+    }
+
+    currentProject = project;
+
+    document.getElementById('projectName').textContent =
+        project.name || 'Project';
+
+    updatePeriodBanner(project);
+}
+
+
+/* =========================================================
+   PERIOD
+========================================================= */
+
+function updatePeriodBanner(project) {
+
+    const startDate = project.created_at
+        ? new Date(project.created_at)
+        : new Date();
+
+    const today = new Date();
+
+    const endDate = project.end_date
+        ? new Date(project.end_date)
+        : new Date(
+            startDate.getTime() +
+            90 * 24 * 60 * 60 * 1000
+        );
+
+    const totalDays = Math.max(
+        1,
+        Math.ceil(
+            (endDate - startDate) /
+            (1000 * 60 * 60 * 24)
+        )
+    );
+
+    const elapsedDays = Math.max(
+        0,
+        Math.min(
+            totalDays,
+            Math.floor(
+                (today - startDate) /
+                (1000 * 60 * 60 * 24)
+            )
+        )
+    );
+
+    const remainingDays = Math.max(
+        0,
+        totalDays - elapsedDays
+    );
+
+    const percent = Math.min(
+        100,
+        Math.floor(
+            (elapsedDays / totalDays) * 100
+        )
+    );
+
+    document.getElementById('periodRange').textContent =
+        `${startDate.toLocaleDateString()} - ${endDate.toLocaleDateString()}`;
+
+    document.getElementById('periodDuration').textContent =
+        `${totalDays} days total project duration`;
+
+    document.getElementById('elapsedDays').textContent =
+        elapsedDays;
+
+    document.getElementById('remainingDays').textContent =
+        remainingDays;
+
+    document.getElementById('completionPercent').textContent =
+        `${percent}%`;
+}
+
+
+/* =========================================================
+   LOAD ANALYTICS DATA
+========================================================= */
 
 async function loadStatistics() {
+
     showLoading(true);
+
     const projectId = getProjectIdFromUrl();
-    if (!projectId) return;
-    const { data: farms } = await supabaseClient.from('farms').select('*').eq('project_id', projectId);
-    allFarms = farms || [];
-    populateFilters();
-    updateAllCharts();
-    showLoading(false);
+
+    if (!projectId) {
+        showLoading(false);
+        return;
+    }
+
+    try {
+
+        /*
+         * 1. FARMS
+         */
+        const {
+            data: farms,
+            error: farmsError
+        } = await supabaseClient
+            .from('farms')
+            .select('*')
+            .eq('project_id', projectId);
+
+        if (farmsError) throw farmsError;
+
+        allFarms = farms || [];
+
+
+        /*
+         * 2. SUBMISSIONS
+         */
+        const {
+            data: submissions,
+            error: submissionsError
+        } = await supabaseClient
+            .from('submissions')
+            .select('id, farm_id, project_id, created_at, status, submitted_by')
+            .eq('project_id', projectId);
+
+        if (submissionsError) {
+
+            console.warn(
+                'Submission loading failed:',
+                submissionsError
+            );
+
+            /*
+             * Do not break the dashboard if the current
+             * user's RLS does not expose submissions.
+             */
+            allSubmissions = [];
+
+        } else {
+
+            allSubmissions = submissions || [];
+        }
+
+
+        /*
+         * 3. ACTIVE ENUMERATORS
+         *
+         * IMPORTANT:
+         * Do not calculate enumerators from farms.
+         * project_members is the authoritative source.
+         */
+        const {
+            data: members,
+            error: membersError
+        } = await supabaseClient
+            .from('project_members')
+            .select('user_id, role, status')
+            .eq('project_id', projectId)
+            .eq('status', 'active');
+
+        if (membersError) throw membersError;
+
+        projectEnumerators = (members || []).filter(
+            m => String(m.role || '').toLowerCase() === 'enumerator'
+        );
+
+
+        populateFilters();
+
+        updateAllCharts();
+
+    } catch (error) {
+
+        console.error(
+            'Statistics loading error:',
+            error
+        );
+
+        alert(
+            'Some project statistics could not be loaded. Check the browser console.'
+        );
+
+    } finally {
+
+        showLoading(false);
+    }
 }
+
+
+/* =========================================================
+   FILTERS
+========================================================= */
 
 function populateFilters() {
-    const enumerators = [...new Set(allFarms.map(f => f.enumerator).filter(e => e && e !== 'null'))];
-    const cooperatives = [...new Set(allFarms.map(f => f.cooperative).filter(c => c && c !== 'null'))];
-    document.getElementById('enumeratorFilter').innerHTML = '<option value="all">All Enumerators</option>' + enumerators.map(e => `<option value="${e}">${e}</option>`).join('');
-    document.getElementById('cooperativeFilter').innerHTML = '<option value="all">All Cooperatives</option>' + cooperatives.map(c => `<option value="${c}">${c}</option>`).join('');
+
+    /*
+     * Enumerator names currently come from farms because
+     * the farms table already contains the display value.
+     */
+    const enumerators = [
+        ...new Set(
+            allFarms
+                .map(f => f.enumerator)
+                .filter(e => e && e !== 'null')
+        )
+    ];
+
+    const cooperatives = [
+        ...new Set(
+            allFarms
+                .map(f => f.cooperative)
+                .filter(c => c && c !== 'null')
+        )
+    ];
+
+    document.getElementById('enumeratorFilter').innerHTML =
+        '<option value="all">All Enumerators</option>' +
+        enumerators
+            .map(
+                e => `<option value="${escapeHtml(e)}">${escapeHtml(e)}</option>`
+            )
+            .join('');
+
+    document.getElementById('cooperativeFilter').innerHTML =
+        '<option value="all">All Cooperatives</option>' +
+        cooperatives
+            .map(
+                c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`
+            )
+            .join('');
 }
 
+
 function getFilteredFarms() {
+
     let filtered = [...allFarms];
-    const enumerator = document.getElementById('enumeratorFilter').value;
-    const cooperative = document.getElementById('cooperativeFilter').value;
-    const startDate = document.getElementById('startDate').value;
-    const endDate = document.getElementById('endDate').value;
-    if (enumerator !== 'all') filtered = filtered.filter(f => f.enumerator === enumerator);
-    if (cooperative !== 'all') filtered = filtered.filter(f => f.cooperative === cooperative);
-    if (startDate) filtered = filtered.filter(f => new Date(f.created_at) >= new Date(startDate));
-    if (endDate) filtered = filtered.filter(f => new Date(f.created_at) <= new Date(endDate));
+
+    const enumerator =
+        document.getElementById('enumeratorFilter').value;
+
+    const cooperative =
+        document.getElementById('cooperativeFilter').value;
+
+    const startDate =
+        document.getElementById('startDate').value;
+
+    const endDate =
+        document.getElementById('endDate').value;
+
+
+    if (enumerator !== 'all') {
+
+        filtered = filtered.filter(
+            f => f.enumerator === enumerator
+        );
+    }
+
+
+    if (cooperative !== 'all') {
+
+        filtered = filtered.filter(
+            f => f.cooperative === cooperative
+        );
+    }
+
+
+    /*
+     * Start date = beginning of selected day.
+     */
+    if (startDate) {
+
+        const start = new Date(`${startDate}T00:00:00`);
+
+        filtered = filtered.filter(
+            f => new Date(f.created_at) >= start
+        );
+    }
+
+
+    /*
+     * End date = END of selected day.
+     *
+     * This fixes the previous bug where records created
+     * later on the selected end date were excluded.
+     */
+    if (endDate) {
+
+        const end = new Date(`${endDate}T23:59:59.999`);
+
+        filtered = filtered.filter(
+            f => new Date(f.created_at) <= end
+        );
+    }
+
+
     return filtered;
 }
 
-function updateAllCharts() {
-    const filtered = getFilteredFarms();
-    updateKPIs(filtered);
-    updateEnumeratorChart(filtered);
-    updateCooperativePieChart(filtered);
-    updateTimelineChart(filtered);
-    updateEnumeratorCooperativeChart(filtered);
-    updateGanttChart(filtered);
+
+/* =========================================================
+   FILTER SUBMISSIONS
+========================================================= */
+
+function getFilteredSubmissions() {
+
+    let filtered = [...allSubmissions];
+
+    const startDate =
+        document.getElementById('startDate').value;
+
+    const endDate =
+        document.getElementById('endDate').value;
+
+
+    if (startDate) {
+
+        const start = new Date(`${startDate}T00:00:00`);
+
+        filtered = filtered.filter(
+            s => new Date(s.created_at) >= start
+        );
+    }
+
+
+    if (endDate) {
+
+        const end = new Date(`${endDate}T23:59:59.999`);
+
+        filtered = filtered.filter(
+            s => new Date(s.created_at) <= end
+        );
+    }
+
+
+    return filtered;
 }
 
-function updateKPIs(filtered) {
-    const total = filtered.length;
-    const totalArea = filtered.reduce((s, f) => s + (f.area || 0), 0);
-    const uniqueEnumerators = [...new Set(filtered.map(f => f.enumerator).filter(e => e && e !== 'null'))];
-    const allEnumerators = [...new Set(allFarms.map(f => f.enumerator).filter(e => e && e !== 'null'))];
-    const activeCount = uniqueEnumerators.length;
-    const avgDaily = filtered.length > 0 ? (filtered.length / 30).toFixed(1) : 0;
-    document.getElementById('totalFarms').innerHTML = total;
-    document.getElementById('totalArea').innerHTML = totalArea.toFixed(1);
-    document.getElementById('activeEnumerators').innerHTML = activeCount;
-    document.getElementById('totalEnumerators').innerHTML = allEnumerators.length;
-    document.getElementById('avgDaily').innerHTML = avgDaily;
+
+/* =========================================================
+   UPDATE EVERYTHING
+========================================================= */
+
+function updateAllCharts() {
+
+    const filteredFarms = getFilteredFarms();
+    const filteredSubmissions = getFilteredSubmissions();
+
+    updateKPIs(
+        filteredFarms,
+        filteredSubmissions
+    );
+
+    updateEnumeratorChart(filteredFarms);
+
+    updateCooperativePieChart(filteredFarms);
+
+    updateTimelineChart(filteredSubmissions);
+
+    updateEnumeratorCooperativeChart(filteredFarms);
+
+    updateGanttChart(filteredFarms);
 }
+
+
+/* =========================================================
+   KPI
+========================================================= */
+
+function updateKPIs(
+    filteredFarms,
+    filteredSubmissions
+) {
+
+    /*
+     * TOTAL FARMS
+     */
+    const totalFarms = filteredFarms.length;
+
+
+    /*
+     * TOTAL AREA
+     *
+     * Current database/source uses "area".
+     */
+    const totalArea = filteredFarms.reduce(
+        (sum, farm) => {
+            const value = Number(
+                farm.area ?? farm.area_ha ?? 0
+            );
+
+            return sum + (
+                Number.isFinite(value)
+                    ? value
+                    : 0
+            );
+        },
+        0
+    );
+
+
+    /*
+     * ACTIVE ENUMERATORS
+     *
+     * Authoritative project membership count.
+     */
+    const activeEnumeratorCount =
+        projectEnumerators.length;
+
+
+    /*
+     * TOTAL ENUMERATORS
+     *
+     * Same project_members source for now.
+     */
+    const totalEnumeratorCount =
+        projectEnumerators.length;
+
+
+    /*
+     * ACTUAL SUBMISSIONS
+     */
+    const submissionCount =
+        filteredSubmissions.length;
+
+
+    /*
+     * CALCULATE REAL DAILY RATE
+     *
+     * Instead of farms / 30.
+     *
+     * Determine the actual date span represented
+     * by the selected data.
+     */
+    let avgDaily = 0;
+
+    if (filteredSubmissions.length > 0) {
+
+        const dates = filteredSubmissions
+            .map(s => new Date(s.created_at))
+            .filter(d => !isNaN(d));
+
+        if (dates.length > 0) {
+
+            const minDate = new Date(
+                Math.min(...dates)
+            );
+
+            const maxDate = new Date(
+                Math.max(...dates)
+            );
+
+            const days = Math.max(
+                1,
+                Math.ceil(
+                    (maxDate - minDate) /
+                    (1000 * 60 * 60 * 24)
+                ) + 1
+            );
+
+            avgDaily =
+                submissionCount / days;
+        }
+    }
+
+
+    /*
+     * UPDATE DOM
+     */
+    document.getElementById('totalFarms').textContent =
+        totalFarms;
+
+    document.getElementById('totalArea').textContent =
+        totalArea.toFixed(1);
+
+    document.getElementById('activeEnumerators').textContent =
+        activeEnumeratorCount;
+
+    document.getElementById('totalEnumerators').textContent =
+        totalEnumeratorCount;
+
+    document.getElementById('avgDaily').textContent =
+        avgDaily.toFixed(1);
+
+
+    /*
+     * Make the existing trend labels truthful.
+     */
+    document.getElementById('farmsTrend').textContent =
+        `${totalFarms} farms in selection`;
+
+    document.getElementById('areaTrend').textContent =
+        `${totalArea.toFixed(1)} ha in selection`;
+
+    document.getElementById('enumeratorTrend').innerHTML =
+        `active out of <span id="totalEnumerators">${totalEnumeratorCount}</span>`;
+
+    document.getElementById('dailyTrend').textContent =
+        'submissions/day';
+}
+
+
+/* =========================================================
+   ENUMERATOR CHART
+========================================================= */
 
 function updateEnumeratorChart(filtered) {
+
     const counts = {};
-    filtered.forEach(f => { const name = f.enumerator || 'Unknown'; counts[name] = (counts[name] || 0) + 1; });
-    const ctx = document.getElementById('enumeratorChart').getContext('2d');
-    if (enumeratorChart) enumeratorChart.destroy();
-    enumeratorChart = new Chart(ctx, { type: 'bar', data: { labels: Object.keys(counts), datasets: [{ label: 'Submissions', data: Object.values(counts), backgroundColor: '#2c6e49', borderRadius: 8 }] }, options: { responsive: true, maintainAspectRatio: false } });
+
+    filtered.forEach(f => {
+
+        const name =
+            f.enumerator || 'Unknown';
+
+        counts[name] =
+            (counts[name] || 0) + 1;
+    });
+
+
+    const ctx =
+        document
+            .getElementById('enumeratorChart')
+            .getContext('2d');
+
+
+    if (enumeratorChart) {
+        enumeratorChart.destroy();
+    }
+
+
+    enumeratorChart = new Chart(ctx, {
+
+        type: 'bar',
+
+        data: {
+
+            labels: Object.keys(counts),
+
+            datasets: [{
+
+                label: 'Mapped Farms',
+
+                data: Object.values(counts),
+
+                backgroundColor: '#2c6e49',
+
+                borderRadius: 8
+            }]
+        },
+
+        options: {
+
+            responsive: true,
+
+            maintainAspectRatio: false
+        }
+    });
 }
+
+
+/* =========================================================
+   COOPERATIVE CHART
+========================================================= */
 
 function updateCooperativePieChart(filtered) {
+
     const areas = {};
-    filtered.forEach(f => { const name = f.cooperative || 'Unknown'; areas[name] = (areas[name] || 0) + (f.area || 0); });
-    const ctx = document.getElementById('cooperativePieChart').getContext('2d');
-    if (cooperativePieChart) cooperativePieChart.destroy();
-    cooperativePieChart = new Chart(ctx, { type: 'pie', data: { labels: Object.keys(areas), datasets: [{ data: Object.values(areas), backgroundColor: ['#2c6e49', '#4CAF50', '#8BC34A', '#CDDC39', '#FFC107', '#FF9800'] }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { tooltip: { callbacks: { label: (ctx) => `${ctx.label}: ${ctx.raw.toFixed(1)} ha` } } } } });
+
+    filtered.forEach(f => {
+
+        const name =
+            f.cooperative || 'Unknown';
+
+        const value =
+            Number(f.area ?? f.area_ha ?? 0);
+
+        areas[name] =
+            (areas[name] || 0) +
+            (Number.isFinite(value) ? value : 0);
+    });
+
+
+    const ctx =
+        document
+            .getElementById('cooperativePieChart')
+            .getContext('2d');
+
+
+    if (cooperativePieChart) {
+        cooperativePieChart.destroy();
+    }
+
+
+    cooperativePieChart = new Chart(ctx, {
+
+        type: 'pie',
+
+        data: {
+
+            labels: Object.keys(areas),
+
+            datasets: [{
+
+                data: Object.values(areas),
+
+                backgroundColor: [
+                    '#2c6e49',
+                    '#4CAF50',
+                    '#8BC34A',
+                    '#CDDC39',
+                    '#FFC107',
+                    '#FF9800'
+                ]
+            }]
+        },
+
+        options: {
+
+            responsive: true,
+
+            maintainAspectRatio: false,
+
+            plugins: {
+
+                tooltip: {
+
+                    callbacks: {
+
+                        label: ctx =>
+                            `${ctx.label}: ${Number(ctx.raw).toFixed(1)} ha`
+                    }
+                }
+            }
+        }
+    });
 }
+
+
+/* =========================================================
+   SUBMISSION TREND
+========================================================= */
 
 function updateTimelineChart(filtered) {
+
     const daily = {};
-    filtered.forEach(f => { const date = new Date(f.created_at).toLocaleDateString(); daily[date] = (daily[date] || 0) + 1; });
-    const sorted = Object.keys(daily).sort((a, b) => new Date(a) - new Date(b));
-    const ctx = document.getElementById('timelineChart').getContext('2d');
-    if (timelineChart) timelineChart.destroy();
-    timelineChart = new Chart(ctx, { type: 'line', data: { labels: sorted, datasets: [{ label: 'Daily Submissions', data: sorted.map(d => daily[d]), borderColor: '#2c6e49', backgroundColor: 'rgba(44,110,73,0.1)', fill: true, tension: 0.3 }] }, options: { responsive: true, maintainAspectRatio: false } });
+
+    filtered.forEach(s => {
+
+        const date =
+            new Date(s.created_at);
+
+        if (isNaN(date)) return;
+
+        /*
+         * ISO date prevents locale sorting problems.
+         */
+        const key =
+            date.toISOString().slice(0, 10);
+
+        daily[key] =
+            (daily[key] || 0) + 1;
+    });
+
+
+    const sorted =
+        Object.keys(daily).sort();
+
+
+    const labels =
+        sorted.map(
+            d => new Date(`${d}T00:00:00`)
+                .toLocaleDateString()
+        );
+
+
+    const ctx =
+        document
+            .getElementById('timelineChart')
+            .getContext('2d');
+
+
+    if (timelineChart) {
+        timelineChart.destroy();
+    }
+
+
+    timelineChart = new Chart(ctx, {
+
+        type: 'line',
+
+        data: {
+
+            labels,
+
+            datasets: [{
+
+                label: 'Daily Submissions',
+
+                data: sorted.map(
+                    d => daily[d]
+                ),
+
+                borderColor: '#2c6e49',
+
+                backgroundColor:
+                    'rgba(44,110,73,0.1)',
+
+                fill: true,
+
+                tension: 0.3
+            }]
+        },
+
+        options: {
+
+            responsive: true,
+
+            maintainAspectRatio: false
+        }
+    });
 }
+
+
+/* =========================================================
+   ENUMERATOR / COOPERATIVE
+========================================================= */
 
 function updateEnumeratorCooperativeChart(filtered) {
+
     const matrix = {};
+
     filtered.forEach(f => {
-        const enumName = f.enumerator || 'Unknown';
-        const coopName = f.cooperative || 'Unknown';
-        if (!matrix[enumName]) matrix[enumName] = {};
-        matrix[enumName][coopName] = (matrix[enumName][coopName] || 0) + 1;
+
+        const enumName =
+            f.enumerator || 'Unknown';
+
+        const coopName =
+            f.cooperative || 'Unknown';
+
+        if (!matrix[enumName]) {
+            matrix[enumName] = {};
+        }
+
+        matrix[enumName][coopName] =
+            (matrix[enumName][coopName] || 0) + 1;
     });
-    const enumerators = Object.keys(matrix);
-    const cooperatives = [...new Set(filtered.map(f => f.cooperative || 'Unknown'))];
-    const datasets = cooperatives.map((coop, i) => ({ label: coop, data: enumerators.map(e => matrix[e][coop] || 0), backgroundColor: `hsl(${i * 360 / cooperatives.length}, 70%, 55%)` }));
-    const ctx = document.getElementById('enumeratorCooperativeCanvas').getContext('2d');
-    if (enumeratorCooperativeChart) enumeratorCooperativeChart.destroy();
-    enumeratorCooperativeChart = new Chart(ctx, { type: 'bar', data: { labels: enumerators, datasets }, options: { responsive: true, maintainAspectRatio: true, scales: { x: { stacked: true }, y: { stacked: true, title: { display: true, text: 'Number of Farms' } } } } });
+
+
+    const enumerators =
+        Object.keys(matrix);
+
+
+    const cooperatives = [
+        ...new Set(
+            filtered.map(
+                f => f.cooperative || 'Unknown'
+            )
+        )
+    ];
+
+
+    const datasets =
+        cooperatives.map(
+            (coop, i) => ({
+
+                label: coop,
+
+                data:
+                    enumerators.map(
+                        e =>
+                            matrix[e][coop] || 0
+                    ),
+
+                backgroundColor:
+                    `hsl(${i * 360 / Math.max(1, cooperatives.length)}, 70%, 55%)`
+            })
+        );
+
+
+    const ctx =
+        document
+            .getElementById('enumeratorCooperativeCanvas')
+            .getContext('2d');
+
+
+    if (enumeratorCooperativeChart) {
+        enumeratorCooperativeChart.destroy();
+    }
+
+
+    enumeratorCooperativeChart =
+        new Chart(ctx, {
+
+            type: 'bar',
+
+            data: {
+
+                labels: enumerators,
+
+                datasets
+            },
+
+            options: {
+
+                responsive: true,
+
+                maintainAspectRatio: true,
+
+                scales: {
+
+                    x: {
+                        stacked: true
+                    },
+
+                    y: {
+
+                        stacked: true,
+
+                        title: {
+                            display: true,
+                            text: 'Number of Farms'
+                        }
+                    }
+                }
+            }
+        });
 }
+
+
+/* =========================================================
+   ENUMERATOR TIMELINE
+========================================================= */
 
 function updateGanttChart(filtered) {
+
     const work = {};
+
     filtered.forEach(f => {
-        const name = f.enumerator || 'Unknown';
-        const date = new Date(f.created_at);
-        if (!work[name]) work[name] = { first: date, last: date, count: 0 };
-        work[name].first = new Date(Math.min(work[name].first, date));
-        work[name].last = new Date(Math.max(work[name].last, date));
+
+        const name =
+            f.enumerator || 'Unknown';
+
+        const date =
+            new Date(f.created_at);
+
+        if (isNaN(date)) return;
+
+        if (!work[name]) {
+
+            work[name] = {
+                first: date,
+                last: date,
+                count: 0
+            };
+        }
+
+        work[name].first =
+            new Date(
+                Math.min(
+                    work[name].first,
+                    date
+                )
+            );
+
+        work[name].last =
+            new Date(
+                Math.max(
+                    work[name].last,
+                    date
+                )
+            );
+
         work[name].count++;
     });
-    const allDates = Object.values(work).flatMap(w => [w.first, w.last]);
-    const minDate = new Date(Math.min(...allDates));
-    const maxDate = new Date(Math.max(...allDates));
-    const totalDays = Math.max(1, Math.ceil((maxDate - minDate) / (1000 * 60 * 60 * 24)));
-    
-    let html = '<div class="gantt-chart"><div class="gantt-header"><div class="gantt-label-header">Enumerator</div><div class="gantt-timeline-header"><span style="position:absolute;left:0;">' + minDate.toLocaleDateString() + '</span><span style="position:absolute;right:0;">' + maxDate.toLocaleDateString() + '</span></div></div>';
-    for (const [name, data] of Object.entries(work)) {
-        const startOffset = Math.max(0, Math.floor((data.first - minDate) / (1000 * 60 * 60 * 24)));
-        const duration = Math.max(1, Math.ceil((data.last - data.first) / (1000 * 60 * 60 * 24)) + 1);
-        const leftPercent = (startOffset / totalDays) * 100;
-        const widthPercent = (duration / totalDays) * 100;
-        html += `<div class="gantt-row"><div class="gantt-label">${name}<br><small>${data.count} farms</small></div><div class="gantt-bars"><div class="gantt-bar" style="left:${leftPercent}%;width:${widthPercent}%;" title="${name}: ${data.count} farms (${data.first.toLocaleDateString()} - ${data.last.toLocaleDateString()})">${duration > 5 ? name : ''}</div></div></div>`;
+
+
+    const allDates =
+        Object.values(work)
+            .flatMap(
+                w => [w.first, w.last]
+            );
+
+
+    if (!allDates.length) {
+
+        document.getElementById(
+            'ganttContainer'
+        ).innerHTML =
+            '<div style="text-align:center;padding:40px;color:#64748b;">No activity found for the selected filters.</div>';
+
+        return;
     }
-    html += '</div>';
-    document.getElementById('ganttContainer').innerHTML = html;
+
+
+    const minDate =
+        new Date(
+            Math.min(...allDates)
+        );
+
+    const maxDate =
+        new Date(
+            Math.max(...allDates)
+        );
+
+
+    const totalDays =
+        Math.max(
+            1,
+            Math.ceil(
+                (maxDate - minDate) /
+                (1000 * 60 * 60 * 24)
+            )
+        );
+
+
+    let html = `
+        <div class="gantt-chart">
+
+            <div class="gantt-header">
+
+                <div class="gantt-label-header">
+                    Enumerator
+                </div>
+
+                <div class="gantt-timeline-header">
+
+                    <span style="position:absolute;left:0;">
+                        ${minDate.toLocaleDateString()}
+                    </span>
+
+                    <span style="position:absolute;right:0;">
+                        ${maxDate.toLocaleDateString()}
+                    </span>
+
+                </div>
+
+            </div>
+    `;
+
+
+    for (const [name, data] of Object.entries(work)) {
+
+        const startOffset =
+            Math.max(
+                0,
+                Math.floor(
+                    (data.first - minDate) /
+                    (1000 * 60 * 60 * 24)
+                )
+            );
+
+
+        const duration =
+            Math.max(
+                1,
+                Math.ceil(
+                    (data.last - data.first) /
+                    (1000 * 60 * 60 * 24)
+                ) + 1
+            );
+
+
+        const leftPercent =
+            (startOffset / totalDays) * 100;
+
+
+        const widthPercent =
+            (duration / totalDays) * 100;
+
+
+        html += `
+
+            <div class="gantt-row">
+
+                <div class="gantt-label">
+
+                    ${escapeHtml(name)}
+
+                    <br>
+
+                    <small>
+                        ${data.count} farms
+                    </small>
+
+                </div>
+
+                <div class="gantt-bars">
+
+                    <div
+                        class="gantt-bar"
+                        style="
+                            left:${leftPercent}%;
+                            width:${widthPercent}%;
+                        "
+                        title="${escapeHtml(name)}: ${data.count} farms (${data.first.toLocaleDateString()} - ${data.last.toLocaleDateString()})"
+                    >
+                        ${duration > 5 ? escapeHtml(name) : ''}
+                    </div>
+
+                </div>
+
+            </div>
+        `;
+    }
+
+
+    html += `
+        </div>
+    `;
+
+
+    document.getElementById(
+        'ganttContainer'
+    ).innerHTML = html;
 }
 
-function applyFilters() { updateAllCharts(); }
-function resetFilters() {
-    document.getElementById('enumeratorFilter').value = 'all';
-    document.getElementById('cooperativeFilter').value = 'all';
-    document.getElementById('startDate').value = '';
-    document.getElementById('endDate').value = '';
+
+/* =========================================================
+   FILTER ACTIONS
+========================================================= */
+
+function applyFilters() {
     updateAllCharts();
 }
 
-function exportStatistics() {
-    const filtered = getFilteredFarms();
-    let csv = 'Farmer Name,Enumerator,Cooperative,Area (ha),Status,Date\n';
-    filtered.forEach(f => csv += `"${f.farmer_name || ''}","${f.enumerator || ''}","${f.cooperative || ''}",${f.area || 0},${f.status || ''},${new Date(f.created_at).toLocaleDateString()}\n`);
-    const blob = new Blob([csv], { type: 'text/csv' }), url = URL.createObjectURL(blob), a = document.createElement('a');
-    a.href = url; a.download = `statistics_${currentProject?.name || 'project'}.csv`; a.click(); URL.revokeObjectURL(url);
+
+function resetFilters() {
+
+    document.getElementById(
+        'enumeratorFilter'
+    ).value = 'all';
+
+    document.getElementById(
+        'cooperativeFilter'
+    ).value = 'all';
+
+    document.getElementById(
+        'startDate'
+    ).value = '';
+
+    document.getElementById(
+        'endDate'
+    ).value = '';
+
+    updateAllCharts();
 }
 
-function goBack() { const pid = getProjectIdFromUrl(); window.location.href = `DataManagement.html${pid ? `?project=${pid}` : ''}`; }
-function showLoading(show) { document.getElementById('loadingOverlay').style.display = show ? 'flex' : 'none'; }
 
-document.getElementById('logoutBtn')?.addEventListener('click', async () => { await supabaseClient.auth.signOut(); localStorage.clear(); window.location.href = 'login.html'; });
+/* =========================================================
+   EXPORT
+========================================================= */
+
+function exportStatistics() {
+
+    const filtered =
+        getFilteredFarms();
+
+    let csv =
+        'Farmer Name,Enumerator,Cooperative,Area (ha),Status,Workflow State,Date\n';
+
+
+    filtered.forEach(f => {
+
+        const area =
+            Number(
+                f.area ?? f.area_ha ?? 0
+            );
+
+
+        csv +=
+            `"${csvEscape(f.farmer_name)}",` +
+            `"${csvEscape(f.enumerator)}",` +
+            `"${csvEscape(f.cooperative)}",` +
+            `${Number.isFinite(area) ? area : 0},` +
+            `"${csvEscape(f.status)}",` +
+            `"${csvEscape(f.workflow_state)}",` +
+            `"${new Date(f.created_at).toLocaleDateString()}"\n`;
+    });
+
+
+    const blob =
+        new Blob(
+            [csv],
+            { type: 'text/csv;charset=utf-8;' }
+        );
+
+
+    const url =
+        URL.createObjectURL(blob);
+
+
+    const a =
+        document.createElement('a');
+
+    a.href = url;
+
+    a.download =
+        `statistics_${currentProject?.name || 'project'}.csv`;
+
+    a.click();
+
+    URL.revokeObjectURL(url);
+}
+
+
+/* =========================================================
+   UTILITIES
+========================================================= */
+
+function csvEscape(value) {
+
+    return String(value ?? '')
+        .replace(/"/g, '""');
+}
+
+
+function escapeHtml(value) {
+
+    return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
+
+/* =========================================================
+   NAVIGATION / LOADING
+========================================================= */
+
+function goBack() {
+
+    const pid =
+        getProjectIdFromUrl();
+
+    window.location.href =
+        `DataManagement.html${pid ? `?project=${pid}` : ''}`;
+}
+
+
+function showLoading(show) {
+
+    document.getElementById(
+        'loadingOverlay'
+    ).style.display =
+        show ? 'flex' : 'none';
+}
+
+
+/* =========================================================
+   LOGOUT
+========================================================= */
+
+document
+    .getElementById('logoutBtn')
+    ?.addEventListener(
+        'click',
+        async () => {
+
+            await supabaseClient.auth.signOut();
+
+            localStorage.clear();
+
+            window.location.href =
+                'login.html';
+        }
+    );
+
+
+/* =========================================================
+   START
+========================================================= */
+
 init();
 </script>
 </body>
