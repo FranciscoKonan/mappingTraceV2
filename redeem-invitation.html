@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Redeem Invitation | MappingTrace</title>
+    <title><span data-i18n="redeem_invitation">Redeem Invitation</span> | MappingTrace</title>
+    <link rel="stylesheet" href="language.css">
     
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -44,6 +45,24 @@
             text-align: center;
         }
         
+        .language-switcher {
+            display: flex;
+            justify-content: flex-end;
+            gap: 4px;
+            margin-bottom: 12px;
+        }
+        .lang-btn {
+            border: 0;
+            background: rgba(255,255,255,.18);
+            color: white;
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+        .lang-btn.active { background: white; color: #2c6e49; }
+
         .header i {
             font-size: 56px;
             margin-bottom: 15px;
@@ -343,9 +362,13 @@
     <div class="container">
         <div class="card">
             <div class="header">
+                <div class="language-switcher" role="group" aria-label="Language">
+                    <button type="button" class="lang-btn" data-lang="en" onclick="setRedeemLanguage('en')">EN</button>
+                    <button type="button" class="lang-btn" data-lang="fr" onclick="setRedeemLanguage('fr')">FR</button>
+                </div>
                 <i class="fas fa-ticket-alt"></i>
-                <h1>Redeem Invitation</h1>
-                <p>Enter your invitation token to join a project</p>
+                <h1 data-i18n="redeem_invitation"><span data-i18n="redeem_invitation">Redeem Invitation</span></h1>
+                <p data-i18n="enter_token_join">Enter your invitation token to join a project</p>
             </div>
             <div class="body">
                 <div id="userInfo" class="user-info">
@@ -358,33 +381,33 @@
                 
                 <div id="loadingState" class="loading">
                     <div class="spinner"></div>
-                    <p style="margin-top: 16px;">Loading available tokens...</p>
+                    <p style="margin-top: 16px;"><span data-i18n="loading_available_tokens">Loading available tokens...</span></p>
                 </div>
                 
                 <div id="redeemForm" style="display: none;">
                     <div class="info-box">
                         <i class="fas fa-info-circle"></i> 
-                        Click on any token below to auto-fill, or enter your invitation token manually.
+                        <span data-i18n="click_token_or_manual">Click on any token below to auto-fill, or enter your invitation token manually.</span>
                     </div>
                     
                     <div id="availableTokensSection" class="available-tokens">
-                        <h4><i class="fas fa-list"></i> Available Tokens (Click to use)</h4>
+                        <h4><i class="fas fa-list"></i> <span data-i18n="available_tokens">Available Tokens (Click to use)</span></h4>
                         <div id="tokensList" class="token-grid"></div>
                     </div>
                     
                     <div class="form-group">
-                        <label><i class="fas fa-qrcode"></i> Or Enter Token Manually</label>
+                        <label><i class="fas fa-qrcode"></i> <span data-i18n="enter_token_manually">Or Enter Token Manually</span></label>
                         <div class="token-input-container">
-                            <input type="text" id="tokenInput" class="token-input" placeholder="e.g., MANAG64b1" autocomplete="off">
+                            <input type="text" id="tokenInput" class="token-input" placeholder="e.g., MANAG64b1" data-i18n-placeholder="token_placeholder" autocomplete="off">
                         </div>
                     </div>
                     
                     <button id="redeemBtn" class="btn-primary">
-                        <i class="fas fa-check-circle"></i> Redeem Invitation
+                        <i class="fas fa-check-circle"></i> <span data-i18n="redeem_invitation">Redeem Invitation</span>
                     </button>
                     
                     <button onclick="window.location.href='index.html'" class="btn-secondary">
-                        <i class="fas fa-home"></i> Go to Dashboard
+                        <i class="fas fa-home"></i> <span data-i18n="go_dashboard">Go to Dashboard</span>
                     </button>
                 </div>
                 
@@ -393,7 +416,7 @@
             </div>
         </div>
         <div class="back-link">
-            <a href="login.html">← Back to Login</a>
+            <a href="login.html"><span data-i18n="back_login">← Back to Login</span></a>
         </div>
     </div>
     
@@ -407,240 +430,266 @@
         let currentUser = null;
         let availableTokens = [];
         
+        const I18N = {
+            en: {
+                redeem_invitation: 'Redeem Invitation',
+                enter_token_join: 'Enter your invitation token to request access to a project',
+                loading_available_tokens: 'Loading available tokens...',
+                click_token_or_manual: 'Click on a token below to auto-fill, or enter your invitation token manually.',
+                available_tokens: 'Available Tokens (Click to use)',
+                enter_token_manually: 'Or Enter Token Manually',
+                go_dashboard: 'Go to Dashboard',
+                back_login: '← Back to Login',
+                token_placeholder: 'e.g., MANAG64b1',
+                please_enter_token: 'Please enter or select an invitation token',
+                selected_token: 'Selected token: {token}',
+                submitting: 'Submitting...',
+                request_submitted: 'Request Submitted!',
+                request_sent: 'Your request to join {project} as {role} has been sent.',
+                pending_notice: 'A project manager must approve your request before access is granted.',
+                already_pending: 'You already have a pending request for "{project}".',
+                already_member: 'You are already a member of "{project}" as {role}.',
+                token_expired: 'Invitation token has expired',
+                token_revoked: 'Invitation token has been revoked',
+                token_maxed: 'Invitation token has reached its maximum number of uses',
+                token_invalid: 'Invalid or unavailable invitation token',
+                request_failed: 'Failed to submit request',
+                dashboard: 'Go to Dashboard',
+                loading_user: 'Loading...',
+                role: 'Role'
+            },
+            fr: {
+                redeem_invitation: 'Demander une invitation',
+                enter_token_join: 'Saisissez votre code d’invitation pour demander l’accès à un projet',
+                loading_available_tokens: 'Chargement des codes disponibles...',
+                click_token_or_manual: 'Cliquez sur un code pour le remplir automatiquement ou saisissez-le manuellement.',
+                available_tokens: 'Codes disponibles (cliquez pour utiliser)',
+                enter_token_manually: 'Ou saisir le code manuellement',
+                go_dashboard: 'Accéder au tableau de bord',
+                back_login: '← Retour à la connexion',
+                token_placeholder: 'ex. : MANAG64b1',
+                please_enter_token: 'Veuillez saisir ou sélectionner un code d’invitation',
+                selected_token: 'Code sélectionné : {token}',
+                submitting: 'Envoi...',
+                request_submitted: 'Demande envoyée !',
+                request_sent: 'Votre demande pour rejoindre {project} en tant que {role} a été envoyée.',
+                pending_notice: 'Un responsable du projet doit approuver votre demande avant que l’accès soit accordé.',
+                already_pending: 'Vous avez déjà une demande en attente pour « {project} ».',
+                already_member: 'Vous êtes déjà membre de « {project} » en tant que {role}.',
+                token_expired: 'Le code d’invitation a expiré',
+                token_revoked: 'Le code d’invitation a été révoqué',
+                token_maxed: 'Le code d’invitation a atteint son nombre maximal d’utilisations',
+                token_invalid: 'Code d’invitation invalide ou indisponible',
+                request_failed: 'Échec de l’envoi de la demande',
+                dashboard: 'Accéder au tableau de bord',
+                loading_user: 'Chargement...',
+                role: 'Rôle'
+            }
+        };
+
+        let language = localStorage.getItem('mappingtrace_language') || 'en';
+
+        function t(key, vars = {}) {
+            let value = I18N[language]?.[key] ?? I18N.en[key] ?? key;
+            Object.entries(vars).forEach(([k, v]) => {
+                value = value.replaceAll(`{${k}}`, String(v));
+            });
+            return value;
+        }
+
+        function escapeHtml(value) {
+            return String(value ?? '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+        function applyRedeemLanguage() {
+            document.documentElement.lang = language;
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                const key = el.dataset.i18n;
+                if (I18N[language]?.[key]) el.textContent = I18N[language][key];
+            });
+            document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+                const key = el.dataset.i18nPlaceholder;
+                if (I18N[language]?.[key]) el.placeholder = I18N[language][key];
+            });
+            document.querySelectorAll('.lang-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.lang === language);
+            });
+        }
+
+        window.setRedeemLanguage = function(lang) {
+            if (!I18N[lang]) return;
+            language = lang;
+            localStorage.setItem('mappingtrace_language', lang);
+            applyRedeemLanguage();
+        };
+
         function showNotification(message, type) {
             const container = document.getElementById('notificationContainer');
             const notification = document.createElement('div');
             notification.className = `notification notification-${type}`;
-            notification.innerHTML = `<i class="fas ${type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle'}"></i> ${message}`;
+            notification.innerHTML =
+                `<i class="fas ${type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle'}"></i> ${escapeHtml(message)}`;
             container.appendChild(notification);
             setTimeout(() => notification.remove(), 5000);
         }
-        
+
         async function init() {
             supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-            await loadUser();
-            await loadAvailableTokens();
+            applyRedeemLanguage();
+
+            const ok = await loadUser();
+            if (!ok) return;
+
+            // This page no longer reads invitation_tokens directly.
+            // It only shows the token supplied in the URL or entered by the user.
+            const params = new URLSearchParams(window.location.search);
+            const urlToken = (params.get('token') || '').trim().toUpperCase();
+            if (urlToken) {
+                document.getElementById('tokenInput').value = urlToken;
+                document.getElementById('tokenInput').style.borderColor = '#22c55e';
+                document.getElementById('tokenInput').style.backgroundColor = '#f0fdf4';
+            }
+
+            document.getElementById('availableTokensSection').style.display = 'none';
             setupEventListeners();
-            
+
             document.getElementById('loadingState').style.display = 'none';
             document.getElementById('redeemForm').style.display = 'block';
         }
-        
+
         async function loadUser() {
             const { data: { session } } = await supabaseClient.auth.getSession();
             if (!session) {
                 window.location.href = 'login.html';
-                return;
+                return false;
             }
+
             currentUser = session.user;
-            
+
             const { data: profile } = await supabaseClient
                 .from('user_profiles')
                 .select('email, first_name')
                 .eq('id', currentUser.id)
                 .maybeSingle();
-            
-            const email = profile?.email || currentUser.email;
+
+            const email = profile?.email || currentUser.email || '';
             const firstName = profile?.first_name || '';
-            const avatarInitial = (firstName.charAt(0) || email.charAt(0)).toUpperCase();
-            
+            const avatarInitial = (firstName.charAt(0) || email.charAt(0) || '?').toUpperCase();
+
             document.getElementById('userEmail').textContent = email;
             document.getElementById('userName').textContent = firstName || email.split('@')[0];
             document.getElementById('userAvatar').textContent = avatarInitial;
+            return true;
         }
-        
-        async function loadAvailableTokens() {
-            try {
-                // Fetch ALL active tokens (case insensitive search will be done in memory)
-                const { data: tokens, error } = await supabaseClient
-                    .from('invitation_tokens')
-                    .select(`
-                        token,
-                        role,
-                        project_id,
-                        projects!inner (name)
-                    `)
-                    .eq('status', 'active')
-                    .limit(20);
-                
-                if (error) throw error;
-                
-                if (tokens && tokens.length > 0) {
-                    availableTokens = tokens;
-                    const tokensList = document.getElementById('tokensList');
-                    tokensList.innerHTML = tokens.map(token => `
-                        <div class="token-item" onclick="selectToken('${token.token}')">
-                            <span class="token-code">${token.token}</span>
-                            <span class="token-role">${token.role}</span>
-                        </div>
-                    `).join('');
-                } else {
-                    document.getElementById('availableTokensSection').style.display = 'none';
-                }
-            } catch (error) {
-                console.error('Error loading tokens:', error);
-                document.getElementById('availableTokensSection').style.display = 'none';
-            }
-        }
-        
+
         window.selectToken = function(token) {
             document.getElementById('tokenInput').value = token;
             document.getElementById('tokenInput').style.borderColor = '#22c55e';
             document.getElementById('tokenInput').style.backgroundColor = '#f0fdf4';
-            showNotification(`Selected token: ${token}`, 'success');
+            showNotification(t('selected_token', { token }), 'success');
         };
-        
+
         async function redeemToken() {
-            let token = document.getElementById('tokenInput').value.trim().toUpperCase();
-            
+            const token = document.getElementById('tokenInput').value.trim().toUpperCase();
+
             if (!token) {
-                showNotification('Please enter or select an invitation token', 'error');
+                showNotification(t('please_enter_token'), 'error');
                 return;
             }
-            
+
             const redeemBtn = document.getElementById('redeemBtn');
             const originalText = redeemBtn.innerHTML;
             redeemBtn.disabled = true;
-            redeemBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Redeeming...';
-            
+            redeemBtn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> ${escapeHtml(t('submitting'))}`;
+
             document.getElementById('resultMessage').style.display = 'none';
             document.getElementById('debugInfo').style.display = 'none';
-            
+
             try {
-                console.log('Attempting to redeem token:', token);
-                
-                // Case-insensitive search using ilike
-                const { data: tokenData, error: tokenError } = await supabaseClient
-                    .from('invitation_tokens')
-                    .select('*, projects(name)')
-                    .ilike('token', token)
-                    .eq('status', 'active')
-                    .maybeSingle();
-                
-                console.log('Token query result:', tokenData);
-                
-                if (tokenError) {
-                    throw new Error(`Database error: ${tokenError.message}`);
-                }
-                
-                if (!tokenData) {
-                    // Check if token exists but not active
-                    const { data: anyToken } = await supabaseClient
-                        .from('invitation_tokens')
-                        .select('status, role')
-                        .ilike('token', token)
-                        .maybeSingle();
-                    
-                    if (anyToken) {
-                        if (anyToken.status === 'revoked') {
-                            throw new Error(`Token "${token}" has been revoked`);
-                        } else if (anyToken.status === 'expired') {
-                            throw new Error(`Token "${token}" has expired`);
-                        }
-                        throw new Error(`Token "${token}" is ${anyToken.status}`);
+                // Secure flow:
+                // token -> SECURITY DEFINER RPC -> access_requests
+                // No direct token read, membership insert, or usage update from browser.
+                const { data, error } = await supabaseClient.rpc(
+                    'request_access_with_invitation_token',
+                    { p_token: token }
+                );
+
+                if (error) throw error;
+
+                const result = Array.isArray(data) ? data[0] : data;
+
+                if (!result?.success) {
+                    const code = result?.error_code || '';
+                    if (code === 'already_pending') {
+                        throw new Error(t('already_pending', { project: result.project_name || '' }));
                     }
-                    
-                    throw new Error(`Token "${token}" not found. Please check the spelling.`);
+                    if (code === 'already_member') {
+                        throw new Error(t('already_member', {
+                            project: result.project_name || '',
+                            role: result.existing_role || ''
+                        }));
+                    }
+                    if (code === 'expired') throw new Error(t('token_expired'));
+                    if (code === 'revoked') throw new Error(t('token_revoked'));
+                    if (code === 'max_uses') throw new Error(t('token_maxed'));
+                    throw new Error(result?.message || t('token_invalid'));
                 }
-                
-                // Check max uses
-                if (tokenData.max_uses && tokenData.used_count >= tokenData.max_uses) {
-                    throw new Error('This token has reached its maximum number of uses');
-                }
-                
-                // Check if user is already a member
-                const { data: existingMember } = await supabaseClient
-                    .from('project_members')
-                    .select('id, status, role')
-                    .eq('project_id', tokenData.project_id)
-                    .eq('user_id', currentUser.id)
-                    .maybeSingle();
-                
-                if (existingMember && existingMember.status === 'active') {
-                    throw new Error(`You are already a member of "${tokenData.projects.name}" as ${existingMember.role}`);
-                }
-                
-                // Add or update member
-                if (existingMember && existingMember.status === 'revoked') {
-                    await supabaseClient
-                        .from('project_members')
-                        .update({ 
-                            status: 'active', 
-                            role: tokenData.role,
-                            granted_at: new Date().toISOString()
-                        })
-                        .eq('id', existingMember.id);
-                } else {
-                    await supabaseClient
-                        .from('project_members')
-                        .insert({
-                            project_id: tokenData.project_id,
-                            user_id: currentUser.id,
-                            role: tokenData.role,
-                            granted_by: tokenData.granted_by,
-                            status: 'active',
-                            granted_at: new Date().toISOString()
-                        });
-                }
-                
-                // Update token usage count
-                await supabaseClient
-                    .from('invitation_tokens')
-                    .update({ used_count: (tokenData.used_count || 0) + 1 })
-                    .eq('id', tokenData.id);
-                
-                // Show success
+
+                const projectName = result.project_name || '';
+                const role = String(result.role || '').replaceAll('_', ' ').toUpperCase();
+
                 document.getElementById('redeemForm').style.display = 'none';
                 document.getElementById('resultMessage').innerHTML = `
                     <div class="success-box">
                         <i class="fas fa-check-circle"></i>
-                        <h3>Successfully Joined!</h3>
-                        <p>You have been added to <strong>${tokenData.projects.name}</strong></p>
-                        <div class="role-badge ${tokenData.role}">Role: ${tokenData.role.replace('_', ' ').toUpperCase()}</div>
-                        <button onclick="window.location.href='index.html'" class="btn-primary" style="margin-top: 20px;">
-                            <i class="fas fa-home"></i> Go to Dashboard
+                        <h3>${escapeHtml(t('request_submitted'))}</h3>
+                        <p>${escapeHtml(t('request_sent', { project: projectName, role }))}</p>
+                        <p style="margin-top:12px;color:#166534;font-size:13px;">
+                            ${escapeHtml(t('pending_notice'))}
+                        </p>
+                        <div class="role-badge ${escapeHtml(result.role || '')}">
+                            ${escapeHtml(t('role'))}: ${escapeHtml(role)}
+                        </div>
+                        <button onclick="window.location.href='index.html'" class="btn-primary" style="margin-top:20px;">
+                            <i class="fas fa-home"></i> ${escapeHtml(t('dashboard'))}
                         </button>
                     </div>
                 `;
                 document.getElementById('resultMessage').style.display = 'block';
-                showNotification(`Successfully joined ${tokenData.projects.name}!`, 'success');
-                
+                showNotification(t('request_submitted'), 'success');
+
             } catch (error) {
-                console.error('Error:', error);
-                showNotification(error.message, 'error');
-                
+                console.error('Request error:', error);
+                const message = error?.message || t('request_failed');
+
+                showNotification(message, 'error');
+
                 document.getElementById('resultMessage').innerHTML = `
                     <div class="error-box">
                         <i class="fas fa-exclamation-triangle"></i>
-                        <strong>Failed to Redeem</strong><br>
-                        ${error.message}
+                        <strong>${escapeHtml(t('request_failed'))}</strong><br>
+                        ${escapeHtml(message)}
                     </div>
                 `;
                 document.getElementById('resultMessage').style.display = 'block';
-                
-                // Show debug info
-                document.getElementById('debugInfo').style.display = 'block';
-                document.getElementById('debugInfo').innerHTML = `
-                    <strong>Debug Info:</strong><br>
-                    Token attempted: ${token}<br>
-                    User ID: ${currentUser?.id}<br>
-                    Time: ${new Date().toLocaleString()}<br>
-                    Tip: Make sure the token exists in the database
-                `;
-                
             } finally {
                 redeemBtn.disabled = false;
                 redeemBtn.innerHTML = originalText;
             }
         }
-        
+
         function setupEventListeners() {
             document.getElementById('redeemBtn').addEventListener('click', redeemToken);
             document.getElementById('tokenInput').addEventListener('keypress', (e) => {
                 if (e.key === 'Enter') redeemToken();
             });
         }
-        
+
         init();
     </script>
 </body>
