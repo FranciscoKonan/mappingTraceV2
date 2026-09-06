@@ -350,13 +350,13 @@
                 manager:"Manager", validator:"Validator", fieldOfficer:"Field Officer", viewer:"Viewer",
                 maxUses:"Max Uses", expiresAtOptional:"Expires At (Optional)", cancel:"Cancel",
                 generateToken:"Generate Token", welcome:"Welcome to", allProjectsWelcome:"ALL PROJECTS",
-                lastUpdated:"Last updated", viewOnlyAccess:"View-Only Access",
+                greetingMorning:"Good morning", greetingAfternoon:"Good afternoon", greetingEvening:"Good evening", welcomeTo:"Welcome to", lastUpdated:"Last updated", viewOnlyAccess:"View-Only Access",
                 viewOnlyText:"You can view data but cannot make changes.",
                 superManagerOversight:"Super Manager Oversight",
                 superManagerText:"You can monitor project progress, review project data and validated farms, and export permitted data. Operational changes are not available.",
                 fieldOfficerAccess:"Field Officer Access",
                 fieldOfficerText:"You can add and edit farms, view data.",
-                pendingRequest:"Pending Request", waitingApproval:"Waiting for approval.",
+                pendingRequest:"Pending Request", requestedRolePrefix:"You requested", roleSuffix:"role", waitingApproval:"Waiting for approval.",
                 projectSettingsDesc:"Set project period, enumerator targets, and track performance",
                 totalFarms:"Total Farms", totalAreaHa:"Total Area (ha)", validatedFarms:"Validated Farms",
                 pendingReview:"Pending Review", farmStatusDistribution:"Farm Status Distribution",
@@ -364,7 +364,7 @@
                 dataWorkspaceDesc:"Open the operational farm workspace or review project analytics.",
                 viewFarmMap:"View the farm map, farm data, filters, details, validation and exports.",
                 viewEnumerator:"View enumerator performance, progress and cooperative analytics.",
-                goToDashboard:"Go to Dashboard", viewStatistics:"View Statistics",
+                goToDashboard:"Go to Dashboard", viewStatistics:"View Statistics", farmDashboardDesc:"View the farm map, farm data, filters, details, validation and exports.", projectStatisticsDesc:"View enumerator performance, progress and cooperative analytics.", project:"Project", projectInfoStatus:"Status", yourRole:"Your Role",
                 projectInformation:"Project Information", projectInfoDesc:"Key information about the current project.",
                 status:"Status", yourRole:"Your Role", projectId:"Project ID",
                 archivedReadOnly:"Archived — Read Only", active:"Active",
@@ -398,13 +398,13 @@
                 manager:"Gestionnaire", validator:"Validateur", fieldOfficer:"Agent de terrain", viewer:"Lecteur",
                 maxUses:"Nombre maximal d'utilisations", expiresAtOptional:"Expiration (facultatif)", cancel:"Annuler",
                 generateToken:"Générer le jeton", welcome:"Bienvenue dans", allProjectsWelcome:"TOUS LES PROJETS",
-                lastUpdated:"Dernière mise à jour", viewOnlyAccess:"Accès en lecture seule",
+                greetingMorning:"Bonjour", greetingAfternoon:"Bonjour", greetingEvening:"Bonsoir", welcomeTo:"Bienvenue dans", lastUpdated:"Dernière mise à jour", viewOnlyAccess:"Accès en lecture seule",
                 viewOnlyText:"Vous pouvez consulter les données mais vous ne pouvez pas les modifier.",
                 superManagerOversight:"Super Manager — supervision",
                 superManagerText:"Vous pouvez suivre l'avancement, examiner les données et les parcelles validées et exporter les données autorisées. Les modifications opérationnelles ne sont pas disponibles.",
                 fieldOfficerAccess:"Accès Agent de terrain",
                 fieldOfficerText:"Vous pouvez ajouter et modifier des parcelles et consulter les données.",
-                pendingRequest:"Demande en attente", waitingApproval:"En attente d'approbation.",
+                pendingRequest:"Demande en attente", requestedRolePrefix:"Vous avez demandé le rôle", roleSuffix:"", waitingApproval:"En attente d’approbation.",
                 projectSettingsDesc:"Définir la période du projet, les objectifs des enquêteurs et suivre les performances",
                 totalFarms:"Total des parcelles", totalAreaHa:"Superficie totale (ha)", validatedFarms:"Parcelles validées",
                 pendingReview:"En attente de revue", farmStatusDistribution:"Répartition des statuts",
@@ -412,7 +412,7 @@
                 dataWorkspaceDesc:"Ouvrir l'espace opérationnel des parcelles ou consulter les analyses du projet.",
                 viewFarmMap:"Consulter la carte, les données, les filtres, les détails, la validation et les exports.",
                 viewEnumerator:"Consulter les performances des enquêteurs et les analyses par coopérative.",
-                goToDashboard:"Ouvrir le tableau de bord", viewStatistics:"Voir les statistiques",
+                goToDashboard:"Ouvrir le tableau de bord", viewStatistics:"Voir les statistiques", farmDashboardDesc:"Consulter la carte, les données, les filtres, les détails, la validation et les exports.", projectStatisticsDesc:"Consulter les performances des enquêteurs, l’avancement et les analyses par coopérative.", project:"Projet", projectInfoStatus:"Statut", yourRole:"Votre rôle",
                 projectInformation:"Informations du projet", projectInfoDesc:"Informations clés sur le projet actuel.",
                 status:"Statut", yourRole:"Votre rôle", projectId:"ID du projet",
                 archivedReadOnly:"Archivé — lecture seule", active:"Actif",
@@ -445,6 +445,7 @@
         function applyPageLanguage(lang) {
             localStorage.setItem('mappingtrace_language', lang);
             document.documentElement.lang = lang;
+            document.title = lang === 'fr' ? 'Gestion des données - MappingTrace V2' : 'Data Management - MappingTrace V2';
             document.querySelectorAll('[data-i18n]').forEach(el => {
                 const key = el.getAttribute('data-i18n');
                 if (DATA_MANAGEMENT_I18N[lang]?.[key] !== undefined) el.textContent = DATA_MANAGEMENT_I18N[lang][key];
@@ -456,7 +457,18 @@
             document.querySelectorAll('[data-lang]').forEach(btn => {
                 btn.style.opacity = btn.dataset.lang === lang ? '1' : '0.55';
             });
-            if (typeof loadDataManagement === 'function' && currentProject) loadDataManagement();
+            if (typeof loadDataManagement === 'function' && currentProject) {
+                Promise.resolve(loadDataManagement()).then(() => {
+                    document.querySelectorAll('[data-i18n]').forEach(el => {
+                        const key = el.getAttribute('data-i18n');
+                        if (DATA_MANAGEMENT_I18N[lang]?.[key] !== undefined) el.textContent = DATA_MANAGEMENT_I18N[lang][key];
+                    });
+                    document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+                        const key = el.getAttribute('data-i18n-placeholder');
+                        if (DATA_MANAGEMENT_I18N[lang]?.[key] !== undefined) el.placeholder = DATA_MANAGEMENT_I18N[lang][key];
+                    });
+                }).catch(() => {});
+            }
         }
 
         function setPageLanguage(lang) { applyPageLanguage(lang); }
@@ -645,13 +657,13 @@
                 if (farms) allFarms = [...allFarms, ...farms];
             }
             await displayData(allFarms, true);
-            document.querySelector('.welcome-text p').innerHTML = `Welcome to ALL PROJECTS.`;
+            document.querySelector('.welcome-text p').innerHTML = `${dmT("welcomeTo")} ${dmT("allProjectsWelcome")}.`;
         }
         
         async function loadProjectData(projectId) {
             const { data: farms } = await supabaseClient.from('farms').select('*').eq('project_id', projectId);
             await displayData(farms || [], false);
-            document.querySelector('.welcome-text p').innerHTML = `Welcome to ${currentProject.name}.`;
+            document.querySelector('.welcome-text p').innerHTML = `${dmT("welcomeTo")} ${escapeHtml(currentProject.name)}.`;
         }
         
         async function displayData(farms, isAllProjects = false) {
@@ -764,39 +776,40 @@
         async function loadDataManagement() {
             const now = new Date();
             const hour = now.getHours();
-            let greeting = 'Good morning';
-            if (hour >= 12 && hour < 17) greeting = 'Good afternoon';
-            if (hour >= 17) greeting = 'Good evening';
+            let greetingKey = 'greetingMorning';
+            if (hour >= 12 && hour < 17) greetingKey = 'greetingAfternoon';
+            if (hour >= 17) greetingKey = 'greetingEvening';
+            const greeting = dmT(greetingKey);
             const userName = currentUser.user_metadata?.first_name || currentUser.email.split('@')[0];
             
             let permissionBanner = '';
-            if (currentUserRole === 'viewer') permissionBanner = `<div class="permission-banner"><i class="fas fa-eye"></i> <strong>View-Only Access:</strong> You can view data but cannot make changes.</div>`;
-            else if (currentUserRole === 'super_manager') permissionBanner = `<div class="permission-banner info"><i class="fas fa-binoculars"></i> <strong>Super Manager Oversight:</strong> You can monitor project progress, review project data and validated farms, and export permitted data. Operational changes are not available.</div>`;
-            else if (currentUserRole === 'field_officer') permissionBanner = `<div class="permission-banner info"><i class="fas fa-pen"></i> <strong>Field Officer Access:</strong> You can add and edit farms, view data.</div>`;
+            if (currentUserRole === 'viewer') permissionBanner = `<div class="permission-banner"><i class="fas fa-eye"></i> <strong>${dmT("viewOnlyAccess")}:</strong> ${dmT("viewOnlyText")}</div>`;
+            else if (currentUserRole === 'super_manager') permissionBanner = `<div class="permission-banner info"><i class="fas fa-binoculars"></i> <strong>${dmT("superManagerOversight")}:</strong> ${dmT("superManagerText")}</div>`;
+            else if (currentUserRole === 'field_officer') permissionBanner = `<div class="permission-banner info"><i class="fas fa-pen"></i> <strong>${dmT("fieldOfficerAccess")}:</strong> ${dmT("fieldOfficerText")}</div>`;
             
             const { data: pendingRequest } = await supabaseClient.from('access_requests').select('*').eq('project_id', currentProject.id).eq('requester_id', currentUser.id).eq('status', 'pending').maybeSingle();
-            let requestBanner = pendingRequest ? `<div class="permission-banner"><i class="fas fa-clock"></i> <strong>Pending Request:</strong> You requested ${pendingRequest.requested_role} role. Waiting for approval.</div>` : '';
+            let requestBanner = pendingRequest ? `<div class="permission-banner"><i class="fas fa-clock"></i> <strong>${dmT("pendingRequest")}:</strong> ${dmT("requestedRolePrefix","You requested")} ${dmT(pendingRequest.requested_role, pendingRequest.requested_role)} ${dmT("roleSuffix","role")}. ${dmT("waitingApproval")}</div>` : '';
             
             // Only show Project Settings button for owners
             const showSettingsButton = (currentUserRole === 'owner') ? `
                 <div class="action-card" onclick="goToProjectSettings()">
                     <div class="action-icon"><i class="fas fa-cog"></i></div>
-                    <h3>Project Settings</h3>
-                    <p>Set project period, enumerator targets, and track performance</p>
+                    <h3>${dmT("projectSettings")}</h3>
+                    <p>${dmT("projectSettingsDesc")}</p>
                 </div>
             ` : '';
             
             const dataManagementHtml = `
                 ${permissionBanner}${requestBanner}${getProjectStatusBanner()}
-                <div class="welcome-banner"><div class="welcome-text"><h2>${greeting}, ${escapeHtml(userName)}! 👋</h2><p>Welcome to ${escapeHtml(currentProject.name)}.</p></div><div class="welcome-image"><i class="fas fa-chart-line"></i><span>Last updated: ${now.toLocaleDateString()}</span></div></div>
+                <div class="welcome-banner"><div class="welcome-text"><h2>${greeting}, ${escapeHtml(userName)}! 👋</h2><p>${dmT("welcomeTo")} ${escapeHtml(currentProject.name)}.</p></div><div class="welcome-image"><i class="fas fa-chart-line"></i><span>${dmT("lastUpdated")}: ${now.toLocaleDateString()}</span></div></div>
                 <div class="kpis"><div class="kpi-card"><div class="kpi-info"><h3>0</h3><p data-i18n="totalFarms">Total Farms</p></div><div class="kpi-icon"><i class="fas fa-tractor"></i></div></div>
                 <div class="kpi-card"><div class="kpi-info"><h3>0</h3><p data-i18n="totalAreaHa">Total Area (ha)</p></div><div class="kpi-icon"><i class="fas fa-chart-line"></i></div></div>
                 <div class="kpi-card"><div class="kpi-info"><h3>0</h3><p data-i18n="validatedFarms">Validated Farms</p></div><div class="kpi-icon"><i class="fas fa-check-circle"></i></div></div>
                 <div class="kpi-card"><div class="kpi-info"><h3>0</h3><p data-i18n="pendingReview">Pending Review</p></div><div class="kpi-icon"><i class="fas fa-clock"></i></div></div></div>
-                <div class="dashboard-grid"><div class="dashboard-card"><h3><i class="fas fa-chart-pie"></i> Farm Status Distribution</h3><div class="chart-container"><canvas id="statusChart"></canvas></div></div>
-                <div class="dashboard-card"><h3><i class="fas fa-chart-bar"></i> Farm Area Distribution</h3><div class="chart-container"><canvas id="farmChart"></canvas></div></div></div>
+                <div class="dashboard-grid"><div class="dashboard-card"><h3><i class="fas fa-chart-pie"></i> ${dmT("farmStatusDistribution")}</h3><div class="chart-container"><canvas id="statusChart"></canvas></div></div>
+                <div class="dashboard-card"><h3><i class="fas fa-chart-bar"></i> ${dmT("farmAreaDistribution")}</h3><div class="chart-container"><canvas id="farmChart"></canvas></div></div></div>
                 <div class="dm-section-title">
-                    <i class="fas fa-database"></i> Data Workspace
+                    <i class="fas fa-database"></i> ${dmT("dataWorkspace")}
                 </div>
                 <p class="dm-section-subtitle">${dmT("dataWorkspaceDesc")}</p>
 
@@ -804,34 +817,34 @@
                     <div class="action-card" onclick="goToDashboard()">
                         <div class="action-icon"><i class="fas fa-map-marked-alt"></i></div>
                         <h3><span data-i18n="farmDashboard">Farm Dashboard</span></h3>
-                        <p>View the farm map, farm data, filters, details, validation and exports.</p>
-                        <div class="action-btn">Go to Dashboard <i class="fas fa-arrow-right"></i></div>
+                        <p>${dmT("farmDashboardDesc")}</p>
+                        <div class="action-btn">${dmT("goToDashboard")} <i class="fas fa-arrow-right"></i></div>
                     </div>
 
                     <div class="action-card" onclick="goToProjectStatistics()">
                         <div class="action-icon"><i class="fas fa-chart-line"></i></div>
                         <h3><span data-i18n="projectStatistics">Project Statistics</span></h3>
-                        <p>View enumerator performance, progress, Gantt charts and cooperative analytics.</p>
-                        <div class="action-btn">View Statistics <i class="fas fa-arrow-right"></i></div>
+                        <p>${dmT("projectStatisticsDesc")}</p>
+                        <div class="action-btn">${dmT("viewStatistics")} <i class="fas fa-arrow-right"></i></div>
                     </div>
                 </div>
 
                 <div class="dm-section-title">
-                    <i class="fas fa-info-circle"></i> Project Information
+                    <i class="fas fa-info-circle"></i> ${dmT("projectInformation")}
                 </div>
                 <p class="dm-section-subtitle">${dmT("projectInfoDesc")}</p>
 
                 <div class="dm-project-info">
                     <div class="dm-info-card">
-                        <span class="dm-info-label">Project</span>
+                        <span class="dm-info-label">${dmT("project")}</span>
                         <span class="dm-info-value">${escapeHtml(currentProject.name)}</span>
                     </div>
                     <div class="dm-info-card">
-                        <span class="dm-info-label">Status</span>
-                        <span class="dm-info-value">${currentProject.status === 'archived' ? 'Archived — Read Only' : 'Active'}</span>
+                        <span class="dm-info-label">${dmT("projectInfoStatus")}</span>
+                        <span class="dm-info-value">${currentProject.status === 'archived' ? dmT('archivedReadOnly') : dmT('active')}</span>
                     </div>
                     <div class="dm-info-card">
-                        <span class="dm-info-label">Your Role</span>
+                        <span class="dm-info-label">${dmT("yourRole")}</span>
                         <span class="dm-info-value">${escapeHtml(currentUserRole.replace('_', ' ').toUpperCase())}</span>
                     </div>
                     <div class="dm-info-card">
