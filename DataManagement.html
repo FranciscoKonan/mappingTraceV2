@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Data Management - MappingTrace V2</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="language.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
@@ -257,8 +258,12 @@
 <body>
     <div class="top-bar">
         <div class="project-info">
+            <div id="mappingtrace-language-switcher" style="display:flex;gap:4px;align-items:center;">
+                <button type="button" data-lang="en" onclick="setPageLanguage('en')" style="border:1px solid #dbe3ea;background:white;border-radius:7px;padding:5px 8px;cursor:pointer;font-weight:600;">EN</button>
+                <button type="button" data-lang="fr" onclick="setPageLanguage('fr')" style="border:1px solid #dbe3ea;background:white;border-radius:7px;padding:5px 8px;cursor:pointer;font-weight:600;">FR</button>
+            </div>
             <button class="back-btn" id="backBtn"><i class="fas fa-arrow-left"></i> All Projects</button>
-            <span class="project-name" id="projectName">Loading...</span>
+            <span class="project-name" id="projectName" data-i18n="loading">Loading...</span>
             <span class="role-badge" id="roleBadge"></span>
         </div>
         <div class="user-info">
@@ -271,29 +276,29 @@
                     </div>
                     <div class="dropdown-menu" id="dropdownMenu">
                         <div class="dropdown-search">
-                            <input type="text" id="projectSearch" placeholder="Search projects...">
+                            <input type="text" id="projectSearch" placeholder="Search projects..." data-i18n-placeholder="searchProjects">
                         </div>
                         <div id="dropdownItems"></div>
                     </div>
                 </div>
             </div>
             <div class="user-avatar" id="userAvatar">JD</div>
-            <span id="userName">User</span>
+            <span id="userName" data-i18n="user">User</span>
             <button id="logoutBtn" style="background:none;border:none;cursor:pointer;font-size:18px;"><i class="fas fa-sign-out-alt"></i></button>
         </div>
     </div>
     
     <div class="sidebar">
-        <a href="#" class="active" data-page="datamanagement"><i class="fas fa-database"></i> <span>Data Management</span></a>
-        <a href="#" data-nav="dashboard"><i class="fas fa-map-marked-alt"></i> <span>Farm Dashboard</span></a>
-        <a href="#" data-nav="statistics"><i class="fas fa-chart-line"></i> <span>Project Statistics</span></a>
+        <a href="#" class="active" data-page="datamanagement"><i class="fas fa-database"></i> <span data-i18n="dataManagement">Data Management</span></a>
+        <a href="#" data-nav="dashboard"><i class="fas fa-map-marked-alt"></i> <span data-i18n="farmDashboard">Farm Dashboard</span></a>
+        <a href="#" data-nav="statistics"><i class="fas fa-chart-line"></i> <span data-i18n="projectStatistics">Project Statistics</span></a>
 
-        <div style="margin:14px 24px 6px; color:#94a3b8; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.08em;">Project Administration</div>
-        <div id="settingsLink" class="hidden"><a href="#" data-nav="settings"><i class="fas fa-cog"></i> <span>Project Settings</span></a></div>
-        <div id="teamLink" class="hidden"><a href="#" data-page="team"><i class="fas fa-users"></i> <span>Team Management</span></a></div>
-        <div id="tokensLink" class="hidden"><a href="#" data-page="tokens"><i class="fas fa-ticket-alt"></i> <span>Invitation Tokens</span></a></div>
-        <div id="requestsLink" class="hidden"><a href="#" data-page="requests"><i class="fas fa-bell"></i> <span>Access Requests</span></a></div>
-        <div id="requestAccessLink" class="hidden"><a href="#" data-page="request-access"><i class="fas fa-level-up-alt"></i> <span>Request Role Upgrade</span></a></div>
+        <div style="margin:14px 24px 6px; color:#94a3b8; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.08em;"><span data-i18n="projectAdministration">Project Administration</span></div>
+        <div id="settingsLink" class="hidden"><a href="#" data-nav="settings"><i class="fas fa-cog"></i> <span data-i18n="projectSettings">Project Settings</span></span></a></div>
+        <div id="teamLink" class="hidden"><a href="#" data-page="team"><i class="fas fa-users"></i> <span data-i18n="teamManagement">Team Management</span></a></div>
+        <div id="tokensLink" class="hidden"><a href="#" data-page="tokens"><i class="fas fa-ticket-alt"></i> <span data-i18n="invitationTokens">Invitation Tokens</span></a></div>
+        <div id="requestsLink" class="hidden"><a href="#" data-page="requests"><i class="fas fa-bell"></i> <span data-i18n="accessRequests">Access Requests</span></a></div>
+        <div id="requestAccessLink" class="hidden"><a href="#" data-page="request-access"><i class="fas fa-level-up-alt"></i> <span data-i18n="requestRoleUpgrade">Request Role Upgrade</span></a></div>
     </div>
     
     <div class="main-content" id="mainContent">
@@ -308,30 +313,154 @@
             </div>
             <form id="createTokenForm">
                 <div class="form-group">
-                    <label>Role to Grant</label>
+                    <label data-i18n="roleToGrant">Role to Grant</label>
                     <select id="tokenRole" required>
-                        <option value="manager">Manager</option>
-                        <option value="validator">Validator</option>
-                        <option value="field_officer">Field Officer</option>
-                        <option value="viewer">Viewer</option>
+                        <option value="manager" data-i18n="manager">Manager</option>
+                        <option value="validator" data-i18n="validator">Validator</option>
+                        <option value="field_officer" data-i18n="fieldOfficer">Field Officer</option>
+                        <option value="viewer" data-i18n="viewer">Viewer</option>
                     </select>
                 </div>
                 <div class="form-group">
-                    <label>Max Uses</label>
+                    <label data-i18n="maxUses">Max Uses</label>
                     <input type="number" id="maxUses" placeholder="1" value="1" min="1">
                 </div>
                 <div class="form-group">
-                    <label>Expires At (Optional)</label>
+                    <label data-i18n="expiresAtOptional">Expires At (Optional)</label>
                     <input type="datetime-local" id="expiresAt">
                 </div>
                 <div class="modal-buttons">
-                    <button type="button" class="btn-secondary" onclick="closeTokenModal()">Cancel</button>
-                    <button type="submit" class="btn-primary">Generate Token</button>
+                    <button type="button" class="btn-secondary" onclick="closeTokenModal()"><span data-i18n="cancel">Cancel</span></button>
+                    <button type="submit" class="btn-primary"><span data-i18n="generateToken">Generate Token</span></button>
                 </div>
             </form>
         </div>
     </div>
     
+    <script>
+        const DATA_MANAGEMENT_I18N = {
+            en: {
+                allProjects:"All Projects", loading:"Loading...", user:"User", project:"Project",
+                searchProjects:"Search projects...", dataManagement:"Data Management",
+                farmDashboard:"Farm Dashboard", projectStatistics:"Project Statistics",
+                projectAdministration:"Project Administration", projectSettings:"Project Settings",
+                teamManagement:"Team Management", invitationTokens:"Invitation Tokens",
+                accessRequests:"Access Requests", requestRoleUpgrade:"Request Role Upgrade",
+                createInvitationToken:"Create Invitation Token", roleToGrant:"Role to Grant",
+                manager:"Manager", validator:"Validator", fieldOfficer:"Field Officer", viewer:"Viewer",
+                maxUses:"Max Uses", expiresAtOptional:"Expires At (Optional)", cancel:"Cancel",
+                generateToken:"Generate Token", welcome:"Welcome to", allProjectsWelcome:"ALL PROJECTS",
+                lastUpdated:"Last updated", viewOnlyAccess:"View-Only Access",
+                viewOnlyText:"You can view data but cannot make changes.",
+                superManagerOversight:"Super Manager Oversight",
+                superManagerText:"You can monitor project progress, review project data and validated farms, and export permitted data. Operational changes are not available.",
+                fieldOfficerAccess:"Field Officer Access",
+                fieldOfficerText:"You can add and edit farms, view data.",
+                pendingRequest:"Pending Request", waitingApproval:"Waiting for approval.",
+                projectSettingsDesc:"Set project period, enumerator targets, and track performance",
+                totalFarms:"Total Farms", totalAreaHa:"Total Area (ha)", validatedFarms:"Validated Farms",
+                pendingReview:"Pending Review", farmStatusDistribution:"Farm Status Distribution",
+                farmAreaDistribution:"Farm Area Distribution", dataWorkspace:"Data Workspace",
+                dataWorkspaceDesc:"${dmT("dataWorkspaceDesc")}",
+                viewFarmMap:"View the farm map, farm data, filters, details, validation and exports.",
+                viewEnumerator:"View enumerator performance, progress and cooperative analytics.",
+                goToDashboard:"Go to Dashboard", viewStatistics:"View Statistics",
+                projectInformation:"Project Information", projectInfoDesc:"${dmT("projectInfoDesc")}",
+                status:"Status", yourRole:"Your Role", projectId:"Project ID",
+                archivedReadOnly:"Archived — Read Only", active:"Active",
+                archivedBanner:"${dmT('archivedBanner')}",
+                archivedText:"${dmT('archivedText')}",
+                activeBanner:"${dmT('activeBanner')}",
+                activeText:"${dmT('activeText')}",
+                noData:"No data available", noAreaData:"No area data available",
+                validated:"Validated", pending:"Pending", rejected:"Rejected",
+                numberOfFarms:"Number of Farms", areaRange:"Area Range", farms:"farms",
+                teamManagementTitle:"Team Management", roleHelpOwner:"As Owner, you can change the role of non-owner members. Super Manager is an oversight role and does not receive operational farm-editing permissions.",
+                roleHelpManager:"Managers can manage eligible lower-level members. Super Managers have oversight access but cannot manage the project team.",
+                teamUser:"User", email:"Email", role:"Role", addedBy:"Added By", addedDate:"Added Date", actions:"Actions",
+                unknownUser:"Unknown User", noEmail:"No email", you:"(You)", system:"System", remove:"Remove",
+                noPendingRequests:"No Pending Requests", requestsProcessed:"All role upgrade requests have been processed.",
+                viewTeamMembers:"View Team Members", noTokensYet:"No Tokens Yet",
+                createFirstToken:"Create your first invitation token to share with team members.",
+                shareTokens:"Share these tokens with users. They can redeem them at the Redeem Invitation page.",
+                uses:"Uses", expires:"Expires", created:"Created", activeStatus:"Active", expired:"Expired",
+                revoke:"Revoke", copy:"Copy", invitationTokensTitle:"Invitation Tokens",
+                createToken:"Create Token", requestRoleUpgradeTitle:"Request Role Upgrade", owner:"Owner", superManager:"Super Manager", enumerator:"Enumerator"
+            },
+            fr: {
+                allProjects:"Tous les projets", loading:"Chargement...", user:"Utilisateur", project:"Projet",
+                searchProjects:"Rechercher des projets...", dataManagement:"Gestion des données",
+                farmDashboard:"Tableau des parcelles", projectStatistics:"Statistiques du projet",
+                projectAdministration:"Administration du projet", projectSettings:"Paramètres du projet",
+                teamManagement:"Gestion de l'équipe", invitationTokens:"Jetons d'invitation",
+                accessRequests:"Demandes d'accès", requestRoleUpgrade:"Demander une évolution de rôle",
+                createInvitationToken:"Créer un jeton d'invitation", roleToGrant:"Rôle à attribuer",
+                manager:"Gestionnaire", validator:"Validateur", fieldOfficer:"Agent de terrain", viewer:"Lecteur",
+                maxUses:"Nombre maximal d'utilisations", expiresAtOptional:"Expiration (facultatif)", cancel:"Annuler",
+                generateToken:"Générer le jeton", welcome:"Bienvenue dans", allProjectsWelcome:"TOUS LES PROJETS",
+                lastUpdated:"Dernière mise à jour", viewOnlyAccess:"Accès en lecture seule",
+                viewOnlyText:"Vous pouvez consulter les données mais vous ne pouvez pas les modifier.",
+                superManagerOversight:"Super Manager — supervision",
+                superManagerText:"Vous pouvez suivre l'avancement, examiner les données et les parcelles validées et exporter les données autorisées. Les modifications opérationnelles ne sont pas disponibles.",
+                fieldOfficerAccess:"Accès Agent de terrain",
+                fieldOfficerText:"Vous pouvez ajouter et modifier des parcelles et consulter les données.",
+                pendingRequest:"Demande en attente", waitingApproval:"En attente d'approbation.",
+                projectSettingsDesc:"Définir la période du projet, les objectifs des enquêteurs et suivre les performances",
+                totalFarms:"Total des parcelles", totalAreaHa:"Superficie totale (ha)", validatedFarms:"Parcelles validées",
+                pendingReview:"En attente de revue", farmStatusDistribution:"Répartition des statuts",
+                farmAreaDistribution:"Répartition des superficies", dataWorkspace:"Espace de données",
+                dataWorkspaceDesc:"Ouvrir l'espace opérationnel des parcelles ou consulter les analyses du projet.",
+                viewFarmMap:"Consulter la carte, les données, les filtres, les détails, la validation et les exports.",
+                viewEnumerator:"Consulter les performances des enquêteurs et les analyses par coopérative.",
+                goToDashboard:"Ouvrir le tableau de bord", viewStatistics:"Voir les statistiques",
+                projectInformation:"Informations du projet", projectInfoDesc:"Informations clés sur le projet actuel.",
+                status:"Statut", yourRole:"Votre rôle", projectId:"ID du projet",
+                archivedReadOnly:"Archivé — lecture seule", active:"Actif",
+                archivedBanner:"Projet archivé — lecture seule.",
+                archivedText:"Les données existantes peuvent être consultées et exportées, mais les modifications opérationnelles sont désactivées.",
+                activeBanner:"Projet actif.",
+                activeText:"Les fonctions opérationnelles sont disponibles selon votre rôle.",
+                noData:"Aucune donnée disponible", noAreaData:"Aucune donnée de superficie disponible",
+                validated:"Validées", pending:"En attente", rejected:"Rejetées",
+                numberOfFarms:"Nombre de parcelles", areaRange:"Plage de superficie", farms:"parcelles",
+                teamManagementTitle:"Gestion de l'équipe", roleHelpOwner:"En tant que propriétaire, vous pouvez modifier le rôle des membres non propriétaires. Super Manager est un rôle de supervision sans droits de modification opérationnelle des parcelles.",
+                roleHelpManager:"Les gestionnaires peuvent gérer les membres de niveau inférieur autorisés. Les Super Managers disposent d'un accès de supervision mais ne peuvent pas gérer l'équipe.",
+                teamUser:"Utilisateur", email:"E-mail", role:"Rôle", addedBy:"Ajouté par", addedDate:"Date d'ajout", actions:"Actions",
+                unknownUser:"Utilisateur inconnu", noEmail:"Aucun e-mail", you:"(Vous)", system:"Système", remove:"Supprimer",
+                noPendingRequests:"Aucune demande en attente", requestsProcessed:"Toutes les demandes d'évolution de rôle ont été traitées.",
+                viewTeamMembers:"Voir les membres de l'équipe", noTokensYet:"Aucun jeton",
+                createFirstToken:"Créez votre premier jeton d'invitation à partager avec les membres de l'équipe.",
+                shareTokens:"Partagez ces jetons avec les utilisateurs. Ils peuvent les utiliser sur la page d'invitation.",
+                uses:"Utilisations", expires:"Expire", created:"Créé", activeStatus:"Actif", expired:"Expiré",
+                revoke:"Révoquer", copy:"Copier", invitationTokensTitle:"Jetons d'invitation",
+                createToken:"Créer un jeton", requestRoleUpgradeTitle:"Demander une évolution de rôle", owner:"Propriétaire", superManager:"Super Manager", enumerator:"Enquêteur"
+            }
+        };
+
+        function dmT(key, fallback) {
+            const lang = localStorage.getItem('mappingtrace_language') || 'en';
+            return DATA_MANAGEMENT_I18N[lang]?.[key] ?? fallback ?? key;
+        }
+
+        function applyPageLanguage(lang) {
+            localStorage.setItem('mappingtrace_language', lang);
+            document.documentElement.lang = lang;
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                const key = el.getAttribute('data-i18n');
+                if (DATA_MANAGEMENT_I18N[lang]?.[key] !== undefined) el.textContent = DATA_MANAGEMENT_I18N[lang][key];
+            });
+            document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+                const key = el.getAttribute('data-i18n-placeholder');
+                if (DATA_MANAGEMENT_I18N[lang]?.[key] !== undefined) el.placeholder = DATA_MANAGEMENT_I18N[lang][key];
+            });
+            document.querySelectorAll('[data-lang]').forEach(btn => {
+                btn.style.opacity = btn.dataset.lang === lang ? '1' : '0.55';
+            });
+            if (typeof loadDataManagement === 'function' && currentProject) loadDataManagement();
+        }
+
+        function setPageLanguage(lang) { applyPageLanguage(lang); }
+    </script>
     <script>
         const SUPABASE_URL = 'https://crvnohvudurqfukjpisv.supabase.co';
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNydm5vaHZ1ZHVycWZ1a2pwaXN2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg0NTUxNzMsImV4cCI6MjA5NDAzMTE3M30.Qp8E57yAN4LnO4A-yirf-Z3QufGZw9OKjBfcQxG7fo8';
@@ -556,10 +685,10 @@
             const kpisHtml = document.querySelector('.kpis');
             if (kpisHtml) {
                 kpisHtml.innerHTML = `
-                    <div class="kpi-card"><div class="kpi-info"><h3>${farmCount}</h3><p>Total Farms</p></div><div class="kpi-icon"><i class="fas fa-tractor"></i></div></div>
-                    <div class="kpi-card"><div class="kpi-info"><h3>${totalArea.toFixed(1)}</h3><p>Total Area (ha)</p></div><div class="kpi-icon"><i class="fas fa-chart-line"></i></div></div>
-                    <div class="kpi-card"><div class="kpi-info"><h3>${validatedCount}</h3><p>Validated Farms</p></div><div class="kpi-icon"><i class="fas fa-check-circle"></i></div></div>
-                    <div class="kpi-card"><div class="kpi-info"><h3>${pendingCount}</h3><p>Pending Review</p></div><div class="kpi-icon"><i class="fas fa-clock"></i></div></div>
+                    <div class="kpi-card"><div class="kpi-info"><h3>${farmCount}</h3><p data-i18n="totalFarms">Total Farms</p></div><div class="kpi-icon"><i class="fas fa-tractor"></i></div></div>
+                    <div class="kpi-card"><div class="kpi-info"><h3>${totalArea.toFixed(1)}</h3><p data-i18n="totalAreaHa">Total Area (ha)</p></div><div class="kpi-icon"><i class="fas fa-chart-line"></i></div></div>
+                    <div class="kpi-card"><div class="kpi-info"><h3>${validatedCount}</h3><p data-i18n="validatedFarms">Validated Farms</p></div><div class="kpi-icon"><i class="fas fa-check-circle"></i></div></div>
+                    <div class="kpi-card"><div class="kpi-info"><h3>${pendingCount}</h3><p data-i18n="pendingReview">Pending Review</p></div><div class="kpi-icon"><i class="fas fa-clock"></i></div></div>
                 `;
             }
             
@@ -574,7 +703,7 @@
             if (member) {
                 currentUserRole = member.role;
                 const badge = document.getElementById('roleBadge');
-                badge.textContent = member.role.replace('_', ' ').toUpperCase();
+                badge.textContent = ({'owner':dmT('owner','Owner'),'manager':dmT('manager','Manager'),'validator':dmT('validator','Validator'),'field_officer':dmT('fieldOfficer','Field Officer'),'viewer':dmT('viewer','Viewer'),'super_manager':dmT('superManager','Super Manager'),'enumerator':dmT('enumerator','Enumerator')}[member.role] || member.role.replace('_',' ')).toUpperCase();
                 badge.className = `role-badge ${member.role}`;
             }
         }
@@ -584,14 +713,14 @@
             if (currentProject.status === 'archived') {
                 return `<div class="dm-archived-banner">
                     <i class="fas fa-box-archive"></i>
-                    <strong>Archived Project — Read Only.</strong>
-                    Existing data can be viewed and exported, but operational changes are disabled.
+                    <strong>${dmT('archivedBanner')}</strong>
+                    ${dmT('archivedText')}
                 </div>`;
             }
             return `<div class="dm-active-banner">
                 <i class="fas fa-circle-check"></i>
-                <strong>Active Project.</strong>
-                Operational project functions are available according to your role.
+                <strong>${dmT('activeBanner')}</strong>
+                ${dmT('activeText')}
             </div>`;
         }
 
@@ -660,28 +789,28 @@
             const dataManagementHtml = `
                 ${permissionBanner}${requestBanner}${getProjectStatusBanner()}
                 <div class="welcome-banner"><div class="welcome-text"><h2>${greeting}, ${escapeHtml(userName)}! 👋</h2><p>Welcome to ${escapeHtml(currentProject.name)}.</p></div><div class="welcome-image"><i class="fas fa-chart-line"></i><span>Last updated: ${now.toLocaleDateString()}</span></div></div>
-                <div class="kpis"><div class="kpi-card"><div class="kpi-info"><h3>0</h3><p>Total Farms</p></div><div class="kpi-icon"><i class="fas fa-tractor"></i></div></div>
-                <div class="kpi-card"><div class="kpi-info"><h3>0</h3><p>Total Area (ha)</p></div><div class="kpi-icon"><i class="fas fa-chart-line"></i></div></div>
-                <div class="kpi-card"><div class="kpi-info"><h3>0</h3><p>Validated Farms</p></div><div class="kpi-icon"><i class="fas fa-check-circle"></i></div></div>
-                <div class="kpi-card"><div class="kpi-info"><h3>0</h3><p>Pending Review</p></div><div class="kpi-icon"><i class="fas fa-clock"></i></div></div></div>
+                <div class="kpis"><div class="kpi-card"><div class="kpi-info"><h3>0</h3><p data-i18n="totalFarms">Total Farms</p></div><div class="kpi-icon"><i class="fas fa-tractor"></i></div></div>
+                <div class="kpi-card"><div class="kpi-info"><h3>0</h3><p data-i18n="totalAreaHa">Total Area (ha)</p></div><div class="kpi-icon"><i class="fas fa-chart-line"></i></div></div>
+                <div class="kpi-card"><div class="kpi-info"><h3>0</h3><p data-i18n="validatedFarms">Validated Farms</p></div><div class="kpi-icon"><i class="fas fa-check-circle"></i></div></div>
+                <div class="kpi-card"><div class="kpi-info"><h3>0</h3><p data-i18n="pendingReview">Pending Review</p></div><div class="kpi-icon"><i class="fas fa-clock"></i></div></div></div>
                 <div class="dashboard-grid"><div class="dashboard-card"><h3><i class="fas fa-chart-pie"></i> Farm Status Distribution</h3><div class="chart-container"><canvas id="statusChart"></canvas></div></div>
                 <div class="dashboard-card"><h3><i class="fas fa-chart-bar"></i> Farm Area Distribution</h3><div class="chart-container"><canvas id="farmChart"></canvas></div></div></div>
                 <div class="dm-section-title">
                     <i class="fas fa-database"></i> Data Workspace
                 </div>
-                <p class="dm-section-subtitle">Open the operational farm workspace or review project-level analytics.</p>
+                <p class="dm-section-subtitle">${dmT("dataWorkspaceDesc")}</p>
 
                 <div class="action-buttons">
                     <div class="action-card" onclick="goToDashboard()">
                         <div class="action-icon"><i class="fas fa-map-marked-alt"></i></div>
-                        <h3>Farm Dashboard</h3>
+                        <h3><span data-i18n="farmDashboard">Farm Dashboard</span></h3>
                         <p>View the farm map, farm data, filters, details, validation and exports.</p>
                         <div class="action-btn">Go to Dashboard <i class="fas fa-arrow-right"></i></div>
                     </div>
 
                     <div class="action-card" onclick="goToProjectStatistics()">
                         <div class="action-icon"><i class="fas fa-chart-line"></i></div>
-                        <h3>Project Statistics</h3>
+                        <h3><span data-i18n="projectStatistics">Project Statistics</span></h3>
                         <p>View enumerator performance, progress, Gantt charts and cooperative analytics.</p>
                         <div class="action-btn">View Statistics <i class="fas fa-arrow-right"></i></div>
                     </div>
@@ -690,7 +819,7 @@
                 <div class="dm-section-title">
                     <i class="fas fa-info-circle"></i> Project Information
                 </div>
-                <p class="dm-section-subtitle">Key information about the current project.</p>
+                <p class="dm-section-subtitle">${dmT("projectInfoDesc")}</p>
 
                 <div class="dm-project-info">
                     <div class="dm-info-card">
@@ -738,14 +867,14 @@
                         ctx.font = '14px Inter';
                         ctx.fillStyle = '#94a3b8';
                         ctx.textAlign = 'center';
-                        ctx.fillText('No data available', canvas.width / 2, canvas.height / 2);
+                        ctx.fillText(dmT('noData'), canvas.width / 2, canvas.height / 2);
                         return;
                     }
                     
                     statusChart = new Chart(ctx, { 
                         type: 'doughnut', 
                         data: { 
-                            labels: ['Validated', 'Pending', 'Rejected'], 
+                            labels: [dmT('validated'), dmT('pending'), dmT('rejected')], 
                             datasets: [{ 
                                 data: data, 
                                 backgroundColor: ['#22c55e', '#eab308', '#ef4444'], 
@@ -800,7 +929,7 @@
                         ctx.font = '14px Inter';
                         ctx.fillStyle = '#94a3b8';
                         ctx.textAlign = 'center';
-                        ctx.fillText('No area data available', canvas.width / 2, canvas.height / 2);
+                        ctx.fillText(dmT('noAreaData'), canvas.width / 2, canvas.height / 2);
                         return;
                     }
                     
@@ -809,7 +938,7 @@
                         data: { 
                             labels: Object.keys(ranges), 
                             datasets: [{ 
-                                label: 'Number of Farms', 
+                                label: dmT('numberOfFarms'), 
                                 data: Object.values(ranges), 
                                 backgroundColor: '#2c6e49', 
                                 borderRadius: 8,
@@ -823,15 +952,15 @@
                                 y: { 
                                     beginAtZero: true, 
                                     ticks: { stepSize: 1, precision: 0 },
-                                    title: { display: true, text: 'Number of Farms' }
+                                    title: { display: true, text: dmT('numberOfFarms') }
                                 },
-                                x: { title: { display: true, text: 'Area Range' } }
+                                x: { title: { display: true, text: dmT('areaRange') } }
                             },
                             plugins: {
                                 tooltip: {
                                     callbacks: {
                                         label: function(context) {
-                                            return `${context.raw} farms`;
+                                            return `${context.raw} ${dmT('farms')}`;
                                         }
                                     }
                                 }
@@ -1414,6 +1543,9 @@
         function escapeHtml(str) { if (!str) return ''; return str.replace(/[&<>]/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[m] || m)); }
         
         init();
+        document.addEventListener('DOMContentLoaded', () => {
+            applyPageLanguage(localStorage.getItem('mappingtrace_language') || 'en');
+        });
     </script>
 </body>
 </html>
