@@ -103,6 +103,26 @@
             .workflow-grid, .quality-grid { grid-template-columns: 1fr; }
         }
 
+        /* Professional Enumerator Mapping Activity */
+        .activity-summary { display:flex; gap:16px; flex-wrap:wrap; margin-top:16px; }
+        .activity-stat { background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:10px 14px; }
+        .activity-stat strong { display:block; font-size:18px; color:#1a1a2e; }
+        .activity-stat span { font-size:11px; color:#64748b; }
+        .activity-container { overflow-x:auto; margin-top:16px; border:1px solid #e2e8f0; border-radius:12px; }
+        .activity-chart { min-width:900px; }
+        .activity-header, .activity-row { display:grid; grid-template-columns:220px 70px 90px minmax(500px,1fr); align-items:center; }
+        .activity-header { background:#f8fafc; font-size:12px; font-weight:700; color:#475569; }
+        .activity-header > div, .activity-row > div { padding:12px 14px; }
+        .activity-row { border-top:1px solid #e2e8f0; min-height:58px; }
+        .activity-row:hover { background:#f8fafc; }
+        .activity-name { font-weight:600; color:#1a1a2e; }
+        .activity-meta { font-size:11px; color:#64748b; margin-top:3px; }
+        .activity-track { position:relative; height:36px; background:repeating-linear-gradient(to right,#f8fafc 0,#f8fafc calc(20% - 1px),#e2e8f0 calc(20% - 1px),#e2e8f0 20%); border-radius:8px; }
+        .activity-dot { position:absolute; top:9px; width:18px; height:18px; border-radius:50%; background:#2c6e49; border:3px solid white; box-shadow:0 1px 4px rgba(0,0,0,.18); transform:translateX(-50%); cursor:pointer; z-index:2; }
+        .activity-dot:hover { transform:translateX(-50%) scale(1.2); }
+        .activity-line { position:absolute; top:17px; height:2px; background:#9fb7a8; z-index:1; }
+        .activity-axis { display:flex; justify-content:space-between; font-size:10px; color:#64748b; margin-top:6px; }
+
         .loading-spinner { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 24px 32px; border-radius: 20px; box-shadow: 0 20px 40px rgba(0,0,0,0.2); z-index: 10000; display: flex; align-items: center; gap: 16px; }
         .user-avatar { width: 40px; height: 40px; background: linear-gradient(135deg, #2c6e49, #4CAF50); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; }
         .role-badge { background: #e2e8f0; padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 600; margin-left: 10px; }
@@ -248,6 +268,10 @@
             <div class="count" id="workflowValidated">0</div>
             <div class="label">Validated</div>
         </div>
+        <div class="workflow-card">
+            <div class="count" id="workflowRejected">0</div>
+            <div class="label">Rejected</div>
+        </div>
     </div>
 
     <div class="section-title">
@@ -354,8 +378,14 @@ function updatePeriodBanner(project) {
     const today = new Date();
     const endDate = project.end_date ? new Date(project.end_date) : new Date(startDate.getTime() + 90 * 24 * 60 * 60 * 1000);
     
-    const elapsed = Math.max(0, Math.floor((today - startDate) / (1000 * 60 * 60 * 24)));
     const total = Math.max(1, Math.floor((endDate - startDate) / (1000 * 60 * 60 * 24)));
+    const elapsed = Math.max(
+        0,
+        Math.min(
+            total,
+            Math.floor((today - startDate) / (1000 * 60 * 60 * 24))
+        )
+    );
     const remaining = Math.max(0, total - elapsed);
     const percent = Math.min(100, Math.floor((elapsed / total) * 100));
     
@@ -428,6 +458,26 @@ async function loadStatistics() {
         }
     }
 
+    /*
+     * Quality data is stored separately from farms.
+     * Load it for the current project so Workflow and
+     * Quality KPIs are based on the authoritative tables.
+     */
+    const {
+        data: quality,
+        error: qualityError
+    } = await supabaseClient
+        .from('farm_quality')
+        .select('farm_id, project_id, quality_status, geometry_valid, empty_geometry, critical_issue_count')
+        .eq('project_id', projectId);
+
+    if (qualityError) {
+        console.warn('Quality loading failed:', qualityError);
+        allQuality = [];
+    } else {
+        allQuality = quality || [];
+    }
+
     populateFilters();
     updateAllCharts();
     showLoading(false);
@@ -486,6 +536,8 @@ function getFilteredFarms() {
 function updateAllCharts() {
     const filtered = getFilteredFarms();
     updateKPIs(filtered);
+    updateWorkflowStatus(filtered);
+    updateQualityStatus(filtered);
     updateEnumeratorChart(filtered);
     updateCooperativePieChart(filtered);
     updateTimelineChart(filtered);
@@ -522,6 +574,95 @@ function updateKPIs(filtered) {
     document.getElementById('enumeratorTrend').innerHTML = `active out of <span id="totalEnumerators">${allEnumerators}</span>`;
     document.getElementById('dailyTrend').textContent = 'submissions/day';
 }
+
+/* =========================================================
+   WORKFLOW STATUS
+========================================================= */
+
+function updateWorkflowStatus(filtered) {
+    const counts = {
+        enumerator_review: 0,
+        field_officer_review: 0,
+        gis_compliance_review: 0,
+        correction_required: 0,
+        final_validation: 0,
+        validated: 0,
+        rejected: 0
+    };
+
+    filtered.forEach(farm => {
+        const state = String(farm.workflow_state || '').trim().toLowerCase();
+        if (Object.prototype.hasOwnProperty.call(counts, state)) {
+            counts[state]++;
+        }
+    });
+
+    document.getElementById('workflowEnumeratorReview').textContent =
+        counts.enumerator_review;
+
+    document.getElementById('workflowFieldOfficer').textContent =
+        counts.field_officer_review;
+
+    document.getElementById('workflowGIS').textContent =
+        counts.gis_compliance_review;
+
+    document.getElementById('workflowCorrection').textContent =
+        counts.correction_required;
+
+    document.getElementById('workflowFinal').textContent =
+        counts.final_validation;
+
+    document.getElementById('workflowValidated').textContent =
+        counts.validated;
+
+    const rejectedEl = document.getElementById('workflowRejected');
+    if (rejectedEl) rejectedEl.textContent = counts.rejected;
+}
+
+
+/* =========================================================
+   QUALITY & COMPLIANCE
+========================================================= */
+
+function updateQualityStatus(filtered) {
+    const farmIds = new Set(
+        filtered.map(f => String(f.id))
+    );
+
+    const quality = allQuality.filter(q =>
+        farmIds.has(String(q.farm_id))
+    );
+
+    const qualityPassed = quality.filter(q =>
+        String(q.quality_status || '').toLowerCase() === 'passed'
+    ).length;
+
+    const qualityIssues = quality.filter(q =>
+        String(q.quality_status || '').toLowerCase() === 'issues_detected'
+    ).length;
+
+    const qualityCritical = quality.filter(q =>
+        Number(q.critical_issue_count || 0) > 0
+    ).length;
+
+    const geometryValid = quality.filter(q =>
+        q.geometry_valid === true &&
+        q.empty_geometry !== true
+    ).length;
+
+    document.getElementById('qualityPassed').textContent =
+        qualityPassed;
+
+    document.getElementById('qualityIssues').textContent =
+        qualityIssues;
+
+    document.getElementById('qualityCritical').textContent =
+        qualityCritical;
+
+    document.getElementById('qualityGeometry').textContent =
+        geometryValid;
+}
+
 
 function getFilteredSubmissions() {
     let filtered = [...allSubmissions];
@@ -576,30 +717,201 @@ function updateEnumeratorCooperativeChart(filtered) {
 }
 
 function updateGanttChart(filtered) {
-    const work = {};
+    /*
+     * This is an activity timeline, not a true Gantt.
+     * Each dot represents an actual mapping date.
+     * We do not imply continuous activity between first and last records.
+     */
+    const activity = {};
+
     filtered.forEach(f => {
         const name = getEnumeratorDisplayName(f);
         const date = new Date(f.created_at);
-        if (!work[name]) work[name] = { first: date, last: date, count: 0 };
-        work[name].first = new Date(Math.min(work[name].first, date));
-        work[name].last = new Date(Math.max(work[name].last, date));
-        work[name].count++;
+
+        if (isNaN(date)) return;
+
+        const dayKey = date.toISOString().slice(0, 10);
+
+        if (!activity[name]) {
+            activity[name] = {};
+        }
+
+        activity[name][dayKey] =
+            (activity[name][dayKey] || 0) + 1;
     });
-    const allDates = Object.values(work).flatMap(w => [w.first, w.last]);
-    const minDate = new Date(Math.min(...allDates));
-    const maxDate = new Date(Math.max(...allDates));
-    const totalDays = Math.max(1, Math.ceil((maxDate - minDate) / (1000 * 60 * 60 * 24)));
-    
-    let html = '<div class="gantt-chart"><div class="gantt-header"><div class="gantt-label-header">Enumerator</div><div class="gantt-timeline-header"><span style="position:absolute;left:0;">' + minDate.toLocaleDateString() + '</span><span style="position:absolute;right:0;">' + maxDate.toLocaleDateString() + '</span></div></div>';
-    for (const [name, data] of Object.entries(work)) {
-        const startOffset = Math.max(0, Math.floor((data.first - minDate) / (1000 * 60 * 60 * 24)));
-        const duration = Math.max(1, Math.ceil((data.last - data.first) / (1000 * 60 * 60 * 24)) + 1);
-        const leftPercent = (startOffset / totalDays) * 100;
-        const widthPercent = (duration / totalDays) * 100;
-        html += `<div class="gantt-row"><div class="gantt-label">${name}<br><small>${data.count} farms</small></div><div class="gantt-bars"><div class="gantt-bar" style="left:${leftPercent}%;width:${widthPercent}%;" title="${name}: ${data.count} farms (${data.first.toLocaleDateString()} - ${data.last.toLocaleDateString()})">${duration > 5 ? name : ''}</div></div></div>`;
+
+    const names = Object.keys(activity).sort((a, b) =>
+        a.localeCompare(b)
+    );
+
+    const allDayKeys = [
+        ...new Set(
+            names.flatMap(name => Object.keys(activity[name]))
+        )
+    ].sort();
+
+    const container =
+        document.getElementById('ganttContainer');
+
+    if (!names.length || !allDayKeys.length) {
+        container.innerHTML =
+            '<div style="text-align:center;padding:40px;color:#64748b;">No mapping activity found for the selected filters.</div>';
+        return;
     }
-    html += '</div>';
-    document.getElementById('ganttContainer').innerHTML = html;
+
+    const firstDate =
+        new Date(`${allDayKeys[0]}T00:00:00`);
+
+    const lastDate =
+        new Date(`${allDayKeys[allDayKeys.length - 1]}T00:00:00`);
+
+    const totalSpan =
+        Math.max(1, lastDate - firstDate);
+
+    const totalFarms = filtered.length;
+    const totalActiveDays = allDayKeys.length;
+
+    let html = `
+        <div class="activity-chart">
+
+            <div class="activity-header">
+                <div>Enumerator</div>
+                <div>Farms</div>
+                <div>Active Days</div>
+                <div>
+                    Activity
+                    <div class="activity-axis">
+                        <span>${firstDate.toLocaleDateString()}</span>
+                        <span>${lastDate.toLocaleDateString()}</span>
+                    </div>
+                </div>
+            </div>
+    `;
+
+    names.forEach(name => {
+        const days = activity[name];
+
+        const farmCount =
+            Object.values(days).reduce(
+                (sum, count) => sum + count,
+                0
+            );
+
+        const activeDays =
+            Object.keys(days).length;
+
+        const dayKeys =
+            Object.keys(days).sort();
+
+        let lines = '';
+
+        for (let i = 0; i < dayKeys.length - 1; i++) {
+            const a =
+                new Date(`${dayKeys[i]}T00:00:00`);
+
+            const b =
+                new Date(`${dayKeys[i + 1]}T00:00:00`);
+
+            const left =
+                ((a - firstDate) / totalSpan) * 100;
+
+            const width =
+                ((b - a) / totalSpan) * 100;
+
+            lines += `
+                <span
+                    class="activity-line"
+                    style="left:${left}%;width:${width}%;"
+                ></span>
+            `;
+        }
+
+        const dots = dayKeys.map(dayKey => {
+            const date =
+                new Date(`${dayKey}T00:00:00`);
+
+            const position =
+                ((date - firstDate) / totalSpan) * 100;
+
+            const count = days[dayKey];
+
+            return `
+                <span
+                    class="activity-dot"
+                    style="left:${position}%;"
+                    title="${escapeHtml(name)} — ${count} farm${count === 1 ? '' : 's'} on ${date.toLocaleDateString()}"
+                ></span>
+            `;
+        }).join('');
+
+        const firstLabel =
+            new Date(`${dayKeys[0]}T00:00:00`)
+                .toLocaleDateString();
+
+        const lastLabel =
+            new Date(`${dayKeys[dayKeys.length - 1]}T00:00:00`)
+                .toLocaleDateString();
+
+        const range =
+            firstLabel === lastLabel
+                ? firstLabel
+                : `${firstLabel} → ${lastLabel}`;
+
+        html += `
+            <div class="activity-row">
+
+                <div>
+                    <div class="activity-name">
+                        ${escapeHtml(name)}
+                    </div>
+                    <div class="activity-meta">
+                        ${range}
+                    </div>
+                </div>
+
+                <div>
+                    <strong>${farmCount}</strong>
+                </div>
+
+                <div>
+                    <strong>${activeDays}</strong>
+                </div>
+
+                <div>
+                    <div class="activity-track">
+                        ${lines}
+                        ${dots}
+                    </div>
+                </div>
+
+            </div>
+        `;
+    });
+
+    html += `
+        </div>
+
+        <div class="activity-summary">
+
+            <div class="activity-stat">
+                <strong>${totalFarms}</strong>
+                <span>Mapped farms</span>
+            </div>
+
+            <div class="activity-stat">
+                <strong>${names.length}</strong>
+                <span>Enumerators shown</span>
+            </div>
+
+            <div class="activity-stat">
+                <strong>${totalActiveDays}</strong>
+                <span>Mapping days</span>
+            </div>
+
+        </div>
+    `;
+
+    container.innerHTML = html;
 }
 
 function applyFilters() { updateAllCharts(); }
@@ -613,8 +925,8 @@ function resetFilters() {
 
 function exportStatistics() {
     const filtered = getFilteredFarms();
-    let csv = 'Farmer Name,Enumerator,Cooperative,Area (ha),Status,Date\n';
-    filtered.forEach(f => csv += `"${f.farmer_name || ''}","${f.enumerator || ''}","${f.cooperative || ''}",${f.area || 0},${f.status || ''},${new Date(f.created_at).toLocaleDateString()}\n`);
+    let csv = 'Farmer Name,Enumerator,Cooperative,Area (ha),Status,Workflow State,Date\n';
+    filtered.forEach(f => csv += `"${f.farmer_name || ''}","${getEnumeratorDisplayName(f)}","${f.cooperative || ''}",${Number(f.area ?? f.area_ha ?? 0)},"${f.status || ''}","${f.workflow_state || ''}",${new Date(f.created_at).toLocaleDateString()}\n`);
     const blob = new Blob([csv], { type: 'text/csv' }), url = URL.createObjectURL(blob), a = document.createElement('a');
     a.href = url; a.download = `statistics_${currentProject?.name || 'project'}.csv`; a.click(); URL.revokeObjectURL(url);
 }
