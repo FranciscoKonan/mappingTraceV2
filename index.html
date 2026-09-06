@@ -335,7 +335,7 @@
             </div>
             <div class="user-menu" id="userMenu">
                 <div class="user-avatar" id="userAvatar">JD</div>
-                <span id="userName" data-i18n="loadingUser">Loading...</span>
+                <span id="userName">Loading...</span>
                 <div class="language-switcher" aria-label="Language">
                     <button id="langEN" type="button" onclick="setProjectsLanguage('en')">EN</button>
                     <button id="langFR" type="button" onclick="setProjectsLanguage('fr')">FR</button>
@@ -400,7 +400,8 @@
             currentUser = session.user;
             const metadata = currentUser.user_metadata || {};
             const fullName = metadata.full_name || metadata.first_name || currentUser.email;
-            document.getElementById('userName').textContent = fullName;
+            const userNameEl = document.getElementById('userName');
+            if (userNameEl) userNameEl.textContent = fullName || currentUser.email || 'User';
             document.getElementById('userAvatar').textContent = (fullName.charAt(0) || 'U').toUpperCase();
         }
         
@@ -474,7 +475,7 @@
                             <i class="fas ${isArchived ? 'fa-box-archive' : 'fa-folder-open'}"></i>
                         </div>
                         <div class="project-name">${escapeHtml(project.name)}</div>
-                        <div class="project-description">${escapeHtml(project.description || projectT('noDescription'))}</div>
+                        <div class="project-description">${escapeHtml(projectDescription(project.description))}</div>
                         <div class="project-stats">
                             <span><i class="fas fa-tractor"></i> ${count || 0} ${projectT("farms")}</span>
                         </div>
@@ -645,12 +646,23 @@
 /* MappingTrace Projects — EN/FR translation layer */
 (function(){
   const I18N={
-    en:{multiTenant:'Multi-tenant Project Platform',loadingUser:'Loading...',logout:'Logout',loadingProjects:'Loading projects...',noProjects:'No Projects',createFirstProject:'Create Your First Project',createFirstProjectDesc:'Create a project to start managing your mapping data.',requestAccess:'Request Access',requestAccessDesc:'Join an existing project using an invitation token.',roleOwner:'Owner',roleManager:'Manager',roleValidator:'Validator',roleFieldOfficer:'Field Officer',roleViewer:'Viewer',noDescription:'No description',farms:'farms',active:'Active',archived:'Archived',restore:'Restore',archive:'Archive',startAnotherProject:'Start another project',requestMoreAccess:'Request more access',requestAdditionalDesc:'Need access to another project? Submit an access request.',archiveConfirm:'Are you sure you want to archive this project?',archiveSuccess:'Project archived successfully.',archiveError:'Failed to archive project: ',restoreConfirm:'Are you sure you want to restore this project?',restoreSuccess:'Project restored successfully.',restoreError:'Failed to restore project: ',creating:'Creating...',createProject:'Create Project',createdSuccess:'Project created successfully.',error:'Error: '},
-    fr:{multiTenant:'Plateforme de gestion de projets multi-tenant',loadingUser:'Chargement...',logout:'Déconnexion',loadingProjects:'Chargement des projets...',noProjects:'Aucun projet',createFirstProject:'Créer votre premier projet',createFirstProjectDesc:'Créez un projet pour commencer à gérer vos données de cartographie.',requestAccess:'Demander un accès',requestAccessDesc:'Rejoignez un projet existant avec un jeton d’invitation.',roleOwner:'Propriétaire',roleManager:'Gestionnaire',roleValidator:'Validateur',roleFieldOfficer:'Agent de terrain',roleViewer:'Lecteur',noDescription:'Aucune description',farms:'exploitations',active:'Actif',archived:'Archivé',restore:'Restaurer',archive:'Archiver',startAnotherProject:'Démarrer un autre projet',requestMoreAccess:'Demander un accès supplémentaire',requestAdditionalDesc:'Besoin d’accéder à un autre projet ? Soumettez une demande d’accès.',archiveConfirm:'Voulez-vous vraiment archiver ce projet ?',archiveSuccess:'Projet archivé avec succès.',archiveError:'Échec de l’archivage du projet : ',restoreConfirm:'Voulez-vous vraiment restaurer ce projet ?',restoreSuccess:'Projet restauré avec succès.',restoreError:'Échec de la restauration du projet : ',creating:'Création...',createProject:'Créer le projet',createdSuccess:'Projet créé avec succès.',error:'Erreur : '}
+    en:{multiTenant:'Multi-tenant Project Platform',loadingUser:'Loading...',allProjects:'All Projects',descCocoaTraceability:'Tracking cocoa farms for sustainability',descRubberPlantation:'Rubber tree plantation monitoring',descCocoaMapping:'Cocoa Mapping',logout:'Logout',loadingProjects:'Loading projects...',noProjects:'No Projects',createFirstProject:'Create Your First Project',createFirstProjectDesc:'Create a project to start managing your mapping data.',requestAccess:'Request Access',requestAccessDesc:'Join an existing project using an invitation token.',roleOwner:'Owner',roleManager:'Manager',roleValidator:'Validator',roleFieldOfficer:'Field Officer',roleViewer:'Viewer',noDescription:'No description',farms:'farms',active:'Active',archived:'Archived',restore:'Restore',archive:'Archive',startAnotherProject:'Start another project',requestMoreAccess:'Request more access',requestAdditionalDesc:'Need access to another project? Submit an access request.',archiveConfirm:'Are you sure you want to archive this project?',archiveSuccess:'Project archived successfully.',archiveError:'Failed to archive project: ',restoreConfirm:'Are you sure you want to restore this project?',restoreSuccess:'Project restored successfully.',restoreError:'Failed to restore project: ',creating:'Creating...',createProject:'Create Project',createdSuccess:'Project created successfully.',error:'Error: '},
+    fr:{multiTenant:'Plateforme de gestion de projets multi-tenant',loadingUser:'Chargement...',allProjects:'Tous les projets',descCocoaTraceability:'Suivi des exploitations de cacao pour la durabilité',descRubberPlantation:'Suivi des plantations d’hévéa',descCocoaMapping:'Cartographie du cacao',logout:'Déconnexion',loadingProjects:'Chargement des projets...',noProjects:'Aucun projet',createFirstProject:'Créer votre premier projet',createFirstProjectDesc:'Créez un projet pour commencer à gérer vos données de cartographie.',requestAccess:'Demander un accès',requestAccessDesc:'Rejoignez un projet existant avec un jeton d’invitation.',roleOwner:'Propriétaire',roleManager:'Gestionnaire',roleValidator:'Validateur',roleFieldOfficer:'Agent de terrain',roleViewer:'Lecteur',noDescription:'Aucune description',farms:'exploitations',active:'Actif',archived:'Archivé',restore:'Restaurer',archive:'Archiver',startAnotherProject:'Démarrer un autre projet',requestMoreAccess:'Demander un accès supplémentaire',requestAdditionalDesc:'Besoin d’accéder à un autre projet ? Soumettez une demande d’accès.',archiveConfirm:'Voulez-vous vraiment archiver ce projet ?',archiveSuccess:'Projet archivé avec succès.',archiveError:'Échec de l’archivage du projet : ',restoreConfirm:'Voulez-vous vraiment restaurer ce projet ?',restoreSuccess:'Projet restauré avec succès.',restoreError:'Échec de la restauration du projet : ',creating:'Création...',createProject:'Créer le projet',createdSuccess:'Projet créé avec succès.',error:'Erreur : '}
   };
   let lang=localStorage.getItem('mappingtrace_language')||'en';
   if(!I18N[lang]) lang='en';
   function projectT(key){ return I18N[lang]?.[key] ?? key; }
+  function projectDescription(value){
+    const raw=String(value ?? '').trim();
+    if(!raw) return projectT('noDescription');
+    const map={
+      'Tracking cocoa farms for sustainability':'descCocoaTraceability',
+      'Rubber tree plantation monitoring':'descRubberPlantation',
+      'Cocoa Mapping':'descCocoaMapping'
+    };
+    const key=map[raw];
+    return key ? projectT(key) : raw;
+  }
   function applyProjectsLanguage(){
     document.documentElement.lang=lang;
     document.title=lang==='fr'?'Projets | MappingTrace':'Projects | MappingTrace';
@@ -661,7 +673,7 @@
   }
   function setProjectsLanguage(value){
     if(!I18N[value]) return; lang=value; localStorage.setItem('mappingtrace_language',value); applyProjectsLanguage();
-    if(typeof loadProjects==='function') loadProjects();
+    if(typeof loadProjects==='function') loadProjects().catch(err=>console.error('Language reload failed:',err));
   }
   window.projectT=projectT;
   window.applyProjectsLanguage=applyProjectsLanguage;
