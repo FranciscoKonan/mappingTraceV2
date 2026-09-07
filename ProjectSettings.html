@@ -142,12 +142,12 @@ const PROJECT_SETTINGS_I18N = {
         projectDurationDays: "Project Duration (days)", notStarted: "Not started",
         active: "Active", ended: "Ended", targetNotSet: "Target not set",
         completed: "Completed", onTrack: "On Track", behind: "Behind",
-        noActiveProjectEnumerators: "${pageT('noActiveProjectEnumerators')}",
-        noProjectEnumerators: "${pageT('noProjectEnumerators')}",
-        migrationNeeded: "Migration needed", legacyTarget: "${pageT('legacyTarget')}",
+        noActiveProjectEnumerators: "No active project enumerators.",
+        noProjectEnumerators: "No project enumerators.",
+        migrationNeeded: "Migration needed", legacyTarget: "Legacy target — not linked to a project member",
         remove: "Remove", removeTarget: "Remove Target",
-        noTargets: "${pageT('noTargets')}",
-        noProjectEnumeratorsSummary: "${pageT('noProjectEnumerators')}",
+        noTargets: "No enumerators with targets.",
+        noProjectEnumeratorsSummary: "No project enumerators.",
         farmsAchievement: "Farms Achievement", targetsConfigured: "Targets Configured",
         activeProjectEnumerators: "Active Project Enumerators",
         ofTarget: "of target", numberOfFarms: "Number of Farms",
@@ -844,7 +844,7 @@ function renderPerformanceTable() {
         const percent = e.target > 0 ? Math.min(100, Math.round((e.achieved / e.target) * 100)) : 0;
         const status = e.target === 0 ? pageT('targetNotSet') : percent >= 100 ? pageT('completed') : percent >= 70 ? pageT('onTrack') : pageT('behind');
         return `<tr><td><strong>${escapeHtml(e.name)}</strong><br><small style="color:#64748b">${escapeHtml(e.email || '')}</small></td><td>${e.target || '—'}</td><td>${e.achieved}</td><td><div class="progress-bar"><div class="progress-fill ${percent >= 100 ? 'over' : percent < 40 ? 'warning' : ''}" style="width:${percent}%"></div></div><small>${e.target ? percent + '%' : '—'}</small></td><td>${e.area.toFixed(2)}</td><td><span class="status-badge ${e.target && percent >= 70 ? 'active' : 'inactive'}">${status}</span></td></tr>`;
-    }).join('') || '<tr><td colspan="6" style="text-align:center;color:#64748b">${pageT('noActiveProjectEnumerators')}</td></tr>';
+    }).join('') || `<tr><td colspan="6" style="text-align:center;color:#64748b">${pageT('noActiveProjectEnumerators')}</td></tr>`;
 }
 
 function renderEnumeratorsTable() {
@@ -861,7 +861,7 @@ function renderEnumeratorsTable() {
         return `<tr><td><strong>${escapeHtml(e.name)}</strong><br><small style="color:#64748b">${escapeHtml(e.email || '')}</small></td><td>${targetFarms || '—'}</td><td>${e.achieved}</td><td><div class="progress-bar"><div class="progress-fill ${percent >= 100 ? 'over' : percent < 40 ? 'warning' : ''}" style="width:${percent}%"></div></div><small>${targetFarms ? percent + '%' : '—'}</small></td><td>${e.area.toFixed(2)}</td><td><span class="status-badge ${targetFarms && percent >= 70 ? 'active' : 'inactive'}">${status}</span></td><td>${target && !target.is_virtual ? `<button class="btn-danger" onclick="deleteEnumerator('${escapeHtml(target.id)}')"><i class="fas fa-trash"></i> Remove Target</button>` : ''}</td></tr>`;
     }).join('');
     const legacyRows = enumeratorTargets.filter(t => t.is_legacy).map(e => `<tr style="background:#fffaf0"><td><strong>${escapeHtml(e.enumerator_name)}</strong><br><small style="color:#b45309">${pageT('legacyTarget')}</small></td><td>${Number(e.target_farms) || 0}</td><td>${getEnumeratorFarmStats({name:e.enumerator_name}).achieved}</td><td>—</td><td>${getEnumeratorFarmStats({name:e.enumerator_name}).totalArea.toFixed(2)}</td><td><span class="status-badge inactive">Migration needed</span></td><td><button class="btn-danger" onclick="deleteEnumerator('${escapeHtml(e.id)}')"><span data-i18n-dynamic="remove">${pageT('remove')}</span></button></td></tr>`).join('');
-    document.getElementById('enumeratorsTableBody').innerHTML = (htmlRows + legacyRows) || '<tr><td colspan="7" style="text-align:center;color:#64748b">${pageT('noProjectEnumerators')}</td></tr>';
+    document.getElementById('enumeratorsTableBody').innerHTML = (htmlRows + legacyRows) || `<tr><td colspan="7" style="text-align:center;color:#64748b">${pageT('noProjectEnumerators')}</td></tr>`;
 }
 
 function renderTopPerformers() {
@@ -924,7 +924,7 @@ function renderTopPerformers() {
             </div>
         `)
         .join('')
-        || '<div style="color:#64748b">${pageT('noTargets')}</div>';
+        || `<div style="color:#64748b">${pageT('noTargets')}</div>`;
 }
 
 function renderDailyTrendChart() {
