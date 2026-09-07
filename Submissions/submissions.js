@@ -1632,7 +1632,13 @@ function updateStats() {
 
         correction: 0,
 
-        duplicates: 0
+        duplicates: 0,
+
+        validated: 0,
+
+        pending: 0,
+
+        rejected: 0
 
     };
 
@@ -1691,6 +1697,14 @@ function updateStats() {
                 counts.duplicates++;
             }
 
+            if (state === 'validated') {
+                counts.validated++;
+            } else if (state === 'rejected') {
+                counts.rejected++;
+            } else {
+                counts.pending++;
+            }
+
         }
     );
 
@@ -1723,6 +1737,23 @@ function updateStats() {
     setText(
         'duplicateCount',
         counts.duplicates
+    );
+
+    // Backward-compatible KPI cards retained by the current HTML.
+    // These are derived from workflow_state, not the legacy farm.status field.
+    setText(
+        'validatedCount',
+        counts.validated
+    );
+
+    setText(
+        'pendingCount',
+        counts.pending
+    );
+
+    setText(
+        'rejectedCount',
+        counts.rejected
     );
 
 
