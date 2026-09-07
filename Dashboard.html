@@ -2930,8 +2930,9 @@ function renderOptionalFarmPhoto(imageBlobUrl, container) {
 
 </script>
 
+
 <script id="dashboard-bilingual-i18n">
-(function(){
+(function () {
     const STORAGE_KEY = 'mappingtrace_language';
 
     const T = {
@@ -2939,8 +2940,6 @@ function renderOptionalFarmPhoto(imageBlobUrl, container) {
             'Dashboard':'Dashboard',
             'Home / Dashboard':'Home / Dashboard',
             'Project:':'Project:',
-            'Search projects...':'Search projects...',
-            'Dashboard':'Dashboard',
             'Main':'Main',
             'Live Mapping':'Live Mapping',
             'Submissions':'Submissions',
@@ -2962,7 +2961,6 @@ function renderOptionalFarmPhoto(imageBlobUrl, container) {
             'Pending Farms':'Pending Farms',
             'Total Farms':'Total Farms',
             'Total Area (ha)':'Total Area (ha)',
-            'Pending Validation':'Pending Validation',
             'Farms Visible':'Farms Visible',
             'Visible Area (ha)':'Visible Area (ha)',
             'Active Plots':'Active Plots',
@@ -3006,14 +3004,12 @@ function renderOptionalFarmPhoto(imageBlobUrl, container) {
             'No Projects':'No Projects',
             'ALL PROJECTS':'ALL PROJECTS',
             'areas loaded':'areas loaded',
-            'Toggle sidebar':'Toggle sidebar',
-            'Farms':'Farms'
+            'Toggle sidebar':'Toggle sidebar'
         },
         fr: {
             'Dashboard':'Tableau de bord',
             'Home / Dashboard':'Accueil / Tableau de bord',
             'Project:':'Projet :',
-            'Search projects...':'Rechercher un projet...',
             'Main':'Principal',
             'Live Mapping':'Cartographie en direct',
             'Submissions':'Soumissions',
@@ -3082,17 +3078,16 @@ function renderOptionalFarmPhoto(imageBlobUrl, container) {
         }
     };
 
-    function lang(){
+    function getLanguage() {
         return localStorage.getItem(STORAGE_KEY) === 'fr' ? 'fr' : 'en';
     }
 
-    function translateText(value){
+    function tr(value) {
         if (!value) return value;
-        const dict = T[lang()];
+        const dict = T[getLanguage()];
         if (Object.prototype.hasOwnProperty.call(dict, value)) return dict[value];
 
-        // Dynamic dashboard strings.
-        if (lang()==='fr') {
+        if (getLanguage() === 'fr') {
             let m;
             m = value.match(/^Overlap area:\s*(.+)$/);
             if (m) return 'Superficie du chevauchement : ' + m[1];
@@ -3108,93 +3103,149 @@ function renderOptionalFarmPhoto(imageBlobUrl, container) {
         return value;
     }
 
-    function translateNode(node){
-        if (node.nodeType === Node.TEXT_NODE) {
-            const original = node.nodeValue;
-            const trimmed = original.trim();
-            if (!trimmed) return;
-            const translated = translateText(trimmed);
-            if (translated !== trimmed) {
-                node.nodeValue = original.replace(trimmed, translated);
-            }
-            return;
-        }
-        if (node.nodeType !== Node.ELEMENT_NODE) return;
-        if (node.id === 'dashboardLanguageSwitcher') return;
-        if (node.tagName === 'SCRIPT' || node.tagName === 'STYLE') return;
+    function translateStaticUI() {
+        document.documentElement.lang = getLanguage();
 
-        if (node.hasAttribute('placeholder')) {
-            node.setAttribute('placeholder', translateText(node.getAttribute('placeholder')));
-        }
-        if (node.hasAttribute('title')) {
-            node.setAttribute('title', translateText(node.getAttribute('title')));
-        }
-        node.childNodes.forEach(translateNode);
-    }
+        // Only translate known/static UI. Do NOT walk the whole body:
+        // dashboard data is rendered asynchronously by Supabase/Chart.js.
+        const selectors = [
+            'aside', '.sidebar', '.main-header', '.header-title',
+            '.breadcrumb', '.project-selector-container',
+            '.kpis', '.farm-queue', '.table-section',
+            '#downloadSection', '#protectedAreaControl',
+            '.filters', '.alert-section', '.farm-queue-header'
+        ];
 
-    function translatePage(){
-        document.documentElement.lang = lang();
-        translateNode(document.body);
-
-        document.querySelectorAll('#dashboardLanguageSwitcher button').forEach(btn=>{
-            btn.classList.toggle('active', btn.dataset.lang === lang());
+        selectors.forEach(selector => {
+            document.querySelectorAll(selector).forEach(root => {
+                root.querySelectorAll('[data-i18n]').forEach(el => {
+                    el.textContent = tr(el.dataset.i18n);
+                });
+            });
         });
 
-        // Keep role badges readable.
-        document.querySelectorAll('.role-badge').forEach(el=>{
-            const r = el.textContent.trim().toLowerCase();
-            if (lang()==='fr') {
-                const roles = {
-                    owner:'PROPRIÉTAIRE',
-                    manager:'GESTIONNAIRE',
-                    validator:'VALIDATEUR',
-                    field_officer:'AGENT TERRAIN',
-                    enumerator:'ENQUÊTEUR',
-                    viewer:'LECTEUR',
-                    super_manager:'SUPER GESTIONNAIRE'
-                };
-                if (roles[r]) el.textContent = roles[r];
+        document.querySelectorAll('input[placeholder], select option').forEach(el => {
+            if (el.tagName === 'OPTION') {
+                el.textContent = tr(el.textContent.trim());
             } else {
-                const roles = {
-                    'propriétaire':'OWNER',
-                    'gestionnaire':'MANAGER',
-                    'validateur':'VALIDATOR',
-                    'agent terrain':'FIELD OFFICER',
-                    'enquêteur':'ENUMERATOR',
-                    'lecteur':'VIEWER',
-                    'super gestionnaire':'SUPER MANAGER'
-                };
-                if (roles[r]) el.textContent = roles[r];
+                el.placeholder = tr(el.placeholder);
             }
+        });
+
+        document.querySelectorAll('#dashboardLanguageSwitcher button').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.lang === getLanguage());
         });
     }
 
-    window.setDashboardLanguage = function(next){
+    function translateDynamicDashboard() {
+        // Translate only text nodes/elements inside rendered dashboard areas,
+        // excluding project/user identity and the language controls.
+        const roots = [
+            '.kpis', '.farm-queue', '.table-section',
+            '#downloadSection', '#protectedAreaControl',
+            '.filters', '.alert-section', '#cooperativeStatsList'
+        ];
+
+        roots.forEach(selector => {
+            document.querySelectorAll(selector).forEach(root => {
+                root.querySelectorAll('*').forEach(el => {
+                    if (el.closest('#dashboardLanguageSwitcher')) return;
+                    if (el.children.length === 0) {
+                        const text = el.textContent.trim();
+                        if (text) {
+                            const translated = tr(text);
+                            if (translated !== text) el.textContent = translated;
+                        }
+                    }
+                    if (el.hasAttribute('placeholder')) {
+                        el.placeholder = tr(el.placeholder);
+                    }
+                });
+            });
+        });
+
+        document.querySelectorAll('.role-badge').forEach(el => {
+            const raw = el.dataset.originalRole || el.textContent.trim().toLowerCase();
+            el.dataset.originalRole = raw;
+            const roles = getLanguage() === 'fr'
+                ? {owner:'PROPRIÉTAIRE',manager:'GESTIONNAIRE',validator:'VALIDATEUR',
+                   field_officer:'AGENT TERRAIN',enumerator:'ENQUÊTEUR',viewer:'LECTEUR',
+                   super_manager:'SUPER GESTIONNAIRE'}
+                : {owner:'OWNER',manager:'MANAGER',validator:'VALIDATOR',
+                   field_officer:'FIELD OFFICER',enumerator:'ENUMERATOR',viewer:'VIEWER',
+                   super_manager:'SUPER MANAGER'};
+            if (roles[raw]) el.textContent = roles[raw];
+        });
+    }
+
+    function translateCharts() {
+        if (getLanguage() !== 'fr') return;
+
+        // Existing Chart.js instances are rendered on canvas. Rebuild their
+        // visible text where the dashboard exposes chart instances globally.
+        try {
+            if (window.coopChart) {
+                window.coopChart.data.datasets.forEach(ds => {
+                    if (ds.label === 'Farms') ds.label = 'Parcelles';
+                });
+                window.coopChart.update();
+            }
+        } catch (e) {}
+    }
+
+    function refreshLanguage() {
+        translateStaticUI();
+        translateDynamicDashboard();
+        translateCharts();
+    }
+
+    window.setDashboardLanguage = function(next) {
         if (next !== 'en' && next !== 'fr') return;
         localStorage.setItem(STORAGE_KEY, next);
-        // Reloading is intentional: it guarantees all asynchronously rendered
-        // dashboard sections are translated from a clean DOM state.
-        window.location.reload();
+        refreshLanguage();
+        // Re-render known dynamic dashboard sections explicitly.
+        setTimeout(refreshLanguage, 100);
+        setTimeout(refreshLanguage, 700);
     };
 
-    // Initial translation + observe dynamically rendered dashboard content.
-    document.addEventListener('DOMContentLoaded', ()=>{
-        translatePage();
-        const observer = new MutationObserver(()=>{
-            clearTimeout(window.__mtLangTimer);
-            window.__mtLangTimer = setTimeout(translatePage, 30);
+    // Make a safe wrapper around the dashboard's dynamic render functions.
+    // This avoids a MutationObserver loop while still translating content
+    // immediately after the dashboard updates it.
+    function wrapRenderFunctions() {
+        [
+            'updateKPIs',
+            'updateCooperativeStats',
+            'updatePendingReview',
+            'updateTable',
+            'updateAlertsUI',
+            'populateFilters',
+            'checkQualityAlerts'
+        ].forEach(name => {
+            const fn = window[name];
+            if (typeof fn !== 'function' || fn.__mtWrapped) return;
+            function wrapped() {
+                const result = fn.apply(this, arguments);
+                setTimeout(refreshLanguage, 0);
+                return result;
+            }
+            wrapped.__mtWrapped = true;
+            window[name] = wrapped;
         });
-        observer.observe(document.body, {childList:true, subtree:true, characterData:true});
-    });
+    }
 
-    // Also expose a small API for future dashboard refinements.
-    window.MappingTraceDashboardLanguage = {
-        get: lang,
-        translate: translateText,
-        refresh: translatePage
-    };
+    document.addEventListener('DOMContentLoaded', function() {
+        refreshLanguage();
+        wrapRenderFunctions();
+
+        // Data loading is asynchronous; these are one-shot checkpoints, not
+        // a continuous DOM observer.
+        setTimeout(refreshLanguage, 1000);
+        setTimeout(refreshLanguage, 2500);
+        setTimeout(refreshLanguage, 5000);
+    });
 })();
 </script>
+
 
 </body>
 </html>
