@@ -122,6 +122,18 @@ let currentProjectRole = null;
 
 let duplicateFarmIds = new Set();
 
+// Prevent the page from remaining in a permanent loading state if a
+// Supabase request or another initialization step fails unexpectedly.
+window.addEventListener('error', (event) => {
+    console.error('❌ Submissions runtime error:', event.error || event.message);
+    try { showLoading(false); } catch (_) {}
+});
+
+window.addEventListener('unhandledrejection', (event) => {
+    console.error('❌ Submissions unhandled rejection:', event.reason);
+    try { showLoading(false); } catch (_) {}
+});
+
 
 // ===========================================
 // INITIALIZATION
@@ -161,11 +173,15 @@ document.addEventListener('DOMContentLoaded', async function () {
             error
         );
 
+        showLoading(false);
         showNotification(
             error.message || 'Initialization failed',
             'error'
         );
 
+    } finally {
+        // Never leave the page in a fake loading state after initialization.
+        showLoading(false);
     }
 
 });
@@ -174,6 +190,18 @@ document.addEventListener('DOMContentLoaded', async function () {
 // ===========================================
 // LOAD USER + PROJECTS
 // ===========================================
+
+async function withTimeout(promise, label, ms = 15000) {
+    let timer;
+    const timeout = new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms / 1000}s`)), ms);
+    });
+    try {
+        return await Promise.race([promise, timeout]);
+    } finally {
+        clearTimeout(timer);
+    }
+}
 
 async function loadUserAndProjects() {
 
@@ -184,7 +212,10 @@ async function loadUserAndProjects() {
         const {
             data: { session },
             error: sessionError
-        } = await supabaseClient.auth.getSession();
+        } = await withTimeout(
+            supabaseClient.auth.getSession(),
+            'Session check'
+        );
 
         if (sessionError) {
             throw sessionError;
@@ -211,11 +242,14 @@ async function loadUserAndProjects() {
         // -------------------------------------------
 
         const { data: profile } =
-            await supabaseClient
-                .from('user_profiles')
-                .select('first_name, email')
-                .eq('id', currentUser.id)
-                .maybeSingle();
+            await withTimeout(
+                supabaseClient
+                    .from('user_profiles')
+                    .select('first_name, email')
+                    .eq('id', currentUser.id)
+                    .maybeSingle(),
+                'User profile load'
+            );
 
         const firstName =
             profile?.first_name || '';
@@ -253,11 +287,14 @@ async function loadUserAndProjects() {
         const {
             data: memberships,
             error: membershipError
-        } = await supabaseClient
-            .from('project_members')
-            .select('project_id, role, projects(*)')
-            .eq('user_id', currentUser.id)
-            .eq('status', 'active');
+        } = await withTimeout(
+            supabaseClient
+                .from('project_members')
+                .select('project_id, role, projects(*)')
+                .eq('user_id', currentUser.id)
+                .eq('status', 'active'),
+            'Project membership load'
+        );
 
         if (membershipError) {
             throw membershipError;
