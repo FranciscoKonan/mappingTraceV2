@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Submissions | MappingTrace</title>
+    <title>Submissions | MappingTrace V2</title>
     
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -113,21 +113,35 @@
 
             <!-- SUBMISSIONS CONTENT -->
             <div class="submissions-container">
-                <!-- Operational Workflow Dashboard -->
-                <div class="workflow-section">
-                    <div class="workflow-heading">
-                        <div>
-                            <h3><i class="fas fa-route"></i> Review Queue</h3>
-                            <p>Operational work queue. Overall KPIs remain on the main Dashboard.</p>
+                <!-- Stats Cards -->
+                <div class="stats-grid">
+                    <div class="stat-card total">
+                        <div class="stat-icon"><i class="fas fa-clipboard-list"></i></div>
+                        <div class="stat-info">
+                            <h4>Total Submissions</h4>
+                            <div class="stat-value" id="totalSubmissions">0</div>
                         </div>
                     </div>
-                    <div class="workflow-grid">
-                        <div class="workflow-card"><span>To Self-Check</span><strong id="selfCheckCount">0</strong><small>Enumerator / FO takeover</small></div>
-                        <div class="workflow-card"><span>Field Officer Review</span><strong id="fieldOfficerCount">0</strong><small>Waiting for FO review</small></div>
-                        <div class="workflow-card"><span>GIS / Compliance</span><strong id="gisCount">0</strong><small>Waiting for GIS check</small></div>
-                        <div class="workflow-card"><span>Final Validation</span><strong id="finalCount">0</strong><small>Ready for final decision</small></div>
-                        <div class="workflow-card"><span>Corrections</span><strong id="correctionCount">0</strong><small>Returned for correction</small></div>
-                        <div class="workflow-card"><span>Duplicate Alerts</span><strong id="duplicateCount">0</strong><small>Code / exact geometry</small></div>
+                    <div class="stat-card validated">
+                        <div class="stat-icon"><i class="fas fa-check-circle"></i></div>
+                        <div class="stat-info">
+                            <h4>Validated</h4>
+                            <div class="stat-value" id="validatedCount">0</div>
+                        </div>
+                    </div>
+                    <div class="stat-card pending">
+                        <div class="stat-icon"><i class="fas fa-clock"></i></div>
+                        <div class="stat-info">
+                            <h4>Pending</h4>
+                            <div class="stat-value" id="pendingCount">0</div>
+                        </div>
+                    </div>
+                    <div class="stat-card rejected">
+                        <div class="stat-icon"><i class="fas fa-times-circle"></i></div>
+                        <div class="stat-info">
+                            <h4>Rejected</h4>
+                            <div class="stat-value" id="rejectedCount">0</div>
+                        </div>
                     </div>
                 </div>
 
@@ -144,7 +158,7 @@
                         </select>
                     </div>
                     <div class="filter-group">
-                        <label>Workflow</label>
+                        <label>Workflow State</label>
                         <select id="statusFilter" class="filter-select">
                             <option value="all">All Workflow States</option>
                             <option value="enumerator_review">To Self-Check</option>
@@ -160,6 +174,7 @@
                         <button class="btn-primary" id="applyFiltersBtn"><i class="fas fa-search"></i> Apply</button>
                         <button class="btn-secondary" id="clearFiltersBtn"><i class="fas fa-times"></i> Clear</button>
                         <button class="btn-secondary" id="exportBtn"><i class="fas fa-download"></i> Export CSV</button>
+                        <button class="btn-secondary hidden" id="manageExportBtn"><i class="fas fa-user-shield"></i> Export Permissions</button>
                     </div>
                 </div>
 
@@ -202,6 +217,41 @@
                 </div>
             </div>
         </main>
+    </div>
+
+    <!-- Export Permission Management Modal -->
+    <div id="exportPermissionModal" class="permission-modal hidden" aria-hidden="true">
+        <div class="permission-modal-content">
+            <div class="permission-modal-header">
+                <div>
+                    <h3><i class="fas fa-file-export"></i> Export Permissions</h3>
+                    <p>Grant or revoke project-specific CSV export access.</p>
+                </div>
+                <button type="button" class="modal-close" id="closeExportPermissionBtn" title="Close">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="permission-modal-body">
+                <div id="exportPermissionMessage" class="permission-message hidden"></div>
+                <div class="permission-table-wrapper">
+                    <table class="permission-table">
+                        <thead>
+                            <tr>
+                                <th>Member</th>
+                                <th>Role</th>
+                                <th>Export</th>
+                            </tr>
+                        </thead>
+                        <tbody id="exportPermissionBody">
+                            <tr><td colspan="3" style="text-align:center;padding:30px;">Loading members...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="permission-modal-footer">
+                <button type="button" class="btn-secondary" id="cancelExportPermissionBtn">Close</button>
+            </div>
+        </div>
     </div>
 
     <div id="loadingOverlay" class="loading-spinner">
