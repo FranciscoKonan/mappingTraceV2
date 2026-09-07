@@ -15,6 +15,7 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     
     <link rel="icon" type="image/x-icon" href="assets/favicon.ico">
+    <link rel="stylesheet" href="language.css">
     
     <style>
         /* ============================================
@@ -1033,6 +1034,41 @@
         }
 
     </style>
+
+<style id="dashboard-language-style">
+.dashboard-language-switcher{
+    display:flex;
+    align-items:center;
+    gap:4px;
+    margin-right:10px;
+    background:#f8fafc;
+    border:1px solid #e2e8f0;
+    border-radius:8px;
+    padding:3px;
+}
+.dashboard-language-switcher button{
+    border:0;
+    background:transparent;
+    color:#475569;
+    font-size:12px;
+    font-weight:600;
+    padding:6px 9px;
+    border-radius:6px;
+    cursor:pointer;
+}
+.dashboard-language-switcher button.active{
+    background:#2c6e49;
+    color:#fff;
+}
+.dashboard-language-switcher button:hover:not(.active){
+    background:#e2e8f0;
+}
+@media(max-width:768px){
+    .dashboard-language-switcher{margin-right:4px}
+    .dashboard-language-switcher button{padding:5px 7px}
+}
+</style>
+
 </head>
 <body>
     <!-- Mobile Sidebar Overlay -->
@@ -1111,7 +1147,13 @@
                         </div>
                     </div>
                 </div>
-                <div class="user-info">
+                
+<div class="dashboard-language-switcher" id="dashboardLanguageSwitcher" aria-label="Language">
+    <button type="button" data-lang="en" onclick="setDashboardLanguage('en')">EN</button>
+    <button type="button" data-lang="fr" onclick="setDashboardLanguage('fr')">FR</button>
+</div>
+
+                    <div class="user-info">
                     <div class="project-selector-container" id="projectSelectorContainer">
                         <label><i class="fas fa-folder-open"></i> Project:</label>
                         <div class="custom-dropdown" id="customDropdown">
@@ -1134,6 +1176,7 @@
                     </div>
                     <button class="sync-btn" id="syncKoboBtn"><i class="fas fa-sync-alt"></i> Sync</button>
                 </div>
+</div>
             </header>
 
             <!-- SCROLLABLE CONTENT -->
@@ -2886,5 +2929,272 @@ function renderOptionalFarmPhoto(imageBlobUrl, container) {
 }
 
 </script>
+
+<script id="dashboard-bilingual-i18n">
+(function(){
+    const STORAGE_KEY = 'mappingtrace_language';
+
+    const T = {
+        en: {
+            'Dashboard':'Dashboard',
+            'Home / Dashboard':'Home / Dashboard',
+            'Project:':'Project:',
+            'Search projects...':'Search projects...',
+            'Dashboard':'Dashboard',
+            'Main':'Main',
+            'Live Mapping':'Live Mapping',
+            'Submissions':'Submissions',
+            'Quality Alerts':'Quality Alerts',
+            'Exports':'Exports',
+            'Data Management':'Data Management',
+            'Logout':'Logout',
+            'Farms Mapped':'Farms Mapped',
+            'Mapped Area (ha)':'Mapped Area (ha)',
+            'Draft Farms':'Draft Farms',
+            'Farms Submitted':'Farms Submitted',
+            'Submitted Area (ha)':'Submitted Area (ha)',
+            'Pending Corrections':'Pending Corrections',
+            'Pending Validation':'Pending Validation',
+            'Area Under Validation (ha)':'Area Under Validation (ha)',
+            'Approved Farms':'Approved Farms',
+            'Correction Required':'Correction Required',
+            'Approved Area (ha)':'Approved Area (ha)',
+            'Pending Farms':'Pending Farms',
+            'Total Farms':'Total Farms',
+            'Total Area (ha)':'Total Area (ha)',
+            'Pending Validation':'Pending Validation',
+            'Farms Visible':'Farms Visible',
+            'Visible Area (ha)':'Visible Area (ha)',
+            'Active Plots':'Active Plots',
+            'Quality Alerts':'Quality Alerts',
+            'Pending Review':'Pending Review',
+            'No farms pending review':'No farms pending review',
+            'Loading pending farms...':'Loading pending farms...',
+            'Farmer ID':'Farmer ID',
+            'Farmer':'Farmer',
+            'Cooperative':'Cooperative',
+            'Area (ha)':'Area (ha)',
+            'Submission':'Submission',
+            'Action':'Action',
+            'Review Farm':'Review Farm',
+            'View on Map':'View on Map',
+            'Farms per Cooperative':'Farms per Cooperative',
+            'Farms':'Farms',
+            'Unassigned':'Unassigned',
+            'All Suppliers':'All Suppliers',
+            'All Cooperatives':'All Cooperatives',
+            'All Status':'All Status',
+            'Validated':'Validated',
+            'Pending':'Pending',
+            'Rejected':'Rejected',
+            'No farms found':'No farms found',
+            'No Overlaps Detected':'No Overlaps Detected',
+            'No Quality Issues':'No Quality Issues',
+            'Overlap area:':'Overlap area:',
+            'Zero Area Detected':'Zero Area Detected',
+            'Duplicate Farmer ID':'Duplicate Farmer ID',
+            'Quality Alerts dismissed':'Quality alerts dismissed',
+            'Overlap alerts dismissed':'Overlap alerts dismissed',
+            'Syncing with Kobo...':'Syncing with Kobo...',
+            'Error loading data:':'Error loading data:',
+            'Error loading projects:':'Error loading projects:',
+            'Photo could not be displayed.':'Photo could not be displayed.',
+            'Photo is optional and does not block validation.':'Photo is optional and does not block validation.',
+            'No farm photo provided':'No farm photo provided',
+            'Farm Photo':'Farm Photo',
+            'Loading...':'Loading...',
+            'No Projects':'No Projects',
+            'ALL PROJECTS':'ALL PROJECTS',
+            'areas loaded':'areas loaded',
+            'Toggle sidebar':'Toggle sidebar',
+            'Farms':'Farms'
+        },
+        fr: {
+            'Dashboard':'Tableau de bord',
+            'Home / Dashboard':'Accueil / Tableau de bord',
+            'Project:':'Projet :',
+            'Search projects...':'Rechercher un projet...',
+            'Main':'Principal',
+            'Live Mapping':'Cartographie en direct',
+            'Submissions':'Soumissions',
+            'Quality Alerts':'Alertes qualité',
+            'Exports':'Exports',
+            'Data Management':'Gestion des données',
+            'Logout':'Déconnexion',
+            'Farms Mapped':'Parcelles cartographiées',
+            'Mapped Area (ha)':'Superficie cartographiée (ha)',
+            'Draft Farms':'Parcelles en brouillon',
+            'Farms Submitted':'Parcelles soumises',
+            'Submitted Area (ha)':'Superficie soumise (ha)',
+            'Pending Corrections':'Corrections en attente',
+            'Pending Validation':'Validation en attente',
+            'Area Under Validation (ha)':'Superficie en validation (ha)',
+            'Approved Farms':'Parcelles approuvées',
+            'Correction Required':'Correction requise',
+            'Approved Area (ha)':'Superficie approuvée (ha)',
+            'Pending Farms':'Parcelles en attente',
+            'Total Farms':'Total des parcelles',
+            'Total Area (ha)':'Superficie totale (ha)',
+            'Farms Visible':'Parcelles visibles',
+            'Visible Area (ha)':'Superficie visible (ha)',
+            'Active Plots':'Parcelles actives',
+            'Quality Alerts':'Alertes qualité',
+            'Pending Review':'En attente de revue',
+            'No farms pending review':'Aucune parcelle en attente de revue',
+            'Loading pending farms...':'Chargement des parcelles en attente...',
+            'Farmer ID':'ID producteur',
+            'Farmer':'Producteur',
+            'Cooperative':'Coopérative',
+            'Area (ha)':'Superficie (ha)',
+            'Submission':'Soumission',
+            'Action':'Action',
+            'Review Farm':'Revoir la parcelle',
+            'View on Map':'Voir sur la carte',
+            'Farms per Cooperative':'Parcelles par coopérative',
+            'Farms':'Parcelles',
+            'Unassigned':'Non attribué',
+            'All Suppliers':'Tous les fournisseurs',
+            'All Cooperatives':'Toutes les coopératives',
+            'All Status':'Tous les statuts',
+            'Validated':'Validée',
+            'Pending':'En attente',
+            'Rejected':'Rejetée',
+            'No farms found':'Aucune parcelle trouvée',
+            'No Overlaps Detected':'Aucun chevauchement détecté',
+            'No Quality Issues':'Aucun problème qualité',
+            'Overlap area:':'Superficie du chevauchement :',
+            'Zero Area Detected':'Superficie nulle détectée',
+            'Duplicate Farmer ID':'ID producteur en doublon',
+            'Quality Alerts dismissed':'Alertes qualité masquées',
+            'Overlap alerts dismissed':'Alertes de chevauchement masquées',
+            'Syncing with Kobo...':'Synchronisation avec Kobo...',
+            'Error loading data:':'Erreur lors du chargement des données :',
+            'Error loading projects:':'Erreur lors du chargement des projets :',
+            'Photo could not be displayed.':'La photo ne peut pas être affichée.',
+            'Photo is optional and does not block validation.':'La photo est facultative et ne bloque pas la validation.',
+            'No farm photo provided':'Aucune photo de parcelle fournie',
+            'Farm Photo':'Photo de la parcelle',
+            'Loading...':'Chargement...',
+            'No Projects':'Aucun projet',
+            'ALL PROJECTS':'TOUS LES PROJETS',
+            'areas loaded':'zones chargées',
+            'Toggle sidebar':'Afficher/masquer le menu'
+        }
+    };
+
+    function lang(){
+        return localStorage.getItem(STORAGE_KEY) === 'fr' ? 'fr' : 'en';
+    }
+
+    function translateText(value){
+        if (!value) return value;
+        const dict = T[lang()];
+        if (Object.prototype.hasOwnProperty.call(dict, value)) return dict[value];
+
+        // Dynamic dashboard strings.
+        if (lang()==='fr') {
+            let m;
+            m = value.match(/^Overlap area:\s*(.+)$/);
+            if (m) return 'Superficie du chevauchement : ' + m[1];
+            m = value.match(/^Farm "(.+)" has zero area$/);
+            if (m) return `La parcelle « ${m[1]} » a une superficie nulle`;
+            m = value.match(/^Farmer ID "(.+)" appears multiple times$/);
+            if (m) return `L’ID producteur « ${m[1]} » apparaît plusieurs fois`;
+            m = value.match(/^Zooming to (.+)$/);
+            if (m) return `Zoom sur ${m[1]}`;
+            m = value.match(/^([0-9]+) areas loaded$/);
+            if (m) return `${m[1]} zones chargées`;
+        }
+        return value;
+    }
+
+    function translateNode(node){
+        if (node.nodeType === Node.TEXT_NODE) {
+            const original = node.nodeValue;
+            const trimmed = original.trim();
+            if (!trimmed) return;
+            const translated = translateText(trimmed);
+            if (translated !== trimmed) {
+                node.nodeValue = original.replace(trimmed, translated);
+            }
+            return;
+        }
+        if (node.nodeType !== Node.ELEMENT_NODE) return;
+        if (node.id === 'dashboardLanguageSwitcher') return;
+        if (node.tagName === 'SCRIPT' || node.tagName === 'STYLE') return;
+
+        if (node.hasAttribute('placeholder')) {
+            node.setAttribute('placeholder', translateText(node.getAttribute('placeholder')));
+        }
+        if (node.hasAttribute('title')) {
+            node.setAttribute('title', translateText(node.getAttribute('title')));
+        }
+        node.childNodes.forEach(translateNode);
+    }
+
+    function translatePage(){
+        document.documentElement.lang = lang();
+        translateNode(document.body);
+
+        document.querySelectorAll('#dashboardLanguageSwitcher button').forEach(btn=>{
+            btn.classList.toggle('active', btn.dataset.lang === lang());
+        });
+
+        // Keep role badges readable.
+        document.querySelectorAll('.role-badge').forEach(el=>{
+            const r = el.textContent.trim().toLowerCase();
+            if (lang()==='fr') {
+                const roles = {
+                    owner:'PROPRIÉTAIRE',
+                    manager:'GESTIONNAIRE',
+                    validator:'VALIDATEUR',
+                    field_officer:'AGENT TERRAIN',
+                    enumerator:'ENQUÊTEUR',
+                    viewer:'LECTEUR',
+                    super_manager:'SUPER GESTIONNAIRE'
+                };
+                if (roles[r]) el.textContent = roles[r];
+            } else {
+                const roles = {
+                    'propriétaire':'OWNER',
+                    'gestionnaire':'MANAGER',
+                    'validateur':'VALIDATOR',
+                    'agent terrain':'FIELD OFFICER',
+                    'enquêteur':'ENUMERATOR',
+                    'lecteur':'VIEWER',
+                    'super gestionnaire':'SUPER MANAGER'
+                };
+                if (roles[r]) el.textContent = roles[r];
+            }
+        });
+    }
+
+    window.setDashboardLanguage = function(next){
+        if (next !== 'en' && next !== 'fr') return;
+        localStorage.setItem(STORAGE_KEY, next);
+        // Reloading is intentional: it guarantees all asynchronously rendered
+        // dashboard sections are translated from a clean DOM state.
+        window.location.reload();
+    };
+
+    // Initial translation + observe dynamically rendered dashboard content.
+    document.addEventListener('DOMContentLoaded', ()=>{
+        translatePage();
+        const observer = new MutationObserver(()=>{
+            clearTimeout(window.__mtLangTimer);
+            window.__mtLangTimer = setTimeout(translatePage, 30);
+        });
+        observer.observe(document.body, {childList:true, subtree:true, characterData:true});
+    });
+
+    // Also expose a small API for future dashboard refinements.
+    window.MappingTraceDashboardLanguage = {
+        get: lang,
+        translate: translateText,
+        refresh: translatePage
+    };
+})();
+</script>
+
 </body>
 </html>
