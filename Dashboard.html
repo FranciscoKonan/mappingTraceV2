@@ -2723,7 +2723,7 @@
             coopChart = new Chart(ctx, { 
                 type: 'bar', 
                 data: { labels: sorted.map(([c]) => c.length > 15 ? c.substring(0,12)+'...' : c), 
-                datasets: [{ label: 'Farms', data: sorted.map(([,count]) => count), backgroundColor: '#2c6e49', borderRadius: 8 }] }, 
+                datasets: [{ label: localStorage.getItem('mappingtrace_language') === 'fr' ? 'Parcelles' : 'Farms', data: sorted.map(([,count]) => count), backgroundColor: '#2c6e49', borderRadius: 8 }] }, 
                 options: { responsive: true, maintainAspectRatio: true, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } } 
             });
         }
@@ -2962,6 +2962,8 @@ function renderOptionalFarmPhoto(imageBlobUrl, container) {
     'View on Map':'Voir sur la carte',
     'Farms per Cooperative':'Parcelles par coopérative',
     'Farms':'Parcelles',
+    'Number of Farms':'Nombre de parcelles',
+    'Area Range':'Classe de superficie',
     'Unassigned':'Non attribué',
     'All Suppliers':'Tous les fournisseurs',
     'All Cooperatives':'Toutes les coopératives',
@@ -3020,6 +3022,8 @@ function renderOptionalFarmPhoto(imageBlobUrl, container) {
     if(m) return text.replace(trimmed,`Superficie du chevauchement : ${m[1]}`);
     m=trimmed.match(/^Zooming to (.+)$/);
     if(m) return text.replace(trimmed,`Zoom sur ${m[1]}`);
+    m=trimmed.match(/^(\d+) farms? loaded$/i);
+    if(m) return text.replace(trimmed,`${m[1]} parcelles chargées`);
     return text;
   }
 
@@ -3068,8 +3072,25 @@ function renderOptionalFarmPhoto(imageBlobUrl, container) {
   // passes catch asynchronous Supabase-rendered content without observing it.
   document.addEventListener('DOMContentLoaded',function(){
     apply();
-    setTimeout(apply,1500);
-    setTimeout(apply,3500);
+    setTimeout(apply,1200);
+    setTimeout(apply,2500);
+
+    // Dashboard content is populated asynchronously from Supabase.
+    // Translate newly-rendered text without touching scripts/styles or the language switcher.
+    const observer = new MutationObserver(function(mutations){
+      if(getLang() !== 'fr') return;
+      for(const mutation of mutations){
+        for(const node of mutation.addedNodes){
+          if(node.nodeType === Node.TEXT_NODE){
+            const translated=translateText(node.nodeValue);
+            if(translated!==node.nodeValue) node.nodeValue=translated;
+          } else if(node.nodeType === Node.ELEMENT_NODE && !node.closest('#dashboardLangSwitcher')) {
+            translateRoot(node);
+          }
+        }
+      }
+    });
+    observer.observe(document.body,{childList:true,subtree:true});
   });
 })();
 </script>
