@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Submissions | MappingTrace V2</title>
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <link rel="stylesheet" href="submissions.css">
+    <link rel="icon" type="image/x-icon" href="../assets/favicon.ico">
+</head>
+<body>
+    <!-- Mobile Sidebar Overlay -->
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+    <div class="layout">
+        <!-- SIDEBAR -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <h2>
+                    <i class="fas fa-map-marked-alt"></i>
+                    <span>MappingTrace</span>
+                </h2>
+                <button class="sidebar-toggle" id="sidebarToggle" title="Toggle sidebar">
+                    <i class="fas fa-chevron-left"></i>
+                </button>
+            </div>
+            <nav class="menu">
+                <div class="menu-label">Main</div>
+                <a href="../Dashboard.html" data-page="dashboard">
+                    <i class="fas fa-tachometer-alt"></i>
+                    <span>Dashboard</span>
+                </a>
+                <a href="../LiveMapping/live-mapping.html" data-page="live-mapping">
+                    <i class="fas fa-map"></i>
+                    <span>Live Mapping</span>
+                </a>
+                <a href="#" class="active" data-page="submissions">
+                    <i class="fas fa-clipboard-list"></i>
+                    <span>Submissions</span>
+                </a>
+                <a href="../QualityAlerts/quality-alerts.html" data-page="quality-alerts">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <span>Quality Alerts</span>
+                </a>
+                <a href="../Exports/exports.html" data-page="exports">
+                    <i class="fas fa-file-export"></i>
+                    <span>Exports</span>
+                </a>
+                
+                <hr class="menu-divider">
+                <div class="data-mgmt-link">
+                    <a href="../DataManagement.html" id="dataMgmtLink">
+                        <i class="fas fa-database"></i>
+                        <span>Data Management</span>
+                    </a>
+                </div>
+                
+                <div class="menu-bottom">
+                    <a href="#" id="logoutBtn">
+                        <i class="fas fa-sign-out-alt"></i>
+                        <span>Logout</span>
+                    </a>
+                </div>
+            </nav>
+        </aside>
+
+        <!-- MAIN CONTENT -->
+        <main class="main">
+            <!-- HEADER -->
+            <header class="main-header">
+                <div class="header-left">
+                    <button class="burger-btn" id="burgerBtn" aria-label="Toggle sidebar">
+                        <i class="fas fa-bars"></i>
+                    </button>
+                    <div class="header-title">
+                        <div>
+                            <h1>
+                                Submissions
+                                <span class="project-badge" id="projectBadge">Loading...</span>
+                            </h1>
+                            <div class="breadcrumb">Home / Submissions</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="user-info">
+                    <div class="project-selector-container hidden" id="projectSelectorContainer">
+                        <label><i class="fas fa-folder-open"></i> Project:</label>
+                        <div class="custom-dropdown" id="customDropdown">
+                            <div class="dropdown-selected" id="dropdownSelected">
+                                <span id="selectedProjectName">Loading...</span>
+                                <i class="fas fa-chevron-down"></i>
+                            </div>
+                            <div class="dropdown-menu" id="dropdownMenu">
+                                <div class="dropdown-search">
+                                    <input type="text" id="projectSearch" placeholder="Search projects...">
+                                </div>
+                                <div id="dropdownItems"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="user-avatar" id="userAvatar">JD</div>
+                    <div class="user-details">
+                        <div class="user-name" id="userName">User</div>
+                        <div class="user-role" id="userRole">Role</div>
+                    </div>
+                    <button class="sync-btn" id="syncKoboBtn"><i class="fas fa-sync-alt"></i> Sync</button>
+                </div>
+            </header>
+
+            <!-- SUBMISSIONS CONTENT -->
+            <div class="submissions-container">
+                <!-- Stats Cards -->
+                <div class="stats-grid">
+                    <div class="stat-card total">
+                        <div class="stat-icon"><i class="fas fa-clipboard-list"></i></div>
+                        <div class="stat-info">
+                            <h4>Total Submissions</h4>
+                            <div class="stat-value" id="totalSubmissions">0</div>
+                        </div>
+                    </div>
+                    <div class="stat-card validated">
+                        <div class="stat-icon"><i class="fas fa-check-circle"></i></div>
+                        <div class="stat-info">
+                            <h4>Validated</h4>
+                            <div class="stat-value" id="validatedCount">0</div>
+                        </div>
+                    </div>
+                    <div class="stat-card pending">
+                        <div class="stat-icon"><i class="fas fa-clock"></i></div>
+                        <div class="stat-info">
+                            <h4>Pending</h4>
+                            <div class="stat-value" id="pendingCount">0</div>
+                        </div>
+                    </div>
+                    <div class="stat-card rejected">
+                        <div class="stat-icon"><i class="fas fa-times-circle"></i></div>
+                        <div class="stat-info">
+                            <h4>Rejected</h4>
+                            <div class="stat-value" id="rejectedCount">0</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Filters -->
+                <div class="filters-bar">
+                    <div class="filter-group">
+                        <label>Search</label>
+                        <input type="text" id="searchInput" class="filter-input" placeholder="Farmer, ID, Cooperative...">
+                    </div>
+                    <div class="filter-group">
+                        <label>Supplier</label>
+                        <select id="supplierFilter" class="filter-select">
+                            <option value="all">All Suppliers</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>Workflow State</label>
+                        <select id="statusFilter" class="filter-select">
+                            <option value="all">All Workflow States</option>
+                            <option value="enumerator_review">To Self-Check</option>
+                            <option value="field_officer_review">Field Officer Review</option>
+                            <option value="gis_compliance_review">GIS / Compliance</option>
+                            <option value="final_validation">Final Validation</option>
+                            <option value="correction_required">Correction Required</option>
+                            <option value="validated">Validated</option>
+                            <option value="rejected">Rejected</option>
+                        </select>
+                    </div>
+                    <div class="filter-actions">
+                        <button class="btn-primary" id="applyFiltersBtn"><i class="fas fa-search"></i> Apply</button>
+                        <button class="btn-secondary" id="clearFiltersBtn"><i class="fas fa-times"></i> Clear</button>
+                        <button class="btn-secondary" id="exportBtn"><i class="fas fa-download"></i> Export CSV</button>
+                        <button class="btn-secondary hidden" id="manageExportBtn"><i class="fas fa-user-shield"></i> Export Permissions</button>
+                    </div>
+                </div>
+
+                <!-- Table -->
+                <div class="table-container">
+                    <div class="table-header">
+                        <h3><i class="fas fa-list"></i> Farm Submissions</h3>
+                        <button class="btn-icon" id="refreshTableBtn" title="Refresh"><i class="fas fa-redo-alt"></i></button>
+                    </div>
+                    <div class="table-wrapper">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th onclick="window.sortTable('farmer_name')">Farmer Name <i class="fas fa-sort"></i></th>
+                                    <th onclick="window.sortTable('farmer_id')">Farmer ID <i class="fas fa-sort"></i></th>
+                                    <th onclick="window.sortTable('cooperative')">Cooperative <i class="fas fa-sort"></i></th>
+                                    <th onclick="window.sortTable('supplier')">Supplier <i class="fas fa-sort"></i></th>
+                                    <th onclick="window.sortTable('area')">Area (ha) <i class="fas fa-sort"></i></th>
+                                    <th onclick="window.sortTable('created_at')">Date <i class="fas fa-sort"></i></th>
+                                    <th onclick="window.sortTable('workflow_state')">Workflow <i class="fas fa-sort"></i></th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tableBody">
+                                <tr><td colspan="8" style="text-align:center;padding:60px;">
+                                    <i class="fas fa-spinner fa-spin" style="font-size:48px;color:#2c6e49;"></i>
+                                    <p>Loading submissions...</p>
+                                </td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="table-footer">
+                        <div class="table-stats">Showing <span id="showingCount">0-0</span> of <span id="totalCount">0</span></div>
+                        <div class="pagination">
+                            <button class="pagination-btn" id="prevPageBtn" disabled><i class="fas fa-chevron-left"></i></button>
+                            <div class="page-numbers" id="pageNumbers"></div>
+                            <button class="pagination-btn" id="nextPageBtn" disabled><i class="fas fa-chevron-right"></i></button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Export Permission Management Modal -->
+    <div id="exportPermissionModal" class="permission-modal hidden" aria-hidden="true">
+        <div class="permission-modal-content">
+            <div class="permission-modal-header">
+                <div>
+                    <h3><i class="fas fa-file-export"></i> Export Permissions</h3>
+                    <p>Grant or revoke project-specific CSV export access.</p>
+                </div>
+                <button type="button" class="modal-close" id="closeExportPermissionBtn" title="Close">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="permission-modal-body">
+                <div id="exportPermissionMessage" class="permission-message hidden"></div>
+                <div class="permission-table-wrapper">
+                    <table class="permission-table">
+                        <thead>
+                            <tr>
+                                <th>Member</th>
+                                <th>Role</th>
+                                <th>Export</th>
+                            </tr>
+                        </thead>
+                        <tbody id="exportPermissionBody">
+                            <tr><td colspan="3" style="text-align:center;padding:30px;">Loading members...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="permission-modal-footer">
+                <button type="button" class="btn-secondary" id="cancelExportPermissionBtn">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="loadingOverlay" class="loading-spinner">
+        <i class="fas fa-spinner fa-spin"></i><span>Loading...</span>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <script src="submissions.js"></script>
+</body>
+</html>
