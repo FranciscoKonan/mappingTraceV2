@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Submissions | MappingTrace V2</title>
+    <title>Submissions | MappingTrace</title>
     
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -158,15 +158,11 @@
                         </select>
                     </div>
                     <div class="filter-group">
-                        <label>Workflow State</label>
+                        <label>Status</label>
                         <select id="statusFilter" class="filter-select">
-                            <option value="all">All Workflow States</option>
-                            <option value="enumerator_review">To Self-Check</option>
-                            <option value="field_officer_review">Field Officer Review</option>
-                            <option value="gis_compliance_review">GIS / Compliance</option>
-                            <option value="final_validation">Final Validation</option>
-                            <option value="correction_required">Correction Required</option>
+                            <option value="all">All Status</option>
                             <option value="validated">Validated</option>
+                            <option value="pending">Pending</option>
                             <option value="rejected">Rejected</option>
                         </select>
                     </div>
@@ -194,7 +190,7 @@
                                     <th onclick="window.sortTable('supplier')">Supplier <i class="fas fa-sort"></i></th>
                                     <th onclick="window.sortTable('area')">Area (ha) <i class="fas fa-sort"></i></th>
                                     <th onclick="window.sortTable('created_at')">Date <i class="fas fa-sort"></i></th>
-                                    <th onclick="window.sortTable('workflow_state')">Workflow <i class="fas fa-sort"></i></th>
+                                    <th onclick="window.sortTable('status')">Status <i class="fas fa-sort"></i></th>
                                     <th>Actions</th>
                                 </tr>
                             </thead>
