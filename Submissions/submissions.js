@@ -741,6 +741,23 @@ function escapeHtml(str) {
     return str.replace(/[&<>]/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[m] || m));
 }
 
+async function refreshData() {
+    try {
+        showLoading(true);
+        if (!currentProject || !currentProject.id) {
+            console.warn('No current project available for refresh.');
+            return;
+        }
+        await loadSubmissions(currentProject.id);
+        showNotification('Data refreshed successfully.', 'success');
+    } catch (error) {
+        console.error('Refresh data error:', error);
+        showNotification('Unable to refresh submissions.', 'error');
+    } finally {
+        showLoading(false);
+    }
+}
+
 function setupEventListeners() {
     document.getElementById('applyFiltersBtn')?.addEventListener('click', applyFilters);
     document.getElementById('clearFiltersBtn')?.addEventListener('click', clearFilters);
