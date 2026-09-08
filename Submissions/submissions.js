@@ -123,6 +123,39 @@ document.addEventListener('DOMContentLoaded', async function() {
     }
 });
 
+
+function updateExportControls() {
+    const exportBtn = document.getElementById('exportBtn');
+    if (!exportBtn) return;
+
+    const allowed = currentProjectCanExport === true;
+    exportBtn.disabled = !allowed;
+    exportBtn.title = allowed
+        ? 'Export submissions to CSV'
+        : 'You do not have export permission for this project';
+
+    if (!allowed) {
+        exportBtn.style.opacity = '0.55';
+        exportBtn.style.cursor = 'not-allowed';
+    } else {
+        exportBtn.style.opacity = '';
+        exportBtn.style.cursor = '';
+    }
+}
+
+function clearFilters() {
+    const searchInput = document.getElementById('searchInput');
+    const supplierFilter = document.getElementById('supplierFilter');
+    const statusFilter = document.getElementById('statusFilter');
+
+    if (searchInput) searchInput.value = '';
+    if (supplierFilter) supplierFilter.value = 'all';
+    if (statusFilter) statusFilter.value = 'all';
+
+    currentPage = 1;
+    applyFilters();
+}
+
 async function loadUserAndProjects() {
     
     const { data: { session } } = await supabaseClient.auth.getSession();
@@ -739,9 +772,7 @@ function setupEventListeners() {
 // Make functions global for inline onclick handlers
 window.applyFilters = applyFilters;
 window.exportToCSV = exportToCSV;
-window.viewOnMap = window.viewOnMap;
 window.clearFilters = clearFilters;
 window.refreshData = refreshData;
-window.goToPage = window.goToPage;
 
 console.log('✅ Submissions page ready');
