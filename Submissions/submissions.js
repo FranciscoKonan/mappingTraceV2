@@ -95,20 +95,43 @@ let currentProjectCanManageExport = false;
 // ===========================================
 document.addEventListener('DOMContentLoaded', async function() {
     console.log('📌 DOM Content Loaded');
-    supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-    await loadUserAndProjects();
-    setupDropdown();
-    setupEventListeners();
+
+    try {
+        supabaseClient = window.supabase.createClient(
+            SUPABASE_URL,
+            SUPABASE_ANON_KEY
+        );
+
+        showLoading(true);
+
+        await loadUserAndProjects();
+
+        setupDropdown();
+        setupEventListeners();
+
+    } catch (error) {
+        console.error('❌ Submissions initialization error:', error);
+
+        if (typeof showNotification === 'function') {
+            showNotification(
+                'Unable to fully initialize the submissions page.',
+                'error'
+            );
+        }
+    } finally {
+        showLoading(false);
+    }
 });
 
 async function loadUserAndProjects() {
-    showLoading(true);
     
     const { data: { session } } = await supabaseClient.auth.getSession();
+
     if (!session) { 
         window.location.href = '../login.html'; 
         return; 
     }
+
     currentUser = session.user;
     
     // Get user profile
@@ -120,8 +143,10 @@ async function loadUserAndProjects() {
     
     const firstName = profile?.first_name || '';
     const displayName = firstName || currentUser.email.split('@')[0];
+
     document.getElementById('userName').textContent = displayName;
-    document.getElementById('userAvatar').textContent = (firstName.charAt(0) || currentUser.email.charAt(0)).toUpperCase();
+    document.getElementById('userAvatar').textContent =
+        (firstName.charAt(0) || currentUser.email.charAt(0)).toUpperCase();
     
     // Get user's projects
     const { data: memberships } = await supabaseClient
@@ -131,15 +156,24 @@ async function loadUserAndProjects() {
         .eq('status', 'active');
     
     if (memberships && memberships.length > 0) {
+
         allUserProjects = memberships;
-        const roleText = memberships[0].role.replace('_', ' ').toUpperCase();
+
+        const roleText = memberships[0].role
+            .replace('_', ' ')
+            .toUpperCase();
+
         document.getElementById('userRole').textContent = roleText;
         
         // Add role badge
         const roleBadge = document.createElement('span');
         roleBadge.className = `role-badge ${memberships[0].role}`;
         roleBadge.textContent = memberships[0].role.toUpperCase();
-        document.querySelector('.user-info').insertBefore(roleBadge, document.querySelector('.sync-btn'));
+
+        document.querySelector('.user-info').insertBefore(
+            roleBadge,
+            document.querySelector('.sync-btn')
+        );
         
         // Get project from URL or localStorage
         const urlParams = new URLSearchParams(window.location.search);
@@ -148,36 +182,66 @@ async function loadUserAndProjects() {
         let targetProject = null;
         
         if (projectIdFromUrl && projectIdFromUrl !== 'all') {
-            targetProject = memberships.find(m => m.projects.id === projectIdFromUrl);
+            targetProject = memberships.find(
+                m => m.projects.id === projectIdFromUrl
+            );
         }
         
         if (!targetProject) {
-            const lastViewed = localStorage.getItem(`lastProject_${currentUser.id}`);
-            if (lastViewed) targetProject = memberships.find(m => m.projects.id === lastViewed);
-            if (!targetProject) targetProject = memberships[0];
+            const lastViewed =
+                localStorage.getItem(`lastProject_${currentUser.id}`);
+
+            if (lastViewed) {
+                targetProject = memberships.find(
+                    m => m.projects.id === lastViewed
+                );
+            }
+
+            if (!targetProject) {
+                targetProject = memberships[0];
+            }
         }
         
         // Show project selector for owners with multiple projects
         const isOwner = memberships.some(m => m.role === 'owner');
+
         if (isOwner && memberships.length > 1) {
-            document.getElementById('projectSelectorContainer').classList.remove('hidden');
+            document
+                .getElementById('projectSelectorContainer')
+                .classList.remove('hidden');
+
             await populateDropdown(memberships);
         }
         
         currentProject = targetProject.projects;
         currentProjectRole = targetProject.role;
-        currentProjectCanManageExport = ['owner','manager','super_manager'].includes(String(targetProject.role || '').toLowerCase());
-        currentProjectCanExport = currentProjectCanManageExport || targetProject.can_export === true;
-        document.getElementById('selectedProjectName').innerHTML = `📁 ${currentProject.name}`;
-        document.getElementById('projectBadge').textContent = currentProject.name;
+
+        currentProjectCanManageExport =
+            ['owner', 'manager', 'super_manager']
+                .includes(String(targetProject.role || '').toLowerCase());
+
+        currentProjectCanExport =
+            currentProjectCanManageExport ||
+            targetProject.can_export === true;
+
+        document.getElementById('selectedProjectName').innerHTML =
+            `📁 ${currentProject.name}`;
+
+        document.getElementById('projectBadge').textContent =
+            currentProject.name;
         
         // Update navigation links
         updateNavigationLinks();
         
         // Load submissions
         updateExportControls();
+
         await loadSubmissions(currentProject.id);
-        localStorage.setItem(`lastProject_${currentUser.id}`, currentProject.id);
+
+        localStorage.setItem(
+            `lastProject_${currentUser.id}`,
+            currentProject.id
+        );
         
         // Update URL
         const url = new URL(window.location);
@@ -185,12 +249,11 @@ async function loadUserAndProjects() {
         window.history.replaceState({}, '', url);
         
         // Update header title
-        document.querySelector('.header-title h1').innerHTML = `Submissions <span style="font-size:14px; background:#e2e8f0; padding:2px 10px; border-radius:20px;">${currentProject.name}</span>`;
+        document.querySelector('.header-title h1').innerHTML =
+            `Submissions <span style="font-size:14px; background:#e2e8f0; padding:2px 10px; border-radius:20px;">${currentProject.name}</span>`;
     }
-    
-    showLoading(false);
 }
-
+    
 function updateNavigationLinks() {
     const queryString = currentProject ? `?project=${currentProject.id}` : '';
     document.querySelector('a[data-page="dashboard"]').href = `../Dashboard.html${queryString}`;
