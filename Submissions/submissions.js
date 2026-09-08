@@ -442,23 +442,43 @@ function applyFilters() {
 }
 
 function updateStats() {
-    const c={selfCheck:0,fieldOfficer:0,gis:0,final:0,correction:0,duplicates:0};
-    filteredSubmissions.forEach(s=>{const st=s.workflow_state||'enumerator_review';
-        if(st==='submitted'||st==='enumerator_review')c.selfCheck++;
-        if(st==='field_officer_review')c.fieldOfficer++;
-        if(st==='gis_compliance_review')c.gis++;
-        if(st==='final_validation')c.final++;
-        if(st==='correction_required')c.correction++;
-        if(s.duplicate_alert)c.duplicates++;
+    const c = {
+        selfCheck: 0,
+        fieldOfficer: 0,
+        gis: 0,
+        final: 0,
+        correction: 0,
+        duplicates: 0
+    };
+
+    filteredSubmissions.forEach(s => {
+        const st = s.workflow_state || 'enumerator_review';
+
+        if (st === 'submitted' || st === 'enumerator_review') c.selfCheck++;
+        if (st === 'field_officer_review') c.fieldOfficer++;
+        if (st === 'gis_compliance_review') c.gis++;
+        if (st === 'final_validation') c.final++;
+        if (st === 'correction_required') c.correction++;
+        if (s.duplicate_alert) c.duplicates++;
     });
-    document.getElementById('selfCheckCount').textContent=c.selfCheck;
-    document.getElementById('fieldOfficerCount').textContent=c.fieldOfficer;
-    document.getElementById('gisCount').textContent=c.gis;
-    document.getElementById('finalCount').textContent=c.final;
-    document.getElementById('correctionCount').textContent=c.correction;
-    document.getElementById('duplicateCount').textContent=c.duplicates;
-    document.getElementById('totalSubmissions').textContent=allSubmissions.length;
-    document.getElementById('totalCount').textContent=filteredSubmissions.length;
+
+    const setText = (id, value) => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.textContent = value;
+        } else {
+            console.warn(`Submissions stats element not found: #${id}`);
+        }
+    };
+
+    setText('selfCheckCount', c.selfCheck);
+    setText('fieldOfficerCount', c.fieldOfficer);
+    setText('gisCount', c.gis);
+    setText('finalCount', c.final);
+    setText('correctionCount', c.correction);
+    setText('duplicateCount', c.duplicates);
+    setText('totalSubmissions', allSubmissions.length);
+    setText('totalCount', filteredSubmissions.length);
 }
 
 function workflowLabel(state){
@@ -558,6 +578,17 @@ window.sortTable = function(column) {
     applyFilters();
 };
 
+function sortTable(column) {
+    if (sortColumn === column) {
+        sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+    } else {
+        sortColumn = column;
+        sortDirection = 'asc';
+    }
+    applyFilters();
+}
+window.sortTable = sortTable;
+
 function convertCoords(coords) {
     if (!coords || !Array.isArray(coords)) return coords;
     if (coords.length === 2 && typeof coords[0] === 'number') return [coords[1], coords[0]];
@@ -645,111 +676,6 @@ function formatDate(dateString) {
     return date.toLocaleDateString();
 }
 
-function canExport() {
-    const roleText = document.getElementById('userRole')?.textContent?.toLowerCase() || '';
-    const allowedRoles = ['owner', 'manager', 'super_manager', 'validator'];
-    return allowedRoles.includes(roleText);
-}
-
-function exportToCSV() {
-    if (!canExport()) {
-        showNotification('Export permission denied. Only Owners, Managers, and Validators can export data.', 'error');
-        return;
-    }
-    
-    if (filteredSubmissions.length === 0) {
-        showNotification('No data to export', 'warning');
-        return;
-    }
-    
-    const headers = ['Farmer Name', 'Farmer ID', 'Cooperative', 'Supplier', 'Area (ha)', 'Workflow State', 'Status', 'Submission Date'];
-    const rows = filteredSubmissions.map(sub => [
-        sub.farmer_name,
-        sub.farmer_id,
-        sub.cooperative,
-        sub.supplier,
-        sub.area.toFixed(2),
-        sub.workflow_state,
-        sub.status,
-        sub.created_at ? new Date(sub.created_at).toLocaleDateString() : 'N/A'
-    ]);
-    
-    const csvContent = [headers, ...rows].map(row => 
-        row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')
-    ).join('\n');
-    
-    const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
-    const filename = `submissions_${currentProject?.name || 'export'}_${new Date().toISOString().split('T')[0]}.csv`;
-    
-    // Use FileSaver or fallback
-    if (typeof saveAs !== 'undefined') {
-        saveAs(blob, filename);
-    } else {
-        const link = document.createElement('a');
-        link.href = URL.createObjectURL(blob);
-        link.download = filename;
-        link.click();
-        URL.revokeObjectURL(link.href);
-    }
-    
-    showNotification(`Exported ${filteredSubmissions.length} records to CSV`, 'success');
-}
-
-function clearFilters() {
-    document.getElementById('searchInput').value = '';
-    document.getElementById('supplierFilter').value = 'all';
-    document.getElementById('statusFilter').value = 'all';
-    applyFilters();
-    showNotification('Filters cleared', 'info');
-}
-
-function refreshData() {
-    if (currentProject) {
-        loadSubmissions(currentProject.id);
-    }
-}
-
-function updateExportControls() {
-    const exportBtn = document.getElementById('exportBtn');
-    const manageBtn = document.getElementById('manageExportBtn');
-    if (exportBtn) {
-        exportBtn.classList.toggle('hidden', !currentProjectCanExport);
-        exportBtn.title = currentProjectCanExport ? 'Export CSV' : 'Export permission not granted';
-    }
-    if (manageBtn) manageBtn.classList.toggle('hidden', !currentProjectCanManageExport);
-}
-function canManageExportPermissions() {
-    return ['owner','manager','super_manager'].includes(currentRole());
-}
-window.openExportPermissions = async function(){
-    if (!canManageExportPermissions()) { showNotification('You are not authorized to manage export permissions.','error'); return; }
-    const modal=document.getElementById('exportPermissionModal'); if(!modal)return;
-    modal.classList.remove('hidden'); modal.setAttribute('aria-hidden','false'); await loadExportPermissions();
-};
-window.closeExportPermissions=function(){const modal=document.getElementById('exportPermissionModal');if(!modal)return;modal.classList.add('hidden');modal.setAttribute('aria-hidden','true');};
-async function loadExportPermissions(){
-    const body=document.getElementById('exportPermissionBody'); if(!body||!currentProject?.id)return;
-    body.innerHTML='<tr><td colspan="3" style="text-align:center;padding:30px;"><i class="fas fa-spinner fa-spin"></i> Loading members...</td></tr>';
-    try{
-        const {data,error}=await supabaseClient.from('project_members').select('user_id, role, status, can_export, user_profiles(first_name,email)').eq('project_id',currentProject.id).eq('status','active').order('role');
-        if(error)throw error;
-        if(!data?.length){body.innerHTML='<tr><td colspan="3" style="text-align:center;padding:30px;">No active members found.</td></tr>';return;}
-        body.innerHTML=data.map(m=>{
-            const p=m.user_profiles||{}, email=p.email||m.user_id, name=p.first_name||email.split('@')[0], role=String(m.role||'').replace(/_/g,' '), locked=['owner','manager','super_manager'].includes(String(m.role||'').toLowerCase()), checked=m.can_export===true||locked;
-            return `<tr><td><strong>${escapeHtml(name)}</strong><small>${escapeHtml(email)}</small></td><td>${escapeHtml(role)}</td><td><label class="permission-switch ${locked?'locked':''}" title="${locked?'Always enabled for management roles':'Toggle export access'}"><input type="checkbox" ${checked?'checked':''} ${locked?'disabled':''} onchange="window.setMemberExportPermission('${m.user_id}',this.checked)"><span class="permission-slider"></span></label></td></tr>`;
-        }).join('');
-    }catch(e){console.error(e);body.innerHTML=`<tr><td colspan="3" style="text-align:center;padding:30px;color:#b91c1c;">${escapeHtml(e.message||'Unable to load permissions.')}</td></tr>`;}
-}
-window.setMemberExportPermission=async function(userId,enabled){
-    if(!canManageExportPermissions()){showNotification('You are not authorized to change export permissions.','error');await loadExportPermissions();return;}
-    try{
-        const {error}=await supabaseClient.rpc('set_project_member_export_permission',{p_project_id:currentProject.id,p_user_id:userId,p_can_export:enabled});
-        if(error)throw error;
-        if(userId===currentUser?.id){currentProjectCanExport=enabled||currentProjectCanManageExport;updateExportControls();}
-        showNotification(enabled?'Export permission granted.':'Export permission revoked.','success');
-        await loadExportPermissions();
-    }catch(e){console.error(e);showNotification(e.message||'Unable to update export permission.','error');await loadExportPermissions();}
-};
 function canExport(){return currentProjectCanExport===true;}
 function exportToCSV(){
     if(!canExport()){showNotification('Export permission denied for this project.','error');return;}
@@ -813,11 +739,9 @@ function setupEventListeners() {
 // Make functions global for inline onclick handlers
 window.applyFilters = applyFilters;
 window.exportToCSV = exportToCSV;
-window.sortTable = sortTable;
-window.viewOnMap = viewOnMap;
-window.exportToCSV = exportToCSV;
+window.viewOnMap = window.viewOnMap;
 window.clearFilters = clearFilters;
 window.refreshData = refreshData;
-window.goToPage = goToPage;
+window.goToPage = window.goToPage;
 
 console.log('✅ Submissions page ready');
